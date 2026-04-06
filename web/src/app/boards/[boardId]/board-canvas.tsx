@@ -17,6 +17,7 @@ type BoardCanvasProps = {
   membersForNewCard: NewCardMemberOption[];
   fieldDefinitions: NewCardFieldDefinition[];
   columnPermissions: BoardColumnPermissions;
+  canMoveCards: boolean;
   cardContentPermissions: CardContentPermissions;
   board: {
     backgroundType: "color" | "image";
@@ -39,6 +40,7 @@ export function BoardCanvas({
   membersForNewCard,
   fieldDefinitions,
   columnPermissions,
+  canMoveCards,
   cardContentPermissions,
   board,
   columns,
@@ -75,6 +77,7 @@ export function BoardCanvas({
         membersForNewCard={membersForNewCard}
         fieldDefinitions={fieldDefinitions}
         columnPermissions={columnPermissions}
+        canMoveCards={canMoveCards}
         cardContentPermissions={cardContentPermissions}
         columns={columns}
         cardsByColumnId={cardsByColumnId}

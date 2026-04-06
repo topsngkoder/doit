@@ -486,6 +486,42 @@ export async function createCardAction(
   return { ok: true, cardId: id };
 }
 
+export type BoardCardsLayoutPayload = { column_id: string; card_ids: string[] }[];
+
+export async function reorderBoardCardsAction(
+  boardId: string,
+  layout: BoardCardsLayoutPayload
+): Promise<ColumnMutationResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  if (!Array.isArray(layout) || layout.length < 1) {
+    return { ok: false, message: "Некорректный порядок карточек." };
+  }
+
+  const { error } = await supabase.rpc("reorder_board_cards", {
+    p_board_id: boardId,
+    p_layout: layout
+  });
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права перемещать карточки на этой доске." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
 const MAX_CARD_DESCRIPTION_LENGTH = 50_000;
 
 export type CardMutationResult = { ok: true } | { ok: false; message: string };
