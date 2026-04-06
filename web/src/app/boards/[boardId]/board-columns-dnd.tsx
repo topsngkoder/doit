@@ -468,6 +468,87 @@ function columnsSignature(cols: ColumnRow[]): string {
     .join("|");
 }
 
+/** Без @dnd-kit — нужен для первого SSR-прохода (иначе aria-describedby DnD… расходится при гидратации). */
+function BoardGridStatic({
+  boardId,
+  currentUserId,
+  canCreateCard,
+  membersForNewCard,
+  fieldDefinitions,
+  columnPermissions,
+  cardContentPermissions,
+  columnRows,
+  cardOrderByColumn,
+  cardsById,
+  onOpenCard
+}: {
+  boardId: string;
+  currentUserId: string;
+  canCreateCard: boolean;
+  membersForNewCard: NewCardMemberOption[];
+  fieldDefinitions: NewCardFieldDefinition[];
+  columnPermissions: BoardColumnPermissions;
+  cardContentPermissions: CardContentPermissions;
+  columnRows: ColumnRow[];
+  cardOrderByColumn: Record<string, string[]>;
+  cardsById: Map<string, BoardCardListItem>;
+  onOpenCard: (card: BoardCardListItem) => void;
+}) {
+  const columnCount = columnRows.length;
+  return (
+    <div className="flex gap-4 overflow-x-auto pb-2">
+      {columnRows.map((col, index) => (
+        <div
+          key={col.id}
+          className="flex w-64 shrink-0 flex-col gap-3 rounded-lg bg-slate-950/70 p-3 ring-1 ring-slate-800"
+        >
+          <BoardColumnHeader
+            boardId={boardId}
+            columnId={col.id}
+            name={col.name}
+            columnType={col.columnType}
+            cardCount={(cardOrderByColumn[col.id] ?? []).length}
+            columnIndex={index}
+            columnCount={columnCount}
+            canRename={columnPermissions.canRename}
+            canReorder={false}
+            canDelete={columnPermissions.canDelete}
+            columnDrag={null}
+          />
+          <div className="flex flex-col gap-2" role="list">
+            {(cardOrderByColumn[col.id] ?? [])
+              .map((id) => cardsById.get(id))
+              .filter(Boolean)
+              .map((card) => (
+                <div key={card!.id} role="listitem">
+                  <BoardCardRow
+                    card={card!}
+                    currentUserId={currentUserId}
+                    cardContentPermissions={cardContentPermissions}
+                    onOpen={onOpenCard}
+                  />
+                </div>
+              ))}
+            {(cardOrderByColumn[col.id] ?? []).length === 0 ?
+              <div className="rounded-md border border-dashed border-slate-800/80 px-3 py-6 text-center text-xs text-slate-500">
+                Пока нет карточек
+              </div>
+            : null}
+          </div>
+          <CreateCardButton
+            boardId={boardId}
+            columnId={col.id}
+            canCreate={canCreateCard}
+            members={membersForNewCard}
+            fieldDefinitions={fieldDefinitions}
+            currentUserId={currentUserId}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function BoardColumnsDnD({
   boardId,
   currentUserId,
@@ -487,6 +568,11 @@ export function BoardColumnsDnD({
   );
   const [persistError, setPersistError] = React.useState<string | null>(null);
   const [editingCard, setEditingCard] = React.useState<BoardCardListItem | null>(null);
+  const [dndMounted, setDndMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setDndMounted(true);
+  }, []);
 
   const colSig = columnsSignature(columns);
   React.useEffect(() => {
@@ -648,56 +734,40 @@ export function BoardColumnsDnD({
     return (
       <>
         {editModal}
-        <div className="flex gap-4 overflow-x-auto pb-2">
-          {columns.map((col, index) => (
-            <div
-              key={col.id}
-              className="flex w-64 shrink-0 flex-col gap-3 rounded-lg bg-slate-950/70 p-3 ring-1 ring-slate-800"
-            >
-              <BoardColumnHeader
-                boardId={boardId}
-                columnId={col.id}
-                name={col.name}
-                columnType={col.columnType}
-                cardCount={(cardOrderByColumn[col.id] ?? []).length}
-                columnIndex={index}
-                columnCount={columns.length}
-                canRename={columnPermissions.canRename}
-                canReorder={false}
-                canDelete={columnPermissions.canDelete}
-                columnDrag={null}
-              />
-              <div className="flex flex-col gap-2" role="list">
-                {(cardOrderByColumn[col.id] ?? [])
-                  .map((id) => cardsById.get(id))
-                  .filter(Boolean)
-                  .map((card) => (
-                    <div key={card!.id} role="listitem">
-                      <BoardCardRow
-                        card={card!}
-                        currentUserId={currentUserId}
-                        cardContentPermissions={cardContentPermissions}
-                        onOpen={setEditingCard}
-                      />
-                    </div>
-                  ))}
-                {(cardOrderByColumn[col.id] ?? []).length === 0 ?
-                  <div className="rounded-md border border-dashed border-slate-800/80 px-3 py-6 text-center text-xs text-slate-500">
-                    Пока нет карточек
-                  </div>
-                : null}
-              </div>
-              <CreateCardButton
-                boardId={boardId}
-                columnId={col.id}
-                canCreate={canCreateCard}
-                members={membersForNewCard}
-                fieldDefinitions={fieldDefinitions}
-                currentUserId={currentUserId}
-              />
-            </div>
-          ))}
-        </div>
+        <BoardGridStatic
+          boardId={boardId}
+          currentUserId={currentUserId}
+          canCreateCard={canCreateCard}
+          membersForNewCard={membersForNewCard}
+          fieldDefinitions={fieldDefinitions}
+          columnPermissions={columnPermissions}
+          cardContentPermissions={cardContentPermissions}
+          columnRows={columns}
+          cardOrderByColumn={cardOrderByColumn}
+          cardsById={cardsById}
+          onOpenCard={setEditingCard}
+        />
+      </>
+    );
+  }
+
+  if (!dndMounted) {
+    return (
+      <>
+        {editModal}
+        <BoardGridStatic
+          boardId={boardId}
+          currentUserId={currentUserId}
+          canCreateCard={canCreateCard}
+          membersForNewCard={membersForNewCard}
+          fieldDefinitions={fieldDefinitions}
+          columnPermissions={columnPermissions}
+          cardContentPermissions={cardContentPermissions}
+          columnRows={columnItems}
+          cardOrderByColumn={cardOrderByColumn}
+          cardsById={cardsById}
+          onOpenCard={setEditingCard}
+        />
       </>
     );
   }

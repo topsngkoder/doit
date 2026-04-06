@@ -189,7 +189,7 @@ $$;
 REVOKE ALL ON FUNCTION public.reorder_board_cards(uuid, jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.reorder_board_cards(uuid, jsonb) TO authenticated;
 
--- Realtime: изменения в cards видны подписчикам доски (F6 DoD)
+-- Realtime: не должен откатывать CREATE FUNCTION при отказе публикации (права/окружение).
 DO $pub$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime')
@@ -203,5 +203,8 @@ BEGIN
   THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.cards;
   END IF;
+EXCEPTION
+  WHEN OTHERS THEN
+    RAISE WARNING 'reorder_board_cards: Realtime publication skip: %', SQLERRM;
 END;
 $pub$;
