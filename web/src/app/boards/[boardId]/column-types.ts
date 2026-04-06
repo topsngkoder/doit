@@ -41,6 +41,26 @@ export function canEditCardContent(
   );
 }
 
+/** Участник карточки (assignee) может менять название/описание и кастомные поля, но не состав участников без прав редактора. */
+export function canEditCardBodyAsAssignee(
+  card: Pick<BoardCardListItem, "assigneeUserIds">,
+  currentUserId: string
+): boolean {
+  return card.assigneeUserIds.includes(currentUserId);
+}
+
+export function canOpenCardModal(
+  perms: CardContentPermissions,
+  card: BoardCardListItem,
+  currentUserId: string
+): boolean {
+  return (
+    canEditCardContent(perms, card.createdByUserId, currentUserId) ||
+    canDeleteCard(perms, card.createdByUserId, currentUserId) ||
+    canEditCardBodyAsAssignee(card, currentUserId)
+  );
+}
+
 export function canDeleteCard(
   perms: CardContentPermissions,
   createdByUserId: string,

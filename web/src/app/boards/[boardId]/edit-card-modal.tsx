@@ -60,6 +60,8 @@ type EditCardModalProps = {
   boardId: string;
   card: BoardCardListItem | null;
   canEditContent: boolean;
+  /** Добавление/исключение участников и ответственный — только редактор карточки (не только assignee). */
+  canManageAssignees: boolean;
   canDelete: boolean;
   canCreateComment: boolean;
   boardMembers: NewCardMemberOption[];
@@ -71,6 +73,7 @@ export function EditCardModal({
   boardId,
   card,
   canEditContent,
+  canManageAssignees,
   canDelete,
   canCreateComment,
   boardMembers,
@@ -157,7 +160,7 @@ export function EditCardModal({
   const readOnly = !canEditContent;
 
   const toggleAssignee = async (userId: string) => {
-    if (!card || readOnly || assigneePending) return;
+    if (!card || !canManageAssignees || assigneePending) return;
     const isMember = selectedAssigneeIds.has(userId);
     const add = !isMember;
     if (!add && selectedAssigneeIds.size <= 1) {
@@ -182,7 +185,7 @@ export function EditCardModal({
   };
 
   const handleSetResponsible = async (userId: string) => {
-    if (!card || readOnly || assigneePending || userId === card.responsibleUserId) return;
+    if (!card || !canManageAssignees || assigneePending || userId === card.responsibleUserId) return;
     setError(null);
     setAssigneePending(true);
     const res = await setCardResponsibleAction(boardId, card.id, userId);
@@ -249,7 +252,7 @@ export function EditCardModal({
                 {assigneesOnCard.map((m) => {
                   const isResponsible = card.responsibleUserId === m.userId;
                   const panelOpen = openAssigneePanelUserId === m.userId;
-                  const showActions = !readOnly;
+                  const showActions = canManageAssignees;
 
                   return (
                     <div
@@ -331,7 +334,7 @@ export function EditCardModal({
                   );
                 })}
               </div>
-              {!readOnly && membersToAdd.length > 0 ?
+              {canManageAssignees && membersToAdd.length > 0 ?
                 <div className="mt-4 border-t border-slate-800/80 pt-3">
                   <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
                     Добавить участника с доски

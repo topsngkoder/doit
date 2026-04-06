@@ -37,7 +37,9 @@ import {
   type BoardColumnPermissions,
   type CardContentPermissions,
   canDeleteCard,
-  canEditCardContent
+  canEditCardBodyAsAssignee,
+  canEditCardContent,
+  canOpenCardModal
 } from "./column-types";
 
 const COLUMN_DND_PREFIX = "column:";
@@ -173,9 +175,7 @@ function BoardCardRow({
     "attributes" | "listeners"
   >;
 }) {
-  const canOpen =
-    canEditCardContent(cardContentPermissions, card.createdByUserId, currentUserId) ||
-    canDeleteCard(cardContentPermissions, card.createdByUserId, currentUserId);
+  const canOpen = canOpenCardModal(cardContentPermissions, card, currentUserId);
 
   return (
     <div
@@ -714,6 +714,15 @@ export function BoardColumnsDnD({
       boardId={boardId}
       card={editingCard}
       canEditContent={
+        editingCard ?
+          canEditCardContent(
+            cardContentPermissions,
+            editingCard.createdByUserId,
+            currentUserId
+          ) || canEditCardBodyAsAssignee(editingCard, currentUserId)
+        : false
+      }
+      canManageAssignees={
         editingCard ?
           canEditCardContent(
             cardContentPermissions,
