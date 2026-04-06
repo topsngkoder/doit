@@ -486,6 +486,96 @@ export async function createCardAction(
   return { ok: true, cardId: id };
 }
 
+export async function mutateCardAssigneeAction(
+  boardId: string,
+  cardId: string,
+  assigneeUserId: string,
+  add: boolean
+): Promise<CardMutationResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: row, error: fetchError } = await supabase
+    .from("cards")
+    .select("board_id")
+    .eq("id", cardId)
+    .maybeSingle();
+
+  if (fetchError) {
+    return { ok: false, message: fetchError.message };
+  }
+  if (!row || row.board_id !== boardId) {
+    return { ok: false, message: "Карточка не найдена на этой доске." };
+  }
+
+  const { error } = await supabase.rpc("mutate_card_assignee", {
+    p_card_id: cardId,
+    p_assignee_user_id: assigneeUserId,
+    p_add: add
+  });
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права менять участников этой карточки." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function setCardResponsibleAction(
+  boardId: string,
+  cardId: string,
+  responsibleUserId: string
+): Promise<CardMutationResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: row, error: fetchError } = await supabase
+    .from("cards")
+    .select("board_id")
+    .eq("id", cardId)
+    .maybeSingle();
+
+  if (fetchError) {
+    return { ok: false, message: fetchError.message };
+  }
+  if (!row || row.board_id !== boardId) {
+    return { ok: false, message: "Карточка не найдена на этой доске." };
+  }
+
+  const { error } = await supabase.rpc("set_card_responsible_user", {
+    p_card_id: cardId,
+    p_responsible_user_id: responsibleUserId
+  });
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права назначать ответственного на этой карточке." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
 export type BoardCardsLayoutPayload = { column_id: string; card_ids: string[] }[];
 
 export async function reorderBoardCardsAction(

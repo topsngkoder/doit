@@ -24,6 +24,10 @@ export type BoardCardListItem = {
   description: string;
   position: number;
   createdByUserId: string;
+  /** Текущий ответственный (если есть). */
+  responsibleUserId: string | null;
+  /** Участники карточки (user_id), минимум один по правилам продукта. */
+  assigneeUserIds: string[];
 };
 
 export function canEditCardContent(

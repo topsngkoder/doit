@@ -135,7 +135,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
 
   const { data: cardRows, error: cardsError } = await supabase
     .from("cards")
-    .select("id, column_id, title, description, position, created_by_user_id")
+    .select("id, column_id, title, description, position, created_by_user_id, responsible_user_id")
     .eq("board_id", boardId)
     .order("position", { ascending: true });
 
@@ -191,6 +191,20 @@ export default async function BoardPage({ params }: BoardPageProps) {
       position: c.position
     })) ?? [];
 
+  const cardIds = (cardRows ?? []).map((r) => r.id);
+  const assigneesByCard = new Map<string, string[]>();
+  if (cardIds.length > 0) {
+    const { data: assigneeRows } = await supabase
+      .from("card_assignees")
+      .select("card_id, user_id")
+      .in("card_id", cardIds);
+    for (const a of assigneeRows ?? []) {
+      const cur = assigneesByCard.get(a.card_id) ?? [];
+      cur.push(a.user_id);
+      assigneesByCard.set(a.card_id, cur);
+    }
+  }
+
   const cardsByColumnId = new Map<
     string,
     Array<{
@@ -199,6 +213,8 @@ export default async function BoardPage({ params }: BoardPageProps) {
       description: string;
       position: number;
       createdByUserId: string;
+      responsibleUserId: string | null;
+      assigneeUserIds: string[];
     }>
   >();
 
@@ -214,7 +230,9 @@ export default async function BoardPage({ params }: BoardPageProps) {
         title: row.title,
         description: row.description ?? "",
         position: row.position,
-        createdByUserId: row.created_by_user_id
+        createdByUserId: row.created_by_user_id,
+        responsibleUserId: row.responsible_user_id ?? null,
+        assigneeUserIds: assigneesByCard.get(row.id) ?? []
       });
     }
   }

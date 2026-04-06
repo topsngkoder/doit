@@ -569,7 +569,7 @@ export function BoardColumnsDnD({
     () => buildCardOrderRecord(cardsByColumnId)
   );
   const [persistError, setPersistError] = React.useState<string | null>(null);
-  const [editingCard, setEditingCard] = React.useState<BoardCardListItem | null>(null);
+  const [editingCardId, setEditingCardId] = React.useState<string | null>(null);
   const [dndMounted, setDndMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -595,6 +595,9 @@ export function BoardColumnsDnD({
     }
     return m;
   }, [cardsByColumnId]);
+
+  const editingCard =
+    editingCardId != null ? (cardsById.get(editingCardId) ?? null) : null;
 
   React.useEffect(() => {
     let cancelled = false;
@@ -730,7 +733,7 @@ export function BoardColumnsDnD({
       }
       canCreateComment={canCreateComment}
       boardMembers={membersForNewCard}
-      onClose={() => setEditingCard(null)}
+      onClose={() => setEditingCardId(null)}
     />
   );
 
@@ -749,7 +752,7 @@ export function BoardColumnsDnD({
           columnRows={columns}
           cardOrderByColumn={cardOrderByColumn}
           cardsById={cardsById}
-          onOpenCard={setEditingCard}
+          onOpenCard={(c) => setEditingCardId(c.id)}
         />
       </>
     );
@@ -770,7 +773,7 @@ export function BoardColumnsDnD({
           columnRows={columnItems}
           cardOrderByColumn={cardOrderByColumn}
           cardsById={cardsById}
-          onOpenCard={setEditingCard}
+          onOpenCard={(c) => setEditingCardId(c.id)}
         />
       </>
     );
@@ -800,7 +803,7 @@ export function BoardColumnsDnD({
               cardIds={cardOrderByColumn[col.id] ?? []}
               cardsById={cardsById}
               columnSortableEnabled
-              onOpenCard={setEditingCard}
+              onOpenCard={(c) => setEditingCardId(c.id)}
             />
           ))}
         </div>
@@ -822,7 +825,7 @@ export function BoardColumnsDnD({
             cardContentPermissions={cardContentPermissions}
             cardIds={cardOrderByColumn[col.id] ?? []}
             cardsById={cardsById}
-            onOpenCard={setEditingCard}
+            onOpenCard={(c) => setEditingCardId(c.id)}
           />
         ))}
       </div>;

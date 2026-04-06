@@ -4,8 +4,12 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
+import { Popover } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import {
   deleteCardAction,
+  mutateCardAssigneeAction,
+  setCardResponsibleAction,
   updateCardAction,
   type CardMutationResult
 } from "./actions";
@@ -15,6 +19,41 @@ import type { BoardCardListItem } from "./column-types";
 
 const inputClass =
   "w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600";
+
+function memberInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function AssigneeAvatar({
+  label,
+  src,
+  className
+}: {
+  label: string;
+  src: string | null;
+  className?: string;
+}) {
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt="" className={cn("rounded-full object-cover", className)} />
+    );
+  }
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-center rounded-full bg-slate-700 font-medium text-slate-200",
+        className
+      )}
+      aria-hidden
+    >
+      {memberInitials(label)}
+    </div>
+  );
+}
 
 type EditCardModalProps = {
   open: boolean;
@@ -43,6 +82,15 @@ export function EditCardModal({
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
+  const [selectedAssigneeIds, setSelectedAssigneeIds] = React.useState<Set<string>>(
+    () => new Set()
+  );
+  const [assigneePending, setAssigneePending] = React.useState(false);
+  const [openAssigneePanelUserId, setOpenAssigneePanelUserId] = React.useState<string | null>(
+    null
+  );
+
+  const assigneeSyncKey = card ? [...card.assigneeUserIds].sort().join("\0") : "";
 
   React.useEffect(() => {
     if (!open || !card) return;
@@ -51,7 +99,28 @@ export function EditCardModal({
     setError(null);
     setPending(false);
     setConfirmDelete(false);
-  }, [open, card]);
+  }, [open, card?.id, card?.title, card?.description]);
+
+  React.useEffect(() => {
+    if (!open || !card) return;
+    setSelectedAssigneeIds(new Set(card.assigneeUserIds));
+  }, [open, card?.id, assigneeSyncKey]);
+
+  React.useEffect(() => {
+    if (!openAssigneePanelUserId) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const el = e.target as HTMLElement;
+      const hit = el.closest("[data-assignee-panel]");
+      if (hit?.getAttribute("data-assignee-panel") === openAssigneePanelUserId) return;
+      setOpenAssigneePanelUserId(null);
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [openAssigneePanelUserId]);
+
+  React.useEffect(() => {
+    if (!open) setOpenAssigneePanelUserId(null);
+  }, [open]);
 
   if (!card) return null;
 
@@ -86,6 +155,48 @@ export function EditCardModal({
   };
 
   const readOnly = !canEditContent;
+
+  const toggleAssignee = async (userId: string) => {
+    if (!card || readOnly || assigneePending) return;
+    const isMember = selectedAssigneeIds.has(userId);
+    const add = !isMember;
+    if (!add && selectedAssigneeIds.size <= 1) {
+      setError("На карточке должен остаться хотя бы один участник.");
+      return;
+    }
+    setError(null);
+    setAssigneePending(true);
+    const res = await mutateCardAssigneeAction(boardId, card.id, userId, add);
+    setAssigneePending(false);
+    if (!res.ok) {
+      setError(res.message);
+      return;
+    }
+    setSelectedAssigneeIds((prev) => {
+      const next = new Set(prev);
+      if (add) next.add(userId);
+      else next.delete(userId);
+      return next;
+    });
+    router.refresh();
+  };
+
+  const handleSetResponsible = async (userId: string) => {
+    if (!card || readOnly || assigneePending || userId === card.responsibleUserId) return;
+    setError(null);
+    setAssigneePending(true);
+    const res = await setCardResponsibleAction(boardId, card.id, userId);
+    setAssigneePending(false);
+    if (!res.ok) {
+      setError(res.message);
+      return;
+    }
+    setOpenAssigneePanelUserId(null);
+    router.refresh();
+  };
+
+  const assigneesOnCard = boardMembers.filter((m) => selectedAssigneeIds.has(m.userId));
+  const membersToAdd = boardMembers.filter((m) => !selectedAssigneeIds.has(m.userId));
 
   return (
     <Modal
@@ -130,6 +241,125 @@ export function EditCardModal({
                 disabled={readOnly || pending}
                 rows={5}
               />
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-medium text-slate-400">Участники карточки</p>
+              <div className="flex flex-wrap gap-2">
+                {assigneesOnCard.map((m) => {
+                  const isResponsible = card.responsibleUserId === m.userId;
+                  const panelOpen = openAssigneePanelUserId === m.userId;
+                  const showActions = !readOnly;
+
+                  return (
+                    <div
+                      key={m.userId}
+                      className="relative"
+                      data-assignee-panel={m.userId}
+                    >
+                      <button
+                        type="button"
+                        disabled={pending}
+                        aria-expanded={panelOpen}
+                        aria-haspopup="dialog"
+                        onClick={() =>
+                          setOpenAssigneePanelUserId((cur) => (cur === m.userId ? null : m.userId))
+                        }
+                        className={cn(
+                          "flex max-w-[200px] items-center gap-2 rounded-full border py-1 pl-1 pr-2 text-left text-sm transition-colors",
+                          isResponsible ?
+                            "border-sky-700/80 bg-sky-950/50 text-sky-100"
+                          : "border-slate-700 bg-slate-900/80 text-slate-100 hover:border-slate-600"
+                        )}
+                      >
+                        <AssigneeAvatar
+                          label={m.displayName}
+                          src={m.avatarUrl ?? null}
+                          className="h-7 w-7 shrink-0 text-xs"
+                        />
+                        <span className="min-w-0 flex-1 truncate">{m.displayName}</span>
+                        {isResponsible ?
+                          <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-sky-300">
+                            Отв.
+                          </span>
+                        : null}
+                      </button>
+                      {panelOpen ?
+                        <div className="absolute left-0 top-[calc(100%+6px)] z-[60] w-max min-w-[240px] max-w-[min(100vw-3rem,280px)]">
+                          <Popover className="space-y-3 p-3 text-xs">
+                            <div className="flex gap-3">
+                              <AssigneeAvatar
+                                label={m.displayName}
+                                src={m.avatarUrl ?? null}
+                                className="h-12 w-12 shrink-0 text-sm"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium text-slate-100">{m.displayName}</p>
+                                <p className="break-all text-slate-400">{m.email}</p>
+                              </div>
+                            </div>
+                            {showActions ?
+                              <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-2">
+                                {!isResponsible ?
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    className="w-full justify-center"
+                                    disabled={assigneePending}
+                                    onClick={() => void handleSetResponsible(m.userId)}
+                                  >
+                                    Сделать ответственным
+                                  </Button>
+                                : null}
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  size="sm"
+                                  className="w-full justify-center text-rose-200 hover:bg-rose-950/50"
+                                  disabled={assigneePending || selectedAssigneeIds.size <= 1}
+                                  onClick={() => void toggleAssignee(m.userId)}
+                                >
+                                  Исключить из карточки
+                                </Button>
+                              </div>
+                            : null}
+                          </Popover>
+                        </div>
+                      : null}
+                    </div>
+                  );
+                })}
+              </div>
+              {!readOnly && membersToAdd.length > 0 ?
+                <div className="mt-4 border-t border-slate-800/80 pt-3">
+                  <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                    Добавить участника с доски
+                  </p>
+                  <ul className="space-y-2">
+                    {membersToAdd.map((m) => (
+                      <li key={m.userId}>
+                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            className="rounded border-slate-600"
+                            checked={false}
+                            disabled={assigneePending || pending}
+                            onChange={() => void toggleAssignee(m.userId)}
+                          />
+                          <AssigneeAvatar
+                            label={m.displayName}
+                            src={m.avatarUrl ?? null}
+                            className="h-6 w-6 shrink-0 text-[10px]"
+                          />
+                          <span className="text-slate-100">{m.displayName}</span>
+                          <span className="truncate text-xs text-slate-500">{m.email}</span>
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              : null}
             </div>
 
             {error ?
