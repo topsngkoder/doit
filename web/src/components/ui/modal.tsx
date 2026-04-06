@@ -14,12 +14,19 @@ export function Modal({ open, title, onClose, children, className }: ModalProps)
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4">
+    <div
+      role="presentation"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 py-8"
+      onClick={() => onClose?.()}
+    >
       <div
+        role="dialog"
+        aria-modal="true"
         className={cn(
-          "w-full max-w-lg rounded-lg border border-slate-800 bg-slate-950/95 p-5 shadow-xl",
+          "max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/95 p-5 shadow-xl",
           className
         )}
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-start justify-between gap-3">
           {title ? (

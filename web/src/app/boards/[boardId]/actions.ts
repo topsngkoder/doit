@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  COLUMN_TYPES,
+  type ColumnType
+} from "./column-types";
 
 export type InviteBoardMemberResult =
   | { ok: true }
@@ -131,4 +135,353 @@ export async function updateBoardMemberRoleAction(
 
   revalidatePath(`/boards/${boardId}`);
   return { ok: true };
+}
+
+export type ColumnMutationResult = { ok: true } | { ok: false; message: string };
+
+function isColumnType(v: string): v is ColumnType {
+  return (COLUMN_TYPES as readonly string[]).includes(v);
+}
+
+export async function createBoardColumnAction(
+  boardId: string,
+  _prev: ColumnMutationResult | undefined,
+  formData: FormData
+): Promise<ColumnMutationResult> {
+  const nameRaw = formData.get("name");
+  const typeRaw = formData.get("column_type");
+  const name = typeof nameRaw === "string" ? nameRaw.trim() : "";
+  const columnType = typeof typeRaw === "string" ? typeRaw.trim() : "";
+
+  if (!name) {
+    return { ok: false, message: "Укажите название колонки." };
+  }
+  if (name.length > 50) {
+    return { ok: false, message: "Название не длиннее 50 символов." };
+  }
+  if (!isColumnType(columnType)) {
+    return { ok: false, message: "Выберите тип колонки." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: maxRow, error: maxError } = await supabase
+    .from("board_columns")
+    .select("position")
+    .eq("board_id", boardId)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (maxError) {
+    return { ok: false, message: maxError.message };
+  }
+
+  const nextPosition = maxRow?.position != null ? Number(maxRow.position) + 1 : 0;
+
+  const { error } = await supabase.from("board_columns").insert({
+    board_id: boardId,
+    name,
+    column_type: columnType,
+    position: nextPosition
+  });
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права создавать колонки на этой доске." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function updateBoardColumnAction(
+  boardId: string,
+  columnId: string,
+  _prev: ColumnMutationResult | undefined,
+  formData: FormData
+): Promise<ColumnMutationResult> {
+  const nameRaw = formData.get("name");
+  const typeRaw = formData.get("column_type");
+  const name = typeof nameRaw === "string" ? nameRaw.trim() : "";
+  const columnType = typeof typeRaw === "string" ? typeRaw.trim() : "";
+
+  if (!name) {
+    return { ok: false, message: "Укажите название колонки." };
+  }
+  if (name.length > 50) {
+    return { ok: false, message: "Название не длиннее 50 символов." };
+  }
+  if (!isColumnType(columnType)) {
+    return { ok: false, message: "Выберите тип колонки." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { error } = await supabase
+    .from("board_columns")
+    .update({ name, column_type: columnType })
+    .eq("board_id", boardId)
+    .eq("id", columnId);
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права переименовывать или менять тип колонки." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function moveBoardColumnAction(
+  boardId: string,
+  columnId: string,
+  direction: "left" | "right"
+): Promise<ColumnMutationResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: rows, error: listError } = await supabase
+    .from("board_columns")
+    .select("id, position")
+    .eq("board_id", boardId)
+    .order("position", { ascending: true });
+
+  if (listError) {
+    return { ok: false, message: listError.message };
+  }
+
+  const cols = rows ?? [];
+  const idx = cols.findIndex((c) => c.id === columnId);
+  if (idx === -1) {
+    return { ok: false, message: "Колонка не найдена." };
+  }
+
+  const swapIdx = direction === "left" ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= cols.length) {
+    return { ok: true };
+  }
+
+  const a = cols[idx];
+  const b = cols[swapIdx];
+  const posA = Number(a.position);
+  const posB = Number(b.position);
+
+  const { error: e1 } = await supabase
+    .from("board_columns")
+    .update({ position: posB })
+    .eq("id", a.id)
+    .eq("board_id", boardId);
+
+  if (e1) {
+    if (e1.code === "42501") {
+      return { ok: false, message: "Нет права менять порядок колонок." };
+    }
+    return { ok: false, message: e1.message };
+  }
+
+  const { error: e2 } = await supabase
+    .from("board_columns")
+    .update({ position: posA })
+    .eq("id", b.id)
+    .eq("board_id", boardId);
+
+  if (e2) {
+    await supabase.from("board_columns").update({ position: posA }).eq("id", a.id).eq("board_id", boardId);
+    if (e2.code === "42501") {
+      return { ok: false, message: "Нет права менять порядок колонок." };
+    }
+    return { ok: false, message: e2.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+/** Устанавливает порядок колонок по массиву id (полная перестановка той же множества, что в БД). */
+export async function reorderBoardColumnsAction(
+  boardId: string,
+  orderedColumnIds: string[]
+): Promise<ColumnMutationResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  if (!Array.isArray(orderedColumnIds) || orderedColumnIds.length === 0) {
+    return { ok: false, message: "Укажите порядок колонок." };
+  }
+
+  const { data: rows, error: listError } = await supabase
+    .from("board_columns")
+    .select("id")
+    .eq("board_id", boardId)
+    .order("position", { ascending: true });
+
+  if (listError) {
+    return { ok: false, message: listError.message };
+  }
+
+  const existingIds = (rows ?? []).map((r) => r.id).sort();
+  const argSorted = [...orderedColumnIds].sort();
+  if (
+    existingIds.length !== argSorted.length ||
+    !existingIds.every((id, i) => id === argSorted[i])
+  ) {
+    return { ok: false, message: "Состав колонок не совпадает с доской." };
+  }
+
+  for (let i = 0; i < orderedColumnIds.length; i++) {
+    const { error } = await supabase
+      .from("board_columns")
+      .update({ position: i })
+      .eq("id", orderedColumnIds[i])
+      .eq("board_id", boardId);
+
+    if (error) {
+      if (error.code === "42501") {
+        return { ok: false, message: "Нет права менять порядок колонок." };
+      }
+      return { ok: false, message: error.message };
+    }
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function deleteBoardColumnAction(
+  boardId: string,
+  columnId: string
+): Promise<ColumnMutationResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { error } = await supabase
+    .from("board_columns")
+    .delete()
+    .eq("board_id", boardId)
+    .eq("id", columnId);
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права удалять колонки." };
+    }
+    if (error.code === "23503") {
+      return {
+        ok: false,
+        message:
+          "В колонке есть карточки. Перенесите или удалите их, затем повторите удаление колонки."
+      };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export type CreateCardFieldValuePayload = {
+  field_definition_id: string;
+  text_value?: string;
+  date_value?: string;
+  link_url?: string;
+  link_text?: string;
+  select_option_id?: string;
+};
+
+export type CreateCardResult =
+  | { ok: true; cardId: string }
+  | { ok: false; message: string };
+
+export async function createCardAction(
+  boardId: string,
+  payload: {
+    columnId: string;
+    title: string;
+    assigneeUserIds: string[];
+    fieldValues: CreateCardFieldValuePayload[];
+  }
+): Promise<CreateCardResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const title = payload.title.trim();
+  if (!title) {
+    return { ok: false, message: "Укажите название карточки." };
+  }
+  if (title.length > 200) {
+    return { ok: false, message: "Название не длиннее 200 символов." };
+  }
+
+  const assignees = [...new Set(payload.assigneeUserIds)];
+  if (assignees.length < 1) {
+    return { ok: false, message: "Выберите хотя бы одного участника карточки." };
+  }
+
+  const { data: cardId, error } = await supabase.rpc("create_card_with_details", {
+    p_board_id: boardId,
+    p_column_id: payload.columnId,
+    p_title: title,
+    p_assignee_user_ids: assignees,
+    p_field_values: payload.fieldValues
+  });
+
+  if (error) {
+    return { ok: false, message: error.message };
+  }
+
+  const id = typeof cardId === "string" ? cardId : null;
+  if (!id) {
+    return { ok: false, message: "Не удалось создать карточку." };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true, cardId: id };
 }
