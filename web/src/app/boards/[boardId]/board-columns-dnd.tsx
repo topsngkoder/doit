@@ -26,8 +26,15 @@ import {
   type NewCardFieldDefinition,
   type NewCardMemberOption
 } from "./create-card-modal";
+import { EditCardModal } from "./edit-card-modal";
 import { reorderBoardColumnsAction } from "./actions";
-import type { BoardColumnPermissions } from "./column-types";
+import {
+  type BoardCardListItem,
+  type BoardColumnPermissions,
+  type CardContentPermissions,
+  canDeleteCard,
+  canEditCardContent
+} from "./column-types";
 
 type ColumnRow = {
   id: string;
@@ -36,6 +43,47 @@ type ColumnRow = {
   position: number;
 };
 
+function BoardCardRow({
+  card,
+  currentUserId,
+  cardContentPermissions,
+  onOpen
+}: {
+  card: BoardCardListItem;
+  currentUserId: string;
+  cardContentPermissions: CardContentPermissions;
+  onOpen: (card: BoardCardListItem) => void;
+}) {
+  const canOpen =
+    canEditCardContent(cardContentPermissions, card.createdByUserId, currentUserId) ||
+    canDeleteCard(cardContentPermissions, card.createdByUserId, currentUserId);
+
+  return (
+    <li
+      className={
+        canOpen ?
+          "cursor-pointer rounded-md border border-slate-800 bg-slate-900/90 px-3 py-2 text-sm text-slate-200 shadow-sm transition-colors hover:border-slate-600 hover:bg-slate-900"
+        : "rounded-md border border-slate-800 bg-slate-900/90 px-3 py-2 text-sm text-slate-200 shadow-sm"
+      }
+      onClick={canOpen ? () => onOpen(card) : undefined}
+      onKeyDown={
+        canOpen ?
+          (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onOpen(card);
+            }
+          }
+        : undefined
+      }
+      role={canOpen ? "button" : undefined}
+      tabIndex={canOpen ? 0 : undefined}
+    >
+      <span className="line-clamp-2">{card.title}</span>
+    </li>
+  );
+}
+
 type BoardColumnsDnDProps = {
   boardId: string;
   currentUserId: string;
@@ -43,8 +91,9 @@ type BoardColumnsDnDProps = {
   membersForNewCard: NewCardMemberOption[];
   fieldDefinitions: NewCardFieldDefinition[];
   columnPermissions: BoardColumnPermissions;
+  cardContentPermissions: CardContentPermissions;
   columns: ColumnRow[];
-  cardsByColumnId: Map<string, Array<{ id: string; title: string; position: number }>>;
+  cardsByColumnId: Map<string, BoardCardListItem[]>;
 };
 
 function SortableColumn({
@@ -57,7 +106,9 @@ function SortableColumn({
   index,
   columnCount,
   columnPermissions,
-  cards
+  cardContentPermissions,
+  cards,
+  onOpenCard
 }: {
   boardId: string;
   currentUserId: string;
@@ -68,7 +119,9 @@ function SortableColumn({
   index: number;
   columnCount: number;
   columnPermissions: BoardColumnPermissions;
-  cards: Array<{ id: string; title: string; position: number }>;
+  cardContentPermissions: CardContentPermissions;
+  cards: BoardCardListItem[];
+  onOpenCard: (card: BoardCardListItem) => void;
 }) {
   const enabled = columnPermissions.canReorder;
   const {
@@ -114,12 +167,13 @@ function SortableColumn({
       />
       <ul className="flex flex-col gap-2">
         {cards.map((card) => (
-          <li
+          <BoardCardRow
             key={card.id}
-            className="rounded-md border border-slate-800 bg-slate-900/90 px-3 py-2 text-sm text-slate-200 shadow-sm"
-          >
-            <span className="line-clamp-2">{card.title}</span>
-          </li>
+            card={card}
+            currentUserId={currentUserId}
+            cardContentPermissions={cardContentPermissions}
+            onOpen={onOpenCard}
+          />
         ))}
         {cards.length === 0 ? (
           <li className="rounded-md border border-dashed border-slate-800/80 px-3 py-6 text-center text-xs text-slate-500">
@@ -152,12 +206,14 @@ export function BoardColumnsDnD({
   membersForNewCard,
   fieldDefinitions,
   columnPermissions,
+  cardContentPermissions,
   columns,
   cardsByColumnId
 }: BoardColumnsDnDProps) {
   const router = useRouter();
   const [items, setItems] = React.useState<ColumnRow[]>(columns);
   const [persistError, setPersistError] = React.useState<string | null>(null);
+  const [editingCard, setEditingCard] = React.useState<BoardCardListItem | null>(null);
 
   const sig = columnsSignature(columns);
   React.useEffect(() => {
@@ -174,54 +230,81 @@ export function BoardColumnsDnD({
 
   if (!columnPermissions.canReorder) {
     return (
-      <div className="flex gap-4 overflow-x-auto pb-2">
-        {columns.map((col, index) => {
-          const cards = cardsByColumnId.get(col.id) ?? [];
-          return (
-            <div
-              key={col.id}
-              className="flex w-64 shrink-0 flex-col gap-3 rounded-lg bg-slate-950/70 p-3 ring-1 ring-slate-800"
-            >
-              <BoardColumnHeader
-                boardId={boardId}
-                columnId={col.id}
-                name={col.name}
-                columnType={col.columnType}
-                cardCount={cards.length}
-                columnIndex={index}
-                columnCount={columns.length}
-                canRename={columnPermissions.canRename}
-                canReorder={columnPermissions.canReorder}
-                canDelete={columnPermissions.canDelete}
-                columnDrag={null}
-              />
-              <ul className="flex flex-col gap-2">
-                {cards.map((card) => (
-                  <li
-                    key={card.id}
-                    className="rounded-md border border-slate-800 bg-slate-900/90 px-3 py-2 text-sm text-slate-200 shadow-sm"
-                  >
-                    <span className="line-clamp-2">{card.title}</span>
-                  </li>
-                ))}
-                {cards.length === 0 ? (
-                  <li className="rounded-md border border-dashed border-slate-800/80 px-3 py-6 text-center text-xs text-slate-500">
-                    Пока нет карточек
-                  </li>
-                ) : null}
-              </ul>
-              <CreateCardButton
-                boardId={boardId}
-                columnId={col.id}
-                canCreate={canCreateCard}
-                members={membersForNewCard}
-                fieldDefinitions={fieldDefinitions}
-                currentUserId={currentUserId}
-              />
-            </div>
-          );
-        })}
-      </div>
+      <>
+        <EditCardModal
+          open={editingCard != null}
+          boardId={boardId}
+          card={editingCard}
+          canEditContent={
+            editingCard ?
+              canEditCardContent(
+                cardContentPermissions,
+                editingCard.createdByUserId,
+                currentUserId
+              )
+            : false
+          }
+          canDelete={
+            editingCard ?
+              canDeleteCard(
+                cardContentPermissions,
+                editingCard.createdByUserId,
+                currentUserId
+              )
+            : false
+          }
+          onClose={() => setEditingCard(null)}
+        />
+        <div className="flex gap-4 overflow-x-auto pb-2">
+          {columns.map((col, index) => {
+            const cards = cardsByColumnId.get(col.id) ?? [];
+            return (
+              <div
+                key={col.id}
+                className="flex w-64 shrink-0 flex-col gap-3 rounded-lg bg-slate-950/70 p-3 ring-1 ring-slate-800"
+              >
+                <BoardColumnHeader
+                  boardId={boardId}
+                  columnId={col.id}
+                  name={col.name}
+                  columnType={col.columnType}
+                  cardCount={cards.length}
+                  columnIndex={index}
+                  columnCount={columns.length}
+                  canRename={columnPermissions.canRename}
+                  canReorder={columnPermissions.canReorder}
+                  canDelete={columnPermissions.canDelete}
+                  columnDrag={null}
+                />
+                <ul className="flex flex-col gap-2">
+                  {cards.map((card) => (
+                    <BoardCardRow
+                      key={card.id}
+                      card={card}
+                      currentUserId={currentUserId}
+                      cardContentPermissions={cardContentPermissions}
+                      onOpen={setEditingCard}
+                    />
+                  ))}
+                  {cards.length === 0 ? (
+                    <li className="rounded-md border border-dashed border-slate-800/80 px-3 py-6 text-center text-xs text-slate-500">
+                      Пока нет карточек
+                    </li>
+                  ) : null}
+                </ul>
+                <CreateCardButton
+                  boardId={boardId}
+                  columnId={col.id}
+                  canCreate={canCreateCard}
+                  members={membersForNewCard}
+                  fieldDefinitions={fieldDefinitions}
+                  currentUserId={currentUserId}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </>
     );
   }
 
@@ -254,6 +337,30 @@ export function BoardColumnsDnD({
 
   return (
     <div className="space-y-1">
+      <EditCardModal
+        open={editingCard != null}
+        boardId={boardId}
+        card={editingCard}
+        canEditContent={
+          editingCard ?
+            canEditCardContent(
+              cardContentPermissions,
+              editingCard.createdByUserId,
+              currentUserId
+            )
+          : false
+        }
+        canDelete={
+          editingCard ?
+            canDeleteCard(
+              cardContentPermissions,
+              editingCard.createdByUserId,
+              currentUserId
+            )
+          : false
+        }
+        onClose={() => setEditingCard(null)}
+      />
       {persistError ? (
         <p className="text-xs text-rose-400" role="alert">
           {persistError}
@@ -278,7 +385,9 @@ export function BoardColumnsDnD({
                 index={index}
                 columnCount={items.length}
                 columnPermissions={columnPermissions}
+                cardContentPermissions={cardContentPermissions}
                 cards={cardsByColumnId.get(col.id) ?? []}
+                onOpenCard={setEditingCard}
               />
             ))}
           </div>

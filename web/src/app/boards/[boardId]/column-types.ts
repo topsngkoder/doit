@@ -10,6 +10,44 @@ export type BoardColumnPermissions = {
   canDelete: boolean;
 };
 
+/** Права на редактирование контента карточки и удаление (own / any). */
+export type CardContentPermissions = {
+  canEditAny: boolean;
+  canEditOwn: boolean;
+  canDeleteAny: boolean;
+  canDeleteOwn: boolean;
+};
+
+export type BoardCardListItem = {
+  id: string;
+  title: string;
+  description: string;
+  position: number;
+  createdByUserId: string;
+};
+
+export function canEditCardContent(
+  perms: CardContentPermissions,
+  createdByUserId: string,
+  currentUserId: string
+): boolean {
+  return (
+    perms.canEditAny ||
+    (perms.canEditOwn && createdByUserId === currentUserId)
+  );
+}
+
+export function canDeleteCard(
+  perms: CardContentPermissions,
+  createdByUserId: string,
+  currentUserId: string
+): boolean {
+  return (
+    perms.canDeleteAny ||
+    (perms.canDeleteOwn && createdByUserId === currentUserId)
+  );
+}
+
 export function columnTypeLabel(key: string): string {
   switch (key) {
     case "queue":

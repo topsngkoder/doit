@@ -485,3 +485,147 @@ export async function createCardAction(
   revalidatePath(`/boards/${boardId}`);
   return { ok: true, cardId: id };
 }
+
+const MAX_CARD_DESCRIPTION_LENGTH = 50_000;
+
+export type CardMutationResult = { ok: true } | { ok: false; message: string };
+
+export async function updateCardAction(
+  boardId: string,
+  cardId: string,
+  payload: { title: string; description: string }
+): Promise<CardMutationResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const title = payload.title.trim();
+  if (title.length < 1 || title.length > 200) {
+    return { ok: false, message: "Название: от 1 до 200 символов." };
+  }
+
+  const description = payload.description ?? "";
+  if (description.length > MAX_CARD_DESCRIPTION_LENGTH) {
+    return {
+      ok: false,
+      message: `Описание не длиннее ${MAX_CARD_DESCRIPTION_LENGTH} символов.`
+    };
+  }
+
+  const { data: row, error: fetchError } = await supabase
+    .from("cards")
+    .select("id, board_id, title, description")
+    .eq("id", cardId)
+    .maybeSingle();
+
+  if (fetchError) {
+    return { ok: false, message: fetchError.message };
+  }
+  if (!row || row.board_id !== boardId) {
+    return { ok: false, message: "Карточка не найдена на этой доске." };
+  }
+
+  const titleChanged = row.title !== title;
+  const descChanged = row.description !== description;
+  if (!titleChanged && !descChanged) {
+    return { ok: true };
+  }
+
+  const { error: updateError } = await supabase
+    .from("cards")
+    .update({ title, description })
+    .eq("id", cardId)
+    .eq("board_id", boardId);
+
+  if (updateError) {
+    if (updateError.code === "42501") {
+      return { ok: false, message: "Нет права редактировать эту карточку." };
+    }
+    if (updateError.message.includes("cards.move allows only")) {
+      return {
+        ok: false,
+        message:
+          "Недостаточно прав на изменение названия или описания (есть только перенос карточки)."
+      };
+    }
+    if (updateError.message.includes("not permitted to update card")) {
+      return { ok: false, message: "Нет права редактировать эту карточку." };
+    }
+    return { ok: false, message: updateError.message };
+  }
+
+  if (titleChanged) {
+    const { error: actErr } = await supabase.from("card_activity").insert({
+      card_id: cardId,
+      actor_user_id: user.id,
+      activity_type: "card_renamed",
+      message: "Переименована карточка",
+      payload: { previous_title: row.title, title }
+    });
+    if (actErr) {
+      return { ok: false, message: `Карточка обновлена, но не удалось записать историю: ${actErr.message}` };
+    }
+  }
+
+  if (descChanged) {
+    const { error: actErr } = await supabase.from("card_activity").insert({
+      card_id: cardId,
+      actor_user_id: user.id,
+      activity_type: "description_updated",
+      message: "Изменено описание",
+      payload: {}
+    });
+    if (actErr) {
+      return { ok: false, message: `Карточка обновлена, но не удалось записать историю: ${actErr.message}` };
+    }
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function deleteCardAction(
+  boardId: string,
+  cardId: string
+): Promise<CardMutationResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: row, error: fetchError } = await supabase
+    .from("cards")
+    .select("board_id")
+    .eq("id", cardId)
+    .maybeSingle();
+
+  if (fetchError) {
+    return { ok: false, message: fetchError.message };
+  }
+  if (!row || row.board_id !== boardId) {
+    return { ok: false, message: "Карточка не найдена на этой доске." };
+  }
+
+  const { error } = await supabase.from("cards").delete().eq("id", cardId).eq("board_id", boardId);
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права удалять эту карточку." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}

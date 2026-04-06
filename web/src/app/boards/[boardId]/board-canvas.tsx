@@ -2,9 +2,13 @@ import type { CSSProperties } from "react";
 import { AddBoardColumnButton } from "./add-board-column-button";
 import { BoardColumnsDnD } from "./board-columns-dnd";
 import type { NewCardFieldDefinition, NewCardMemberOption } from "./create-card-modal";
-import type { BoardColumnPermissions } from "./column-types";
+import type {
+  BoardCardListItem,
+  BoardColumnPermissions,
+  CardContentPermissions
+} from "./column-types";
 
-export type { BoardColumnPermissions };
+export type { BoardColumnPermissions, BoardCardListItem, CardContentPermissions };
 
 type BoardCanvasProps = {
   boardId: string;
@@ -13,6 +17,7 @@ type BoardCanvasProps = {
   membersForNewCard: NewCardMemberOption[];
   fieldDefinitions: NewCardFieldDefinition[];
   columnPermissions: BoardColumnPermissions;
+  cardContentPermissions: CardContentPermissions;
   board: {
     backgroundType: "color" | "image";
     backgroundColor: string | null;
@@ -24,10 +29,7 @@ type BoardCanvasProps = {
     columnType: string;
     position: number;
   }>;
-  cardsByColumnId: Map<
-    string,
-    Array<{ id: string; title: string; position: number }>
-  >;
+  cardsByColumnId: Map<string, BoardCardListItem[]>;
 };
 
 export function BoardCanvas({
@@ -37,6 +39,7 @@ export function BoardCanvas({
   membersForNewCard,
   fieldDefinitions,
   columnPermissions,
+  cardContentPermissions,
   board,
   columns,
   cardsByColumnId
@@ -72,6 +75,7 @@ export function BoardCanvas({
         membersForNewCard={membersForNewCard}
         fieldDefinitions={fieldDefinitions}
         columnPermissions={columnPermissions}
+        cardContentPermissions={cardContentPermissions}
         columns={columns}
         cardsByColumnId={cardsByColumnId}
       />

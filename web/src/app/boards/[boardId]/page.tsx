@@ -50,6 +50,10 @@ export default async function BoardPage({ params }: BoardPageProps) {
   let canRenameColumn = false;
   let canReorderColumn = false;
   let canDeleteColumn = false;
+  let canEditCardAny = false;
+  let canEditCardOwn = false;
+  let canDeleteCardAny = false;
+  let canDeleteCardOwn = false;
   if (memberRow?.board_role_id) {
     const { data: perms } = await supabase
       .from("board_role_permissions")
@@ -59,6 +63,10 @@ export default async function BoardPage({ params }: BoardPageProps) {
         "board.invite_members",
         "roles.manage",
         "cards.create",
+        "cards.edit_any",
+        "cards.edit_own",
+        "cards.delete_any",
+        "cards.delete_own",
         "columns.create",
         "columns.rename",
         "columns.reorder",
@@ -70,6 +78,10 @@ export default async function BoardPage({ params }: BoardPageProps) {
       if (p.permission === "board.invite_members") canInvite = true;
       if (p.permission === "roles.manage") canManageRoles = true;
       if (p.permission === "cards.create") canCreateCard = true;
+      if (p.permission === "cards.edit_any") canEditCardAny = true;
+      if (p.permission === "cards.edit_own") canEditCardOwn = true;
+      if (p.permission === "cards.delete_any") canDeleteCardAny = true;
+      if (p.permission === "cards.delete_own") canDeleteCardOwn = true;
       if (p.permission === "columns.create") canCreateColumn = true;
       if (p.permission === "columns.rename") canRenameColumn = true;
       if (p.permission === "columns.reorder") canReorderColumn = true;
@@ -117,7 +129,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
 
   const { data: cardRows, error: cardsError } = await supabase
     .from("cards")
-    .select("id, column_id, title, position")
+    .select("id, column_id, title, description, position, created_by_user_id")
     .eq("board_id", boardId)
     .order("position", { ascending: true });
 
@@ -175,7 +187,13 @@ export default async function BoardPage({ params }: BoardPageProps) {
 
   const cardsByColumnId = new Map<
     string,
-    Array<{ id: string; title: string; position: number }>
+    Array<{
+      id: string;
+      title: string;
+      description: string;
+      position: number;
+      createdByUserId: string;
+    }>
   >();
 
   for (const col of columns) {
@@ -185,7 +203,13 @@ export default async function BoardPage({ params }: BoardPageProps) {
   for (const row of cardRows ?? []) {
     const list = cardsByColumnId.get(row.column_id);
     if (list) {
-      list.push({ id: row.id, title: row.title, position: row.position });
+      list.push({
+        id: row.id,
+        title: row.title,
+        description: row.description ?? "",
+        position: row.position,
+        createdByUserId: row.created_by_user_id
+      });
     }
   }
 
@@ -251,6 +275,12 @@ export default async function BoardPage({ params }: BoardPageProps) {
         canCreateCard={canCreateCard}
         membersForNewCard={membersForNewCard}
         fieldDefinitions={fieldDefinitions}
+        cardContentPermissions={{
+          canEditAny: canEditCardAny,
+          canEditOwn: canEditCardOwn,
+          canDeleteAny: canDeleteCardAny,
+          canDeleteOwn: canDeleteCardOwn
+        }}
         columnPermissions={{
           canCreate: canCreateColumn,
           canRename: canRenameColumn,
