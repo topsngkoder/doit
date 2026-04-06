@@ -3,7 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BoardCanvas } from "./board-canvas";
 import type { NewCardFieldDefinition } from "./create-card-modal";
+import type { BoardLabelOption } from "./column-types";
 import { BoardMembersPanel, type BoardMemberPublic, type BoardRoleOption } from "./board-members";
+import { BoardLabelsButton } from "./board-labels-button";
 import { InviteMemberButton } from "./invite-member-button";
 
 type BoardPageProps = {
@@ -56,6 +58,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
   let canDeleteCardOwn = false;
   let canMoveCards = false;
   let canCreateComment = false;
+  let canManageBoardLabels = false;
   if (memberRow?.board_role_id) {
     const { data: perms } = await supabase
       .from("board_role_permissions")
@@ -64,6 +67,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
       .in("permission", [
         "board.invite_members",
         "roles.manage",
+        "labels.manage",
         "cards.create",
         "cards.edit_any",
         "cards.edit_own",
@@ -81,6 +85,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
       if (p.allowed !== true) continue;
       if (p.permission === "board.invite_members") canInvite = true;
       if (p.permission === "roles.manage") canManageRoles = true;
+      if (p.permission === "labels.manage") canManageBoardLabels = true;
       if (p.permission === "cards.create") canCreateCard = true;
       if (p.permission === "cards.edit_any") canEditCardAny = true;
       if (p.permission === "cards.edit_own") canEditCardOwn = true;
@@ -139,6 +144,19 @@ export default async function BoardPage({ params }: BoardPageProps) {
     .eq("board_id", boardId)
     .order("position", { ascending: true });
 
+  const { data: labelRows } = await supabase
+    .from("labels")
+    .select("id, name, color, position")
+    .eq("board_id", boardId)
+    .order("position", { ascending: true });
+
+  const boardLabels: BoardLabelOption[] = (labelRows ?? []).map((l) => ({
+    id: l.id,
+    name: l.name,
+    color: l.color,
+    position: Number(l.position)
+  }));
+
   const { data: fieldDefRows } = await supabase
     .from("board_field_definitions")
     .select(
@@ -193,6 +211,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
 
   const cardIds = (cardRows ?? []).map((r) => r.id);
   const assigneesByCard = new Map<string, string[]>();
+  const labelIdsByCard = new Map<string, string[]>();
   if (cardIds.length > 0) {
     const { data: assigneeRows } = await supabase
       .from("card_assignees")
@@ -202,6 +221,16 @@ export default async function BoardPage({ params }: BoardPageProps) {
       const cur = assigneesByCard.get(a.card_id) ?? [];
       cur.push(a.user_id);
       assigneesByCard.set(a.card_id, cur);
+    }
+
+    const { data: cardLabelRows } = await supabase
+      .from("card_labels")
+      .select("card_id, label_id")
+      .in("card_id", cardIds);
+    for (const cl of cardLabelRows ?? []) {
+      const cur = labelIdsByCard.get(cl.card_id) ?? [];
+      cur.push(cl.label_id);
+      labelIdsByCard.set(cl.card_id, cur);
     }
   }
 
@@ -215,6 +244,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
       createdByUserId: string;
       responsibleUserId: string | null;
       assigneeUserIds: string[];
+      labelIds: string[];
     }>
   >();
 
@@ -232,7 +262,8 @@ export default async function BoardPage({ params }: BoardPageProps) {
         position: row.position,
         createdByUserId: row.created_by_user_id,
         responsibleUserId: row.responsible_user_id ?? null,
-        assigneeUserIds: assigneesByCard.get(row.id) ?? []
+        assigneeUserIds: assigneesByCard.get(row.id) ?? [],
+        labelIds: labelIdsByCard.get(row.id) ?? []
       });
     }
   }
@@ -285,6 +316,11 @@ export default async function BoardPage({ params }: BoardPageProps) {
             canInvite={canInvite}
             canManageRoles={canManageRoles}
           />
+          <BoardLabelsButton
+            boardId={board.id}
+            canManage={canManageBoardLabels}
+            labels={boardLabels}
+          />
           <InviteMemberButton boardId={board.id} canInvite={canInvite} />
         </div>
       </div>
@@ -299,6 +335,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
         currentUserId={user!.id}
         canCreateCard={canCreateCard}
         membersForNewCard={membersForNewCard}
+        boardLabels={boardLabels}
         fieldDefinitions={fieldDefinitions}
         cardContentPermissions={{
           canEditAny: canEditCardAny,

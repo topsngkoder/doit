@@ -5,16 +5,18 @@ import type { NewCardFieldDefinition, NewCardMemberOption } from "./create-card-
 import type {
   BoardCardListItem,
   BoardColumnPermissions,
+  BoardLabelOption,
   CardContentPermissions
 } from "./column-types";
 
-export type { BoardColumnPermissions, BoardCardListItem, CardContentPermissions };
+export type { BoardColumnPermissions, BoardCardListItem, BoardLabelOption, CardContentPermissions };
 
 type BoardCanvasProps = {
   boardId: string;
   currentUserId: string;
   canCreateCard: boolean;
   membersForNewCard: NewCardMemberOption[];
+  boardLabels: BoardLabelOption[];
   fieldDefinitions: NewCardFieldDefinition[];
   columnPermissions: BoardColumnPermissions;
   canMoveCards: boolean;
@@ -39,6 +41,7 @@ export function BoardCanvas({
   currentUserId,
   canCreateCard,
   membersForNewCard,
+  boardLabels,
   fieldDefinitions,
   columnPermissions,
   canMoveCards,
@@ -77,6 +80,7 @@ export function BoardCanvas({
         currentUserId={currentUserId}
         canCreateCard={canCreateCard}
         membersForNewCard={membersForNewCard}
+        boardLabels={boardLabels}
         fieldDefinitions={fieldDefinitions}
         columnPermissions={columnPermissions}
         canMoveCards={canMoveCards}

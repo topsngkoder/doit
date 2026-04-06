@@ -64,6 +64,122 @@ export async function inviteBoardMemberAction(
   return { ok: true };
 }
 
+export type BoardLabelCatalogResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+function normalizeBoardLabelName(raw: string): string {
+  return raw.trim();
+}
+
+function normalizeBoardLabelHexColor(raw: string): string | null {
+  const s = raw.trim();
+  if (/^#[0-9A-Fa-f]{6}$/.test(s)) {
+    return s.toUpperCase();
+  }
+  return null;
+}
+
+export async function createBoardLabelAction(
+  boardId: string,
+  nameRaw: string,
+  colorRaw: string
+): Promise<BoardLabelCatalogResult> {
+  const name = normalizeBoardLabelName(nameRaw);
+  if (name.length < 1 || name.length > 30) {
+    return { ok: false, message: "Название метки: от 1 до 30 символов." };
+  }
+  const color = normalizeBoardLabelHexColor(colorRaw);
+  if (!color) {
+    return { ok: false, message: "Некорректный цвет: нужен формат #RRGGBB." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: maxRow } = await supabase
+    .from("labels")
+    .select("position")
+    .eq("board_id", boardId)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const maxPos =
+    maxRow?.position != null ? Number(maxRow.position) : 0;
+  const nextPos = Number.isFinite(maxPos) ? maxPos + 1 : 1;
+
+  const { error } = await supabase.from("labels").insert({
+    board_id: boardId,
+    name,
+    color,
+    position: nextPos
+  });
+
+  if (error) {
+    if (error.code === "23505") {
+      return {
+        ok: false,
+        message: "Метка с таким названием уже есть на этой доске."
+      };
+    }
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права управлять метками доски." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function deleteBoardLabelAction(
+  boardId: string,
+  labelId: string
+): Promise<BoardLabelCatalogResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: row, error: readError } = await supabase
+    .from("labels")
+    .select("id, board_id")
+    .eq("id", labelId)
+    .maybeSingle();
+
+  if (readError) {
+    return { ok: false, message: readError.message };
+  }
+  if (!row || row.board_id !== boardId) {
+    return { ok: false, message: "Метка не найдена на этой доске." };
+  }
+
+  const { error } = await supabase.from("labels").delete().eq("id", labelId);
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права управлять метками доски." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
 export type UpdateBoardMemberRoleResult =
   | { ok: true }
   | { ok: false; message: string };
@@ -524,6 +640,52 @@ export async function mutateCardAssigneeAction(
   if (error) {
     if (error.code === "42501") {
       return { ok: false, message: "Нет права менять участников этой карточки." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function mutateCardLabelAction(
+  boardId: string,
+  cardId: string,
+  labelId: string,
+  add: boolean
+): Promise<CardMutationResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: row, error: fetchError } = await supabase
+    .from("cards")
+    .select("board_id")
+    .eq("id", cardId)
+    .maybeSingle();
+
+  if (fetchError) {
+    return { ok: false, message: fetchError.message };
+  }
+  if (!row || row.board_id !== boardId) {
+    return { ok: false, message: "Карточка не найдена на этой доске." };
+  }
+
+  const { error } = await supabase.rpc("mutate_card_label", {
+    p_card_id: cardId,
+    p_label_id: labelId,
+    p_add: add
+  });
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права менять метки этой карточки." };
     }
     return { ok: false, message: error.message };
   }

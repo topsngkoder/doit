@@ -18,6 +18,14 @@ export type CardContentPermissions = {
   canDeleteOwn: boolean;
 };
 
+/** Метка доски (каталог на уровне board). */
+export type BoardLabelOption = {
+  id: string;
+  name: string;
+  color: string;
+  position: number;
+};
+
 export type BoardCardListItem = {
   id: string;
   title: string;
@@ -28,6 +36,8 @@ export type BoardCardListItem = {
   responsibleUserId: string | null;
   /** Участники карточки (user_id), минимум один по правилам продукта. */
   assigneeUserIds: string[];
+  /** id меток, назначенных на карточку. */
+  labelIds: string[];
 };
 
 export function canEditCardContent(

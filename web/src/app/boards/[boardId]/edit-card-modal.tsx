@@ -9,13 +9,14 @@ import { cn } from "@/lib/utils";
 import {
   deleteCardAction,
   mutateCardAssigneeAction,
+  mutateCardLabelAction,
   setCardResponsibleAction,
   updateCardAction,
   type CardMutationResult
 } from "./actions";
 import { CardCommentsSidebar } from "./card-comments-sidebar";
 import type { NewCardMemberOption } from "./create-card-modal";
-import type { BoardCardListItem } from "./column-types";
+import type { BoardCardListItem, BoardLabelOption } from "./column-types";
 
 const inputClass =
   "w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600";
@@ -59,9 +60,12 @@ type EditCardModalProps = {
   open: boolean;
   boardId: string;
   card: BoardCardListItem | null;
+  boardLabels: BoardLabelOption[];
   canEditContent: boolean;
   /** Добавление/исключение участников и ответственный — только редактор карточки (не только assignee). */
   canManageAssignees: boolean;
+  /** Метки на карточке — как у RLS card_labels (редактор или участник карточки). */
+  canManageLabels: boolean;
   canDelete: boolean;
   canCreateComment: boolean;
   boardMembers: NewCardMemberOption[];
@@ -72,8 +76,10 @@ export function EditCardModal({
   open,
   boardId,
   card,
+  boardLabels,
   canEditContent,
   canManageAssignees,
+  canManageLabels,
   canDelete,
   canCreateComment,
   boardMembers,
@@ -92,8 +98,14 @@ export function EditCardModal({
   const [openAssigneePanelUserId, setOpenAssigneePanelUserId] = React.useState<string | null>(
     null
   );
+  const [selectedLabelIds, setSelectedLabelIds] = React.useState<Set<string>>(() => new Set());
+  const [labelPending, setLabelPending] = React.useState(false);
+  const [labelQuery, setLabelQuery] = React.useState("");
+  const [labelSuggestOpen, setLabelSuggestOpen] = React.useState(false);
+  const labelComboRef = React.useRef<HTMLDivElement>(null);
 
   const assigneeSyncKey = card ? [...card.assigneeUserIds].sort().join("\0") : "";
+  const labelSyncKey = card ? [...card.labelIds].sort().join("\0") : "";
 
   React.useEffect(() => {
     if (!open || !card) return;
@@ -108,6 +120,28 @@ export function EditCardModal({
     if (!open || !card) return;
     setSelectedAssigneeIds(new Set(card.assigneeUserIds));
   }, [open, card?.id, assigneeSyncKey]);
+
+  React.useEffect(() => {
+    if (!open || !card) return;
+    setSelectedLabelIds(new Set(card.labelIds));
+    setLabelQuery("");
+    setLabelSuggestOpen(false);
+  }, [open, card?.id, labelSyncKey]);
+
+  React.useEffect(() => {
+    if (!labelSuggestOpen) return;
+    const onMouseDown = (e: MouseEvent) => {
+      const el = e.target as Node;
+      if (labelComboRef.current?.contains(el)) return;
+      setLabelSuggestOpen(false);
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [labelSuggestOpen]);
+
+  React.useEffect(() => {
+    if (!open) setLabelSuggestOpen(false);
+  }, [open]);
 
   React.useEffect(() => {
     if (!openAssigneePanelUserId) return;
@@ -200,6 +234,38 @@ export function EditCardModal({
 
   const assigneesOnCard = boardMembers.filter((m) => selectedAssigneeIds.has(m.userId));
   const membersToAdd = boardMembers.filter((m) => !selectedAssigneeIds.has(m.userId));
+
+  const labelsOnCard = boardLabels
+    .filter((l) => selectedLabelIds.has(l.id))
+    .sort((a, b) => a.position - b.position);
+
+  const labelQueryNorm = labelQuery.trim().toLowerCase();
+  const labelSuggestions = boardLabels.filter(
+    (l) =>
+      !selectedLabelIds.has(l.id) &&
+      (labelQueryNorm === "" || l.name.toLowerCase().includes(labelQueryNorm))
+  );
+
+  const toggleCardLabel = async (labelId: string, add: boolean) => {
+    if (!card || !canManageLabels || labelPending) return;
+    setError(null);
+    setLabelPending(true);
+    const res = await mutateCardLabelAction(boardId, card.id, labelId, add);
+    setLabelPending(false);
+    if (!res.ok) {
+      setError(res.message);
+      return;
+    }
+    setSelectedLabelIds((prev) => {
+      const next = new Set(prev);
+      if (add) next.add(labelId);
+      else next.delete(labelId);
+      return next;
+    });
+    setLabelQuery("");
+    setLabelSuggestOpen(false);
+    router.refresh();
+  };
 
   return (
     <Modal
@@ -363,6 +429,92 @@ export function EditCardModal({
                   </ul>
                 </div>
               : null}
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-medium text-slate-400">Метки</p>
+              {boardLabels.length === 0 ?
+                <p className="text-xs text-slate-500">
+                  На доске пока нет меток. Владелец или администратор доски может создать их кнопкой{" "}
+                  <span className="text-slate-400">«Метки»</span> в шапке страницы доски.
+                </p>
+              : <>
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {labelsOnCard.length === 0 ?
+                      <span className="text-xs text-slate-500">Меток нет</span>
+                    : labelsOnCard.map((l) => (
+                        <span
+                          key={l.id}
+                          className="inline-flex max-w-full items-center gap-1 rounded-md border border-slate-700 bg-slate-900/80 pl-2 pr-1 text-xs text-slate-100"
+                          style={{ borderLeftWidth: 3, borderLeftColor: l.color }}
+                        >
+                          <span className="min-w-0 truncate">{l.name}</span>
+                          {canManageLabels ?
+                            <button
+                              type="button"
+                              disabled={labelPending || pending}
+                              className="shrink-0 rounded p-0.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                              aria-label={`Снять метку ${l.name}`}
+                              onClick={() => void toggleCardLabel(l.id, false)}
+                            >
+                              ×
+                            </button>
+                          : null}
+                        </span>
+                      ))}
+                  </div>
+                  {canManageLabels ?
+                    <div ref={labelComboRef} className="relative space-y-1">
+                      <label htmlFor={`card-labels-q-${card.id}`} className="sr-only">
+                        Добавить метку по названию
+                      </label>
+                      <input
+                        id={`card-labels-q-${card.id}`}
+                        className={inputClass}
+                        placeholder="Найти метку по названию…"
+                        value={labelQuery}
+                        disabled={labelPending || pending}
+                        autoComplete="off"
+                        onChange={(e) => {
+                          setLabelQuery(e.target.value);
+                          setLabelSuggestOpen(true);
+                        }}
+                        onFocus={() => setLabelSuggestOpen(true)}
+                      />
+                      {labelSuggestOpen && labelSuggestions.length > 0 ?
+                        <ul
+                          className="absolute z-[70] mt-1 max-h-48 w-full overflow-auto rounded-md border border-slate-700 bg-slate-950 py-1 shadow-lg"
+                          role="listbox"
+                        >
+                          {labelSuggestions.map((l) => (
+                            <li key={l.id} role="option">
+                              <button
+                                type="button"
+                                disabled={labelPending}
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800"
+                                onClick={() => void toggleCardLabel(l.id, true)}
+                              >
+                                <span
+                                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                  style={{ backgroundColor: l.color }}
+                                  aria-hidden
+                                />
+                                <span className="min-w-0 truncate">{l.name}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      : null}
+                      {labelSuggestOpen &&
+                      labelQuery.trim() !== "" &&
+                      labelSuggestions.length === 0 &&
+                      boardLabels.some((l) => !selectedLabelIds.has(l.id)) ?
+                        <p className="text-xs text-slate-500">Нет совпадений по названию.</p>
+                      : null}
+                    </div>
+                  : null}
+                </>
+              }
             </div>
 
             {error ?

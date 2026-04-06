@@ -35,6 +35,7 @@ import { reorderBoardCardsAction, reorderBoardColumnsAction } from "./actions";
 import {
   type BoardCardListItem,
   type BoardColumnPermissions,
+  type BoardLabelOption,
   type CardContentPermissions,
   canDeleteCard,
   canEditCardBodyAsAssignee,
@@ -260,6 +261,7 @@ type BoardColumnsDnDProps = {
   canMoveCards: boolean;
   canCreateComment: boolean;
   membersForNewCard: NewCardMemberOption[];
+  boardLabels: BoardLabelOption[];
   fieldDefinitions: NewCardFieldDefinition[];
   columnPermissions: BoardColumnPermissions;
   cardContentPermissions: CardContentPermissions;
@@ -557,6 +559,7 @@ export function BoardColumnsDnD({
   canMoveCards,
   canCreateComment,
   membersForNewCard,
+  boardLabels,
   fieldDefinitions,
   columnPermissions,
   cardContentPermissions,
@@ -713,6 +716,7 @@ export function BoardColumnsDnD({
       open={editingCard != null}
       boardId={boardId}
       card={editingCard}
+      boardLabels={boardLabels}
       canEditContent={
         editingCard ?
           canEditCardContent(
@@ -729,6 +733,15 @@ export function BoardColumnsDnD({
             editingCard.createdByUserId,
             currentUserId
           )
+        : false
+      }
+      canManageLabels={
+        editingCard ?
+          canEditCardContent(
+            cardContentPermissions,
+            editingCard.createdByUserId,
+            currentUserId
+          ) || canEditCardBodyAsAssignee(editingCard, currentUserId)
         : false
       }
       canDelete={
