@@ -18,6 +18,7 @@ type BoardCanvasProps = {
   fieldDefinitions: NewCardFieldDefinition[];
   columnPermissions: BoardColumnPermissions;
   canMoveCards: boolean;
+  canCreateComment: boolean;
   cardContentPermissions: CardContentPermissions;
   board: {
     backgroundType: "color" | "image";
@@ -41,6 +42,7 @@ export function BoardCanvas({
   fieldDefinitions,
   columnPermissions,
   canMoveCards,
+  canCreateComment,
   cardContentPermissions,
   board,
   columns,
@@ -78,6 +80,7 @@ export function BoardCanvas({
         fieldDefinitions={fieldDefinitions}
         columnPermissions={columnPermissions}
         canMoveCards={canMoveCards}
+        canCreateComment={canCreateComment}
         cardContentPermissions={cardContentPermissions}
         columns={columns}
         cardsByColumnId={cardsByColumnId}

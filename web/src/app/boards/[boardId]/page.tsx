@@ -55,6 +55,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
   let canDeleteCardAny = false;
   let canDeleteCardOwn = false;
   let canMoveCards = false;
+  let canCreateComment = false;
   if (memberRow?.board_role_id) {
     const { data: perms } = await supabase
       .from("board_role_permissions")
@@ -72,7 +73,8 @@ export default async function BoardPage({ params }: BoardPageProps) {
         "columns.rename",
         "columns.reorder",
         "columns.delete",
-        "cards.move"
+        "cards.move",
+        "comments.create"
       ]);
 
     for (const p of perms ?? []) {
@@ -89,6 +91,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
       if (p.permission === "columns.reorder") canReorderColumn = true;
       if (p.permission === "columns.delete") canDeleteColumn = true;
       if (p.permission === "cards.move") canMoveCards = true;
+      if (p.permission === "comments.create") canCreateComment = true;
     }
   }
 
@@ -238,7 +241,8 @@ export default async function BoardPage({ params }: BoardPageProps) {
   const membersForNewCard = members.map((m) => ({
     userId: m.userId,
     displayName: m.displayName,
-    email: m.email
+    email: m.email,
+    avatarUrl: m.avatarUrl
   }));
 
   return (
@@ -291,6 +295,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
           canDelete: canDeleteColumn
         }}
         canMoveCards={canMoveCards}
+        canCreateComment={canCreateComment}
         board={{
           backgroundType: board.background_type as "color" | "image",
           backgroundColor: board.background_color,

@@ -9,6 +9,8 @@ import {
   updateCardAction,
   type CardMutationResult
 } from "./actions";
+import { CardCommentsSidebar } from "./card-comments-sidebar";
+import type { NewCardMemberOption } from "./create-card-modal";
 import type { BoardCardListItem } from "./column-types";
 
 const inputClass =
@@ -20,6 +22,8 @@ type EditCardModalProps = {
   card: BoardCardListItem | null;
   canEditContent: boolean;
   canDelete: boolean;
+  canCreateComment: boolean;
+  boardMembers: NewCardMemberOption[];
   onClose: () => void;
 };
 
@@ -29,6 +33,8 @@ export function EditCardModal({
   card,
   canEditContent,
   canDelete,
+  canCreateComment,
+  boardMembers,
   onClose
 }: EditCardModalProps) {
   const router = useRouter();
@@ -86,95 +92,121 @@ export function EditCardModal({
       open={open}
       title="Карточка"
       onClose={onClose}
-      className="max-w-xl"
+      className="max-w-5xl"
+      bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden px-0 pb-0 pt-0"
     >
-      <div className="flex flex-col gap-4">
-        <div>
-          <label htmlFor={`card-title-${card.id}`} className="mb-1 block text-xs text-slate-400">
-            Название
-          </label>
-          <input
-            id={`card-title-${card.id}`}
-            className={inputClass}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            disabled={readOnly || pending}
-            maxLength={200}
-            autoComplete="off"
-          />
-        </div>
-        <div>
-          <label htmlFor={`card-desc-${card.id}`} className="mb-1 block text-xs text-slate-400">
-            Описание
-          </label>
-          <textarea
-            id={`card-desc-${card.id}`}
-            className={`${inputClass} min-h-[120px] resize-y`}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            disabled={readOnly || pending}
-            rows={5}
-          />
-        </div>
+      <div className="flex min-h-[min(520px,calc(90vh-5rem))] flex-1 flex-col overflow-hidden md:min-h-[420px] md:flex-row">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-5 pb-5 pt-1">
+          <div className="flex flex-col gap-4">
+            <div>
+              <label
+                htmlFor={`card-title-${card.id}`}
+                className="mb-1 block text-xs text-slate-400"
+              >
+                Название
+              </label>
+              <input
+                id={`card-title-${card.id}`}
+                className={inputClass}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                disabled={readOnly || pending}
+                maxLength={200}
+                autoComplete="off"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor={`card-desc-${card.id}`}
+                className="mb-1 block text-xs text-slate-400"
+              >
+                Описание
+              </label>
+              <textarea
+                id={`card-desc-${card.id}`}
+                className={`${inputClass} min-h-[120px] resize-y`}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                disabled={readOnly || pending}
+                rows={5}
+              />
+            </div>
 
-        {error ? (
-          <p className="text-sm text-rose-400" role="alert">
-            {error}
-          </p>
-        ) : null}
+            {error ?
+              <p className="text-sm text-rose-400" role="alert">
+                {error}
+              </p>
+            : null}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-4">
-          {canDelete ? (
-            <div className="flex flex-wrap items-center gap-2">
-              {confirmDelete ? (
-                <>
-                  <span className="text-xs text-amber-200/90">Удалить карточку безвозвратно?</span>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    disabled={pending}
-                    onClick={handleDelete}
-                  >
-                    Да, удалить
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    disabled={pending}
-                    onClick={() => setConfirmDelete(false)}
-                  >
-                    Отмена
-                  </Button>
-                </>
-              ) : (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-4">
+              {canDelete ?
+                <div className="flex flex-wrap items-center gap-2">
+                  {confirmDelete ?
+                    <>
+                      <span className="text-xs text-amber-200/90">Удалить карточку безвозвратно?</span>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        disabled={pending}
+                        onClick={handleDelete}
+                      >
+                        Да, удалить
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        disabled={pending}
+                        onClick={() => setConfirmDelete(false)}
+                      >
+                        Отмена
+                      </Button>
+                    </>
+                  : <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      disabled={pending}
+                      onClick={() => setConfirmDelete(true)}
+                    >
+                      Удалить карточку
+                    </Button>}
+                </div>
+              : <span />}
+
+              <div className="flex flex-wrap items-center justify-end gap-2">
                 <Button
                   type="button"
-                  variant="destructive"
+                  variant="secondary"
                   size="sm"
                   disabled={pending}
-                  onClick={() => setConfirmDelete(true)}
+                  onClick={onClose}
                 >
-                  Удалить карточку
+                  Закрыть
                 </Button>
-              )}
+                {canEditContent ?
+                  <Button type="button" size="sm" disabled={pending} onClick={handleSave}>
+                    Сохранить
+                  </Button>
+                : null}
+              </div>
             </div>
-          ) : (
-            <span />
-          )}
-
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button type="button" variant="secondary" size="sm" disabled={pending} onClick={onClose}>
-              Закрыть
-            </Button>
-            {canEditContent ?
-              <Button type="button" size="sm" disabled={pending} onClick={handleSave}>
-                Сохранить
-              </Button>
-            : null}
           </div>
         </div>
+
+        <aside
+          className="flex max-h-[55vh] w-full shrink-0 flex-col border-t border-slate-800 md:max-h-none md:w-[min(100%,20rem)] md:border-l md:border-t-0"
+          aria-label="Комментарии к карточке"
+        >
+          <CardCommentsSidebar
+            cardId={card.id}
+            open={open}
+            canCreate={canCreateComment}
+            boardMembers={boardMembers}
+            onMutation={() => router.refresh()}
+          />
+        </aside>
       </div>
     </Modal>
   );

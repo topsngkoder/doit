@@ -258,6 +258,7 @@ type BoardColumnsDnDProps = {
   currentUserId: string;
   canCreateCard: boolean;
   canMoveCards: boolean;
+  canCreateComment: boolean;
   membersForNewCard: NewCardMemberOption[];
   fieldDefinitions: NewCardFieldDefinition[];
   columnPermissions: BoardColumnPermissions;
@@ -554,6 +555,7 @@ export function BoardColumnsDnD({
   currentUserId,
   canCreateCard,
   canMoveCards,
+  canCreateComment,
   membersForNewCard,
   fieldDefinitions,
   columnPermissions,
@@ -726,6 +728,8 @@ export function BoardColumnsDnD({
           )
         : false
       }
+      canCreateComment={canCreateComment}
+      boardMembers={membersForNewCard}
       onClose={() => setEditingCard(null)}
     />
   );

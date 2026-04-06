@@ -14,6 +14,7 @@ export type NewCardMemberOption = {
   userId: string;
   displayName: string;
   email: string;
+  avatarUrl?: string | null;
 };
 
 export type NewCardFieldDefinition = {
