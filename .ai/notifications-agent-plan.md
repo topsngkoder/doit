@@ -1,0 +1,447 @@
+# План реализации уведомлений (для AI-агента)
+
+Основано на `.ai/notifications-specification.md`.
+
+Цель плана: дать исполняемую декомпозицию для приведения текущей системы уведомлений к новой спецификации: только `browser` + `email`, 6 типов событий, новый экран настроек, Browser Notification API, email-outbox, удаление Telegram/timezone/quiet-hours из пользовательского сценария.
+
+## 0) Входные решения (зафиксировано спецификацией)
+- Пользовательские каналы в системе: только `browser` и `email`.
+- Канал `browser` означает:
+  - создание записи во внутреннем центре уведомлений приложения;
+  - показ нативного браузерного уведомления только при `Notification.permission = 'granted'`.
+- Telegram не участвует в UI, настройках, матрице типов, доставке и пользовательских сценариях.
+- Временная зона, тихие часы и `notification_user_settings` удаляются из целевой модели.
+- На экране настроек должно быть ровно 6 типов уведомлений:
+  - `added_to_card`
+  - `made_responsible`
+  - `card_comment_new`
+  - `card_moved`
+  - `card_in_progress`
+  - `card_ready`
+- Для каждого типа на экране настроек должны быть ровно 2 чекбокса:
+  - `browser`
+  - `email`
+- Правило “не уведомлять автора” обязательно для всех 6 типов и обоих каналов.
+- Для одного межколоночного перемещения карточки создаётся ровно одно событие из набора:
+  - `card_moved`
+  - `card_in_progress`
+  - `card_ready`
+- В MVP нативные браузерные уведомления не используют Web Push, Service Worker и не работают при закрытой вкладке/браузере.
+- Email-доставка выполняется асинхронно через `notification_outbox`, максимум 5 попыток.
+
+## 1) Текущий технический контекст проекта
+
+### 1.1. Что уже есть в коде
+- `web/src/lib/notifications/constants.ts`
+  - сейчас содержит 4 event type;
+  - каналы сейчас: `telegram` и `internal`.
+- `web/src/app/notifications/page.tsx`
+  - экран внутреннего центра уведомлений;
+  - читает `internal_notifications`;
+  - умеет помечать уведомления прочитанными.
+- `web/src/app/notifications/actions.ts`
+  - `markInternalNotificationReadAction`;
+  - `markAllInternalNotificationsReadAction`.
+- `web/src/app/notifications/settings/page.tsx`
+  - грузит `notification_user_settings.timezone`;
+  - грузит `notification_preferences`;
+  - собирает initial preferences.
+- `web/src/app/notifications/settings/notification-settings-client.tsx`
+  - показывает timezone select;
+  - использует switch/toggle вместо checkbox;
+  - рендерит колонки `Telegram` и `Внутренние`.
+- `web/src/app/notifications/settings/actions.ts`
+  - обновляет timezone;
+  - сохраняет `notification_preferences`.
+- `web/src/app/boards/[boardId]/card-comments-sidebar.tsx`
+  - создаёт комментарии прямым `insert` в `card_comments`;
+  - здесь понадобится интеграция `card_comment_new`.
+- SQL-функция `public.enqueue_notification_event(...)`
+  - миграция `supabase/migrations/20260407153000_notification_delivery_filters.sql`;
+  - сейчас работает только для `internal` + `telegram`;
+  - знает только 4 типа событий.
+
+### 1.2. Что уже есть в БД
+- `notification_preferences`
+  - сейчас хранит каналы `telegram` и `internal`;
+  - event type ограничены 4 значениями.
+- `notification_outbox`
+  - сейчас допускает только канал `telegram`;
+  - event type ограничены 4 значениями;
+  - статусы уже есть: `pending | sent | failed`;
+  - лимит попыток уже ограничен до 5.
+- `internal_notifications`
+  - уже используется как внутренний центр уведомлений.
+- `notification_user_settings`
+  - сейчас хранит `timezone` и quiet hours;
+  - по новой спецификации должна исчезнуть из целевой модели.
+- `profiles`
+  - содержит поля для Telegram (`telegram_chat_id`, `telegram_username`, `telegram_linked_at`);
+  - спецификация не требует их удалять из `profiles`, но они не должны участвовать в UI и логике уведомлений.
+
+### 1.3. Явные конфликты текущей реализации со спецификацией
+- Каналы неправильные: сейчас `telegram/internal`, нужно `browser/email`.
+- Event type неполные: сейчас 4, нужно 6.
+- UI настроек неправильный:
+  - есть timezone;
+  - нет блока browser permission;
+  - используются switch, а нужны checkbox;
+  - колонки неправильные.
+- SQL-фильтрация доставки неправильная:
+  - пишет в `internal_notifications` и `notification_outbox(channel='telegram')`;
+  - не умеет `email`;
+  - не умеет `card_in_progress` и `card_ready`.
+- Доменные события уведомлений не доведены до конца:
+  - нет полной склейки “действие в карточке -> enqueue_notification_event”.
+- Логика перемещения карточек пока не соответствует приоритету `done -> in_work -> moved`.
+- Нативные браузерные уведомления пока не реализованы.
+- Email-воркер/consumer для `notification_outbox(channel='email')` в репозитории явно не найден.
+
+## 2) Стратегия выполнения
+- Двигаться сверху вниз по зависимостям:
+  - shared constants/types;
+  - БД и миграции;
+  - SQL-функции доставки;
+  - интеграция доменных событий;
+  - UI настроек;
+  - client runtime для native browser notifications;
+  - email outbox processing;
+  - приёмка.
+- Не начинать UI-часть до фиксации новых enum/check constraints в БД.
+- Не подключать native browser notifications до стабилизации semantics канала `browser`.
+- Приоритет внедрения для доменных событий:
+  1. `added_to_card`
+  2. `made_responsible`
+  3. `card_comment_new`
+  4. `card_ready` / `card_in_progress` / `card_moved`
+- Любая логика “default = true, если нет записи preference” должна применяться одинаково на server side и в settings UI.
+- Telegram/timezone/quiet-hours не “скрывать частично”, а исключить из активного кода и пользовательского сценария.
+
+## 3) Трекер задач (живой чеклист)
+Статусы: `todo | doing | blocked | done`.
+
+### EPIC NT1 — Привести shared constants и UI-словарь к новой модели
+- [x] **NT1.1 (done)** Обновить `web/src/lib/notifications/constants.ts`
+  - заменить каналы на `browser | email`;
+  - расширить event type до 6 значений;
+  - обновить русские label для каналов и типов.
+  - **DoD**: фронтенд-код больше не использует `telegram/internal` как допустимые пользовательские каналы.
+- [ ] **NT1.2 (todo)** Проверить все импорты `NotificationChannel` / `NotificationEventType`
+  - исправить места, где код опирается на старые значения;
+  - не оставлять runtime-ветки под `telegram` и `internal` в пользовательском UI.
+  - **DoD**: сборка не падает из-за старых union type и label map.
+
+### EPIC NT2 — Обновить схему БД под `browser + email` и 6 event types
+- [ ] **NT2.1 (todo)** Добавить миграцию на `notification_preferences`
+  - допустимые `channel`: только `browser`, `email`;
+  - допустимые `event_type`: все 6 значений;
+  - сохранить уникальность `(user_id, channel, event_type)`.
+  - **DoD**: схема таблицы соответствует спецификации 11.1.
+- [ ] **NT2.2 (todo)** Добавить миграцию на `notification_outbox`
+  - допустимый `channel`: только `email`;
+  - допустимые `event_type`: все 6 значений;
+  - статусы `pending | sent | failed` оставить;
+  - лимит попыток до 5 сохранить.
+  - **DoD**: схема таблицы соответствует спецификации 11.2.
+- [ ] **NT2.3 (todo)** Добавить миграцию на `internal_notifications`
+  - расширить допустимые `event_type` до 6 значений.
+  - **DoD**: схема таблицы соответствует спецификации 11.3.
+- [ ] **NT2.4 (todo)** Убрать `notification_user_settings` из целевой модели
+  - удалить таблицу или перевести проект в состояние полной независимости от неё;
+  - убрать связанные `updated_at` trigger references, если они завязаны на существование таблицы;
+  - убрать её из server/UI-кода.
+  - **DoD**: приложение, UI и логика уведомлений не читают и не пишут `notification_user_settings`.
+- [ ] **NT2.5 (todo)** Проверить RLS после миграций
+  - `notification_preferences`: CRUD только своих строк;
+  - `internal_notifications`: select/update только своих строк;
+  - `notification_outbox`: без пользовательских политик на прямой доступ.
+  - **DoD**: после миграций существующая модель доступа не сломана.
+
+### EPIC NT3 — Миграция данных со старой модели на новую
+- [ ] **NT3.1 (todo)** Перенести пользовательские preference по старым 4 типам
+  - сохранить existing enabled/disabled значения для старых типов;
+  - сопоставление каналов:
+    - `internal -> browser`
+    - `telegram -> email`
+  - если в текущих данных есть оба канала, перенести каждый независимо.
+  - **DoD**: пользовательские значения по 4 старым типам не теряются.
+- [ ] **NT3.2 (todo)** Инициализировать новые типы `card_in_progress` и `card_ready`
+  - если явных записей нет, default трактуется как `browser = true`, `email = true`;
+  - при необходимости можно не материализовать строки в БД, если server/UI уже корректно применяют fallback `true`.
+  - **DoD**: новый пользователь и существующий пользователь без явной записи получают `true` по умолчанию.
+- [ ] **NT3.3 (todo)** Обработать legacy timezone / quiet hours
+  - старые данные не должны участвовать в UI и доставке;
+  - никакой попытки “мигрировать” quiet hours в новую логику не требуется.
+  - **DoD**: старые настройки считаются устаревшими и нигде не используются.
+- [ ] **NT3.4 (todo)** Проверить legacy Telegram-данные
+  - `profiles.telegram_*` и `telegram_link_tokens` не использовать в новой логике уведомлений;
+  - не удалять автоматически, если это не требуется отдельной задачей.
+  - **DoD**: Telegram-данные не влияют на пользовательское поведение уведомлений.
+
+### EPIC NT4 — Переписать SQL-слой доставки уведомлений
+- [ ] **NT4.1 (todo)** Переписать `public.enqueue_notification_event(...)`
+  - поддержать 6 event type;
+  - применять правило “не уведомлять автора”;
+  - при `browser` preference = true создавать запись в `internal_notifications`;
+  - при `email` preference = true создавать запись в `notification_outbox` с `channel='email'`;
+  - по умолчанию при отсутствии preference считать канал включённым.
+  - **DoD**: функция соответствует разделам 2.4, 3.2, 8, 9.
+- [ ] **NT4.2 (todo)** Обновить возвращаемый контракт функции
+  - вместо `internal_inserted` / `telegram_inserted` вернуть семантику `browser_inserted` / `email_inserted` или аналогично понятный контракт;
+  - не допускать legacy-терминов в новых JSON-ключах.
+  - **DoD**: результат функции отражает новую модель каналов.
+- [ ] **NT4.3 (todo)** Проверить текстовые поля уведомления
+  - title/body/link_url должны позволять формировать одинаковые данные для внутреннего центра и email;
+  - обязательные данные: доска, карточка, автор, описание, ссылка.
+  - **DoD**: SQL-слой не теряет обязательные поля из раздела 10.2.
+
+### EPIC NT5 — Подключить создание уведомлений к доменным событиям
+
+#### NT5.A — `added_to_card`
+- [ ] **NT5.1 (todo)** Найти и обновить место, где пользователь добавляется в `card_assignees`
+  - событие должно создаваться только если пользователь действительно не был участником карточки до этого;
+  - получатель: только добавленный пользователь;
+  - если пользователь добавил сам себя, уведомление не создавать.
+  - **DoD**: уведомление создаётся строго по правилам 4.1.
+
+#### NT5.B — `made_responsible`
+- [ ] **NT5.2 (todo)** Подключить уведомление при смене `cards.responsible_user_id`
+  - событие создаётся только для нового ответственного;
+  - не создавать, если пользователь назначил ответственным сам себя;
+  - не создавать, если значение фактически не изменилось.
+  - **DoD**: уведомление создаётся строго по правилам 4.2.
+
+#### NT5.C — `card_comment_new`
+- [ ] **NT5.3 (todo)** Убрать прямой `insert` комментария из чисто клиентского сценария, если это мешает централизованной доставке
+  - целевой вариант: создание комментария через server action или RPC, где можно централизованно вызвать `enqueue_notification_event`;
+  - сохранить текущие RLS-ограничения и поведение reply.
+  - **DoD**: после создания комментария корректно создаются уведомления всем текущим участникам карточки, кроме автора.
+- [ ] **NT5.4 (todo)** Обеспечить фильтрацию удалённых комментариев
+  - событие только для нового комментария, который не является удалённым.
+  - **DoD**: soft delete/update не создают `card_comment_new`.
+
+#### NT5.D — `card_moved`, `card_in_progress`, `card_ready`
+- [ ] **NT5.5 (todo)** Пересобрать логику уведомлений при перемещении карточки
+  - определить `from column_type` и `to column_type`;
+  - реализовать строгий приоритет:
+    1. `card_ready`
+    2. `card_in_progress`
+    3. `card_moved`
+  - не создавать уведомление при изменении позиции внутри той же колонки.
+  - **DoD**: за одно перемещение создаётся не более одного уведомления из трёх.
+- [ ] **NT5.6 (todo)** Проверить интеграцию с существующими RPC перемещения карточек
+  - `supabase/migrations/20260406160000_reorder_board_cards_rpc.sql`
+  - `supabase/migrations/20260406170000_reorder_board_cards_auto_responsible_in_work.sql`
+  - при необходимости выпустить новую миграцию `CREATE OR REPLACE FUNCTION ...`.
+  - **DoD**: SQL/RPC на перемещение соответствует разделам 4.4–4.6 и 5.
+- [ ] **NT5.7 (todo)** Сформировать корректных получателей для перемещения
+  - все текущие участники карточки;
+  - исключить автора перемещения;
+  - использовать актуальный состав assignee после операции, если это соответствует фактическому state карточки.
+  - **DoD**: список получателей соответствует спецификации.
+
+### EPIC NT6 — Пересобрать экран настроек уведомлений
+- [ ] **NT6.1 (todo)** Упростить серверную загрузку `web/src/app/notifications/settings/page.tsx`
+  - убрать чтение `notification_user_settings`;
+  - грузить только `notification_preferences`;
+  - initial state строить по 6 типам и 2 каналам с fallback `true`.
+  - **DoD**: server page не обращается к timezone и quiet hours.
+- [ ] **NT6.2 (todo)** Переписать `notification-settings-client.tsx`
+  - удалить блок timezone;
+  - удалить все упоминания Telegram;
+  - заменить switch на checkbox;
+  - сделать таблицу `Тип уведомления | В браузере | По email`;
+  - показать ровно 6 строк.
+  - **DoD**: UI соответствует разделу 6.1–6.4.
+- [ ] **NT6.3 (todo)** Добавить информационную плашку
+  - текст про правило “Вы не получаете уведомления, если являетесь автором действия”.
+  - **DoD**: плашка соответствует спецификации.
+- [ ] **NT6.4 (todo)** Сохранить автосохранение
+  - одно действие пользователя меняет только одну настройку;
+  - сохранить optimistic/local UX, если он уже есть;
+  - server action должен upsert-ить одну запись.
+  - **DoD**: изменение одного чекбокса сохраняется сразу без кнопки “Сохранить”.
+- [ ] **NT6.5 (todo)** Переписать `web/src/app/notifications/settings/actions.ts`
+  - удалить `updateNotificationTimezoneAction`;
+  - оставить только действия для preference;
+  - проверить server validation на новые каналы и типы.
+  - **DoD**: server actions соответствуют новой модели.
+
+### EPIC NT7 — Добавить блок browser permission и native browser notifications
+- [ ] **NT7.1 (todo)** Добавить client-side определение `Notification.permission`
+  - состояния: `default | granted | denied`;
+  - корректно обрабатывать отсутствие API в браузере.
+  - **DoD**: UI знает текущее состояние разрешения без БД.
+- [ ] **NT7.2 (todo)** Добавить блок разрешения на странице настроек
+  - при `default`: активная кнопка “Включить уведомления в браузере”;
+  - при `granted`: статус “Браузерные уведомления включены”;
+  - при `denied`: статус с инструкцией разрешить вручную в браузере и обновить страницу.
+  - **DoD**: блок соответствует разделу 7.
+- [ ] **NT7.3 (todo)** Реализовать вызов `Notification.requestPermission()`
+  - после ответа браузера UI должен сразу обновить статус;
+  - при `default` после закрытия системного диалога без выбора сохранить это состояние в UI.
+  - **DoD**: поведение соответствует разделу 7.3–7.4.
+- [ ] **NT7.4 (todo)** Выбрать точку запуска native browser notifications
+  - вероятный вариант: отдельный клиентский provider в layout или на защищённой оболочке приложения;
+  - provider должен слушать появление новых `internal_notifications` для текущего пользователя.
+  - **DoD**: есть единая точка runtime-логики, а не разрозненные вызовы по страницам.
+- [ ] **NT7.5 (todo)** Реализовать правило показа только для открытой, но неактивной вкладки
+  - показывать native notification только если:
+    - preference `browser = true`;
+    - permission = `granted`;
+    - вкладка открыта;
+    - вкладка неактивна/невидима;
+    - запись во внутреннем центре уже существует.
+  - при активной вкладке создавать только внутреннее уведомление без `new Notification(...)`.
+  - **DoD**: правила раздела 8.1–8.4 выполняются.
+- [ ] **NT7.6 (todo)** Избежать дублей native notifications
+  - если список `internal_notifications` перезагружается или realtime присылает одно и то же обновление, не показывать всплывающее уведомление повторно;
+  - хранить dedupe state локально в памяти клиента.
+  - **DoD**: одно внутреннее уведомление даёт не более одного native popup в рамках жизни вкладки.
+
+### EPIC NT8 — Email outbox и фактическая отправка email
+- [ ] **NT8.1 (todo)** Подготовить data contract для email outbox
+  - `notification_outbox.channel = 'email'`;
+  - запись должна содержать всё необходимое для шаблона письма;
+  - title/body/link_url должны быть пригодны для email.
+  - **DoD**: outbox достаточно самодостаточен для отправки письма.
+- [ ] **NT8.2 (blocked)** Найти или определить существующий механизм фоновой обработки outbox
+  - проверить, есть ли в проекте cron, worker, Edge Function или внешний обработчик;
+  - если инфраструктура отсутствует, агент должен остановиться перед реализацией отправки и запросить решение у пользователя.
+  - **DoD**: выбран технический путь фактической email-доставки.
+- [ ] **NT8.3 (todo)** Реализовать обработчик `pending -> sent/failed`
+  - брать только `channel='email'`;
+  - увеличивать `attempts`;
+  - ограничивать ретраи до 5;
+  - учитывать `next_attempt_at`, если поле уже используется в проекте.
+  - **DoD**: асинхронная email-доставка соответствует разделу 9.2.
+- [ ] **NT8.4 (todo)** Подготовить шаблоны/formatter email-содержимого
+  - заголовки строго из раздела 10.1;
+  - тело должно включать доску, карточку, автора, описание, ссылку.
+  - **DoD**: email соответствует обязательным данным из раздела 10.2.
+
+### EPIC NT9 — Привести экран внутреннего центра уведомлений в консистентное состояние
+- [ ] **NT9.1 (todo)** Проверить `web/src/app/notifications/page.tsx`
+  - при необходимости обновить copy: вместо “внутренние” ориентироваться на термин “центр уведомлений”;
+  - не менять базовое поведение read/unread, если оно уже соответствует требованиям.
+  - **DoD**: UI центра уведомлений консистентен с каналом `browser`.
+- [ ] **NT9.2 (todo)** Проверить `web/src/app/notifications/actions.ts`
+  - убедиться, что mark-as-read логика не зависит от legacy event type/channel semantics.
+  - **DoD**: прочтение уведомлений продолжает работать без регрессии.
+
+### EPIC NT10 — Очистка legacy UI и copy
+- [ ] **NT10.1 (todo)** Удалить все упоминания Telegram из notification UI
+  - тексты;
+  - labels;
+  - описания;
+  - табличные заголовки.
+  - **DoD**: на экране настроек и связанных экранах Telegram не упоминается.
+- [ ] **NT10.2 (todo)** Удалить все упоминания timezone/quiet hours из notification UI
+  - тексты;
+  - select;
+  - server loading;
+  - actions.
+  - **DoD**: пользовательский сценарий больше не содержит timezone и quiet hours.
+- [ ] **NT10.3 (todo)** Проверить `.ai/done/agent-plan.md` и соседние документы только на предмет внутренних ссылок/ожиданий
+  - не править исторические планы без необходимости;
+  - убедиться, что текущая реализация не ориентируется на устаревшие пункты про Telegram.
+  - **DoD**: активный код не зависит от старой документации.
+
+### EPIC NT11 — Проверка критериев приёмки и smoke-тесты
+- [ ] **NT11.1 (todo)** Экран настроек
+  - нет timezone;
+  - нет Telegram;
+  - 6 строк;
+  - 2 канала;
+  - checkbox по каждому сочетанию.
+  - **DoD**: соответствует разделу 13.1.
+- [ ] **NT11.2 (todo)** Browser permission block
+  - `default`: видна кнопка;
+  - `granted`: статус включено;
+  - `denied`: статус с инструкцией.
+  - **DoD**: соответствует разделу 13.2.
+- [ ] **NT11.3 (todo)** Новые типы уведомлений
+  - перенос в `in_work` создаёт `card_in_progress`;
+  - перенос в `done` создаёт `card_ready`;
+  - одно перемещение не создаёт дубли между тремя типами.
+  - **DoD**: соответствует разделу 13.3.
+- [ ] **NT11.4 (todo)** Поведение каналов
+  - `email=false` отключает email;
+  - `browser=false` отключает создание записи во внутреннем центре;
+  - `browser=true + granted + hidden tab` показывает native notification;
+  - `browser=true + active tab` не показывает native notification;
+  - автор не получает уведомление.
+  - **DoD**: соответствует разделу 13.4.
+- [ ] **NT11.5 (todo)** Регрессии
+  - экран `/notifications` открывается;
+  - read/unread работает;
+  - settings page сохраняет настройки;
+  - сборка и типизация зелёные;
+  - lint по изменённым файлам чистый.
+  - **DoD**: нет очевидных регрессий в существующем notification flow.
+
+## 4) Порядок выполнения для агента
+1. NT1 — обновить shared constants и типы.
+2. NT2 — выпустить миграции схемы.
+3. NT3 — выпустить миграцию данных.
+4. NT4 — переписать `enqueue_notification_event`.
+5. NT5 — подключить доменные события к уведомлениям.
+6. NT6 — пересобрать settings page.
+7. NT7 — добавить browser permission + native notifications runtime.
+8. NT8 — довести email outbox до фактической отправки.
+9. NT9/NT10 — cleanup legacy UI и терминологии.
+10. NT11 — ручная и техническая приёмка.
+
+## 5) Файлы и модули, которые почти наверняка будут затронуты
+
+### Frontend
+- `web/src/lib/notifications/constants.ts`
+- `web/src/app/notifications/page.tsx`
+- `web/src/app/notifications/actions.ts`
+- `web/src/app/notifications/settings/page.tsx`
+- `web/src/app/notifications/settings/notification-settings-client.tsx`
+- `web/src/app/notifications/settings/actions.ts`
+- `web/src/app/layout.tsx` или другой общий layout/provider-слой для runtime browser notifications
+- `web/src/app/boards/[boardId]/card-comments-sidebar.tsx`
+- `web/src/app/boards/[boardId]/actions.ts` и связанные модули, если уведомления будут подключаться через server actions
+
+### SQL / migrations
+- новая миграция для `notification_preferences`
+- новая миграция для `notification_outbox`
+- новая миграция для `internal_notifications`
+- новая миграция для удаления/деактивации `notification_user_settings`
+- новая миграция с `CREATE OR REPLACE FUNCTION public.enqueue_notification_event(...)`
+- новая миграция для обновления RPC перемещения карточек:
+  - `reorder_board_cards`
+  - авто-логики `in_work`
+- возможно новая миграция/RPC для централизованного создания комментариев с уведомлениями
+
+### Инфраструктура
+- модуль/worker/Edge Function для обработки `notification_outbox(channel='email')`
+- возможно новый клиентский provider/hook для Browser Notification API
+
+## 6) Риски и стоп-условия
+- Если в проекте нет существующего механизма отправки email и нет согласованного провайдера, выполнение EPIC NT8 должно остановиться с вопросом пользователю.
+- Если создание комментариев останется прямым клиентским `insert`, а централизованно вызвать `enqueue_notification_event` не получится без дублирования логики, агент должен остановиться и выбрать один из путей:
+  - перевод создания комментария на server action/RPC;
+  - либо DB-trigger подход, если он лучше укладывается в текущую архитектуру.
+- Если удаление `notification_user_settings` ломает существующие миграции/триггеры, разрешается перейти на промежуточный шаг:
+  - сначала полностью отвязать код;
+  - затем удалить таблицу отдельной миграцией.
+
+## 7) Минимальный definition of done всей задачи
+- В пользовательском UI больше нет Telegram, timezone и quiet hours на экране настроек уведомлений.
+- На экране настроек есть только 6 типов уведомлений и только 2 канала: `browser`, `email`.
+- `browser=false` отключает создание записи в `internal_notifications`.
+- `browser=true` создаёт запись в `internal_notifications`, а native notification показывается только при `granted` и скрытой/неактивной вкладке.
+- `email=true` создаёт запись в `notification_outbox(channel='email')`.
+- Для `card_ready` / `card_in_progress` / `card_moved` соблюдён строгий приоритет без дублей.
+- Правило “не уведомлять автора” соблюдается для всех 6 типов и обоих каналов.
+- Legacy-логика `telegram/internal/timezone/quiet hours` не участвует в пользовательском сценарии и доставке уведомлений.
+
+## 8) Журнал прогресса (агент)
+- **2026-04-07 — NT1.1**
+  - Обновлён `web/src/lib/notifications/constants.ts`: каналы `browser` / `email`, шесть типов событий (добавлены `card_in_progress`, `card_ready`), подписи каналов «В браузере» / «По email» и типов по спецификации §3.1.
+  - `web/src/app/notifications/settings/notification-settings-client.tsx`: колонки и переключатели строятся из `NOTIFICATION_CHANNELS` (без хардкода `telegram`/`internal`); для `form action` часового пояса добавлена обёртка `async (fd) => { await updateTimezoneAction(fd); }` из‑за типов Next.js 15 (возврат `ServerResult` из прямого `action` не допускается).
+  - Миграции не делались (шаг NT2).
+  - Проверка: в каталоге `web/` выполнен `npm run build` — успешно.

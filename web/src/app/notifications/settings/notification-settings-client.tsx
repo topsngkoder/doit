@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { cn } from "@/lib/utils";
 import {
   NOTIFICATION_CHANNEL_LABEL,
+  NOTIFICATION_CHANNELS,
   NOTIFICATION_EVENT_TYPE_LABEL,
   NOTIFICATION_EVENT_TYPES,
   type NotificationChannel,
@@ -143,7 +144,12 @@ export function NotificationSettingsClient({
             <div className="text-xs text-slate-400">Используется для тихих часов (Telegram).</div>
           </div>
 
-          <form action={updateTimezoneAction} className="flex items-center gap-2">
+          <form
+            action={async (formData) => {
+              await updateTimezoneAction(formData);
+            }}
+            className="flex items-center gap-2"
+          >
             <select
               name="timezone"
               value={timezone}
@@ -179,14 +185,15 @@ export function NotificationSettingsClient({
       <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/60">
         <div className="grid grid-cols-[1fr_120px_140px] gap-0 border-b border-slate-800 px-4 py-3 text-xs font-semibold text-slate-200">
           <div>Тип уведомления</div>
-          <div className="text-center">{NOTIFICATION_CHANNEL_LABEL.telegram}</div>
-          <div className="text-center">{NOTIFICATION_CHANNEL_LABEL.internal}</div>
+          {NOTIFICATION_CHANNELS.map((channel) => (
+            <div key={channel} className="text-center">
+              {NOTIFICATION_CHANNEL_LABEL[channel]}
+            </div>
+          ))}
         </div>
 
         <div className="divide-y divide-slate-800">
           {NOTIFICATION_EVENT_TYPES.map((eventType) => {
-            const telegramKey = buildKey(eventType, "telegram");
-            const internalKey = buildKey(eventType, "internal");
             return (
               <div
                 key={eventType}
@@ -197,23 +204,16 @@ export function NotificationSettingsClient({
                   <div className="mt-0.5 text-xs text-slate-500">{eventType}</div>
                 </div>
 
-                <div className="flex justify-center">
-                  <Switch
-                    checked={!!prefs[telegramKey]}
-                    disabled={isPending}
-                    label={`${NOTIFICATION_EVENT_TYPE_LABEL[eventType]} · Telegram`}
-                    onChange={(next) => submitPreference(eventType, "telegram", next)}
-                  />
-                </div>
-
-                <div className="flex justify-center">
-                  <Switch
-                    checked={!!prefs[internalKey]}
-                    disabled={isPending}
-                    label={`${NOTIFICATION_EVENT_TYPE_LABEL[eventType]} · Внутренние`}
-                    onChange={(next) => submitPreference(eventType, "internal", next)}
-                  />
-                </div>
+                {NOTIFICATION_CHANNELS.map((channel) => (
+                  <div key={channel} className="flex justify-center">
+                    <Switch
+                      checked={!!prefs[buildKey(eventType, channel)]}
+                      disabled={isPending}
+                      label={`${NOTIFICATION_EVENT_TYPE_LABEL[eventType]} · ${NOTIFICATION_CHANNEL_LABEL[channel]}`}
+                      onChange={(next) => submitPreference(eventType, channel, next)}
+                    />
+                  </div>
+                ))}
               </div>
             );
           })}
