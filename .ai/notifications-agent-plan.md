@@ -280,11 +280,11 @@
   - после ответа браузера UI должен сразу обновить статус;
   - при `default` после закрытия системного диалога без выбора сохранить это состояние в UI.
   - **DoD**: поведение соответствует разделу 7.3–7.4.
-- [ ] **NT7.4 (todo)** Выбрать точку запуска native browser notifications
+- [x] **NT7.4 (done)** Выбрать точку запуска native browser notifications
   - вероятный вариант: отдельный клиентский provider в layout или на защищённой оболочке приложения;
   - provider должен слушать появление новых `internal_notifications` для текущего пользователя.
   - **DoD**: есть единая точка runtime-логики, а не разрозненные вызовы по страницам.
-- [ ] **NT7.5 (todo)** Реализовать правило показа только для открытой, но неактивной вкладки
+- [x] **NT7.5 (done)** Реализовать правило показа только для открытой, но неактивной вкладки
   - показывать native notification только если:
     - preference `browser = true`;
     - permission = `granted`;
@@ -570,4 +570,21 @@
   - `notification-settings-client.tsx`: карточка с подзаголовком §7.1 (не подменяет таблицу / email / внутренний центр); состояния — текст при `pending` и `unsupported`; при `granted` — «Браузерные уведомления включены»; при `denied` — дословно §7.2; при `default` — кнопка «Включить уведомления в браузере» → `Notification.requestPermission()`, затем `refresh` в `finally` (ошибки контекста — тоже перечитать состояние, §7.4).
   - Миграции не требовались.
   - Проверка: `npm run build` в `web/` — успешно. Вручную на `/notifications/settings`: до клика — кнопка при первом заходе; после разрешения/запрета — нужный текст; заблокировать сайту уведомления в настройках браузера → обновить страницу — ветка `denied`; снять блокировку и обновить — снова запрос или `default`/`granted` в зависимости от браузера.
-  - **Следующий шаг по плану:** NT7.4 (точка запуска native notifications / provider).
+  - **Следующий шаг по плану:** NT7.4 (точка запуска native notifications / provider) — см. журнал ниже.
+- **2026-04-07 — NT7.4**
+  - **Realtime:** миграция `supabase/migrations/20260407261000_realtime_internal_notifications.sql` — таблица `internal_notifications` добавлена в публикацию `supabase_realtime` (идемпотентно, с `RAISE WARNING` при ошибке).
+  - **Provider:** `web/src/lib/notifications/browser-native-notifications-provider.tsx` — клиентский контекст: подписка `postgres_changes` только на `INSERT` по `user_id=eq.<session>`; переключение канала при `onAuthStateChange`; оповещение подписчиков через `subscribe` / хук `useInternalNotificationInserts` (для NT7.5–NT7.6).
+  - **Layout:** `web/src/app/layout.tsx` — обёртка `BrowserNativeNotificationsProvider` вокруг основного контейнера страницы.
+  - Применено: `npx supabase db push --yes`. Сборка: `npm run build` в `web/` — успешно.
+  - **Как проверить:** залогиниться, открыть приложение; в другой сессии/браузере вызвать действие, создающее внутреннее уведомление; в DevTools → Application можно повесить временно `useInternalNotificationInserts` на тестовой странице или поставить breakpoint в `emit` — событие должно прийти после применения миграции и при включённом Realtime на проекте. Без миграции вставки в БД есть, но Realtime по таблице не шлёт.
+  - **Следующий шаг по плану:** NT7.5 (вкладка неактивна + `Notification` только при `granted` и preference browser) — см. журнал ниже.
+- **2026-04-07 — NT7.5**
+  - `browser-native-notifications-provider.tsx`: парсинг Realtime INSERT дополняет `event_type` (`isNotificationEventType`); `BrowserNativeNotificationPresenter` внутри provider вызывает `useInternalNotificationInserts` и по событию:
+    - §8.1–8.2: `readBrowserNotificationPermission` только `granted`; для типа — `notification_preferences` `channel=browser` + `event_type`, отсутствие строки = включено (`enabled !== false`);
+    - §8.3–8.4: `shouldOfferNativeBrowserPopup()` — показ только если `document.hidden` / `visibilityState === 'hidden'` или окно без фокуса (`!document.hasFocus()`); на активной видимой вкладке всплытия нет;
+    - проверка `getUser()` совпадает с `row.user_id`;
+    - `new Notification(title, { body, data })`, `onclick` — фокус окна и переход по `link_url` при наличии.
+  - Дедупликация по `id` в `Set` (до 500) в том же презентере — база под NT7.6.
+  - Проверка: `npm run build` в `web/` — успешно.
+  - **Как проверить вручную:** выдать сайту разрешение на уведомления; для типа события включить «В браузере»; воспроизвести действие **другим** пользователем; получатель **с вкладкой в фоне** (или без фокуса окна) — системное уведомление; та же вкладка **в фокусе и видима** — только запись в `/notifications`, без popup.
+  - **Следующий шаг по плану:** NT7.6 (доработать dedupe при необходимости — перезагрузка списка и пр.).

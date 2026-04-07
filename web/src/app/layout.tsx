@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
+import { BrowserNativeNotificationsProvider } from "@/lib/notifications/browser-native-notifications-provider";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -25,6 +26,7 @@ export default function RootLayout({
         className="min-h-screen bg-slate-950 font-sans text-slate-50"
         style={{ backgroundColor: "#020617", color: "#f8fafc" }}
       >
+        <BrowserNativeNotificationsProvider>
         <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-4 py-6">
           <header className="mb-6 flex items-center justify-between gap-4 border-b border-slate-800 pb-4">
             <Link href="/" className="text-lg font-semibold tracking-tight">
@@ -68,6 +70,7 @@ export default function RootLayout({
             MVP Doit · Supabase + Next.js
           </footer>
         </div>
+        </BrowserNativeNotificationsProvider>
       </body>
     </html>
   );
