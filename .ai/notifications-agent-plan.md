@@ -304,16 +304,15 @@
   - запись должна содержать всё необходимое для шаблона письма;
   - title/body/link_url должны быть пригодны для email.
   - **DoD**: outbox достаточно самодостаточен для отправки письма.
-- [ ] **NT8.2 (blocked — нужен выбор стека от владельца)** Найти или определить существующий механизм фоновой обработки outbox
-  - проверить, есть ли в проекте cron, worker, Edge Function или внешний обработчик;
-  - **аудит 2026-04-07:** готового обработчика в репозитории нет (см. журнал «NT8.2»); типы/контракт outbox есть, исполнителя очереди — нет;
-  - если инфраструктура отсутствует, агент должен остановиться перед реализацией отправки и запросить решение у пользователя.
-  - **DoD**: выбран технический путь фактической email-доставки (после ответа владельца отметить `[x]` и перейти к NT8.3).
-- [ ] **NT8.3 (todo)** Реализовать обработчик `pending -> sent/failed`
+- [x] **NT8.2 (done)** Найти или определить существующий механизм фоновой обработки outbox
+  - **аудит:** см. журнал 2026-04-07 «NT8.2»; **зафиксированный путь (сообщение владельца «дальше»):** Next.js Route Handler + `SUPABASE_SERVICE_ROLE_KEY` + расписание (пример: `web/vercel.json` каждые 5 мин; либо внешний cron с `Authorization: Bearer`).
+  - **DoD**: выбран технический путь фактической email-доставки.
+- [x] **NT8.3 (done)** Реализовать обработчик `pending -> sent/failed`
   - брать только `channel='email'`;
   - увеличивать `attempts`;
   - ограничивать ретраи до 5;
   - учитывать `next_attempt_at`, если поле уже используется в проекте.
+  - **Реализация:** `GET|POST /api/cron/process-notification-outbox`, пакетная логика в `process-notification-outbox-email-batch.ts`, отправка через Resend HTTP (`send-outbox-email-resend.ts`).
   - **DoD**: асинхронная email-доставка соответствует разделу 9.2.
 - [ ] **NT8.4 (todo)** Подготовить шаблоны/formatter email-содержимого
   - заголовки строго из раздела 10.1;
@@ -615,3 +614,11 @@
   - **От владельца нужно:** номер варианта (или свой), хостинг приложения/БД, предпочтительный email-провайдер (Resend, SendGrid, SMTP и т.д.) и где хранить секреты.
   - Миграции на этом шаге не требовались.
   - **Проверка читателем:** `rg notification_outbox web supabase --glob '*.{ts,tsx,sql}'` — вхождения только в миграциях, SQL `enqueue_*` и `notification-outbox.ts`; отдельного воркера нет.
+- **2026-04-07 — NT8.2 (закрытие) + NT8.3**
+  - **Путь:** вариант 1 из аудита — API route в Next.js; провайдер исходящей почты **Resend** (без нового npm-пакета, `fetch`).
+  - **Файлы:** `web/src/lib/supabase/service-role.ts`; `web/src/lib/notifications/send-outbox-email-resend.ts`; `web/src/lib/notifications/process-notification-outbox-email-batch.ts`; `web/src/app/api/cron/process-notification-outbox/route.ts`; `web/vercel.json` (cron каждые 5 минут); дополнен `web/.env.local.example` (`SUPABASE_SERVICE_ROLE_KEY`, `NOTIFICATION_OUTBOX_CRON_SECRET`, `RESEND_API_KEY`, `NOTIFICATION_EMAIL_FROM`).
+  - **Семантика:** выборка `pending` + `channel=email` + `next_attempt_at <= now()`; для каждой строки `attempts += 1`; успех → `sent`; ошибка отправки → при `attempts < 5` остаётся `pending`, `next_attempt_at` = backoff (1m→2h); иначе `failed`; пустой `profiles.email` → сразу `failed`.
+  - **Auth cron:** `Authorization: Bearer` = `NOTIFICATION_OUTBOX_CRON_SECRET` или `CRON_SECRET` (как на Vercel).
+  - **Миграции:** не требовались. `supabase db push` — без изменений схемы.
+  - **Проверка:** заполнить env на проде/локально; создать тестовую строку outbox или воспроизвести событие с `email=true`; `curl -H "Authorization: Bearer $NOTIFICATION_OUTBOX_CRON_SECRET" "http://localhost:3000/api/cron/process-notification-outbox"` — ответ JSON `{ examined, sent, failedPermanent, scheduledRetry }`; письмо в Resend dashboard / почте.
+  - **Следующий шаг по плану:** NT8.4 (шаблоны/formatter §10 при необходимости сверх `title`/`body`/`link`).
