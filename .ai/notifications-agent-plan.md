@@ -228,39 +228,39 @@
     3. `card_moved`
   - не создавать уведомление при изменении позиции внутри той же колонки.
   - **DoD**: за одно перемещение создаётся не более одного уведомления из трёх.
-- [ ] **NT5.6 (todo)** Проверить интеграцию с существующими RPC перемещения карточек
+- [x] **NT5.6 (done)** Проверить интеграцию с существующими RPC перемещения карточек
   - `supabase/migrations/20260406160000_reorder_board_cards_rpc.sql`
   - `supabase/migrations/20260406170000_reorder_board_cards_auto_responsible_in_work.sql`
   - при необходимости выпустить новую миграцию `CREATE OR REPLACE FUNCTION ...`.
   - **DoD**: SQL/RPC на перемещение соответствует разделам 4.4–4.6 и 5.
-- [ ] **NT5.7 (todo)** Сформировать корректных получателей для перемещения
+- [x] **NT5.7 (done)** Сформировать корректных получателей для перемещения
   - все текущие участники карточки;
   - исключить автора перемещения;
   - использовать актуальный состав assignee после операции, если это соответствует фактическому state карточки.
   - **DoD**: список получателей соответствует спецификации.
 
 ### EPIC NT6 — Пересобрать экран настроек уведомлений
-- [ ] **NT6.1 (todo)** Упростить серверную загрузку `web/src/app/notifications/settings/page.tsx`
+- [x] **NT6.1 (done)** Упростить серверную загрузку `web/src/app/notifications/settings/page.tsx`
   - убрать чтение `notification_user_settings`;
   - грузить только `notification_preferences`;
   - initial state строить по 6 типам и 2 каналам с fallback `true`.
   - **DoD**: server page не обращается к timezone и quiet hours.
-- [ ] **NT6.2 (todo)** Переписать `notification-settings-client.tsx`
+- [x] **NT6.2 (done)** Переписать `notification-settings-client.tsx`
   - удалить блок timezone;
   - удалить все упоминания Telegram;
   - заменить switch на checkbox;
   - сделать таблицу `Тип уведомления | В браузере | По email`;
   - показать ровно 6 строк.
   - **DoD**: UI соответствует разделу 6.1–6.4.
-- [ ] **NT6.3 (todo)** Добавить информационную плашку
+- [x] **NT6.3 (done)** Добавить информационную плашку
   - текст про правило “Вы не получаете уведомления, если являетесь автором действия”.
   - **DoD**: плашка соответствует спецификации.
-- [ ] **NT6.4 (todo)** Сохранить автосохранение
+- [x] **NT6.4 (done)** Сохранить автосохранение
   - одно действие пользователя меняет только одну настройку;
   - сохранить optimistic/local UX, если он уже есть;
   - server action должен upsert-ить одну запись.
   - **DoD**: изменение одного чекбокса сохраняется сразу без кнопки “Сохранить”.
-- [ ] **NT6.5 (todo)** Переписать `web/src/app/notifications/settings/actions.ts`
+- [x] **NT6.5 (done)** Переписать `web/src/app/notifications/settings/actions.ts`
   - удалить `updateNotificationTimezoneAction`;
   - оставить только действия для preference;
   - проверить server validation на новые каналы и типы.
@@ -537,4 +537,24 @@
   - Участники берутся **после** возможного `INSERT` в `card_assignees` при переносе в `in_work` (актуальный состав).
   - Применено: `supabase db push` (remote).
   - **Проверка в UI:** доска с колонками очередь / в работе / готово; карточка с двумя участниками (A перетаскивает, B в наблюдателях): A тащит в «В работе» — у B одно уведомление типа `card_in_progress`, заголовок «Ваша карточка в работе»; в «Готово» — `card_ready`; между двумя не-in_work колонками — `card_moved`; перетаскивание только вверх/вниз **в той же** колонке — новых уведомлений нет; A сам не получает запись.
-  - **Следующий шаг по плану:** NT5.6 (ревизия интеграции RPC перемещения) / NT5.7 (получатели уже покрыты в NT5.5, при приёмке сверить со спецификацией).
+  - **Следующий шаг по плану:** NT5.7 (получатели — см. NT5.5; при приёмке сверить со спецификацией) либо EPIC NT6.
+- **2026-04-07 — NT5.6**
+  - **Цепочка миграций:** `20260406160000_reorder_board_cards_rpc.sql` → `20260406170000_reorder_board_cards_auto_responsible_in_work.sql` → `20260407250000_nt55_reorder_board_cards_move_notifications.sql`; итоговое определение функции — только в NT55 (других `CREATE OR REPLACE` для `reorder_board_cards` в репозитории нет).
+  - **Сохранённая семантика F6/F7 из 0616/0617:** валидация layout, права на перемещение, при смене колонки на `in_work` — `INSERT card_assignees(actor)`, `UPDATE responsible_user_id`, две записи `card_activity` (`card_moved` и при необходимости `responsible_auto_set`).
+  - **NT55:** блок уведомлений только при `v_col_changed`, приоритет `card_ready` → `card_in_progress` → `card_moved`, порядок внутри колонки без `enqueue`; получатели — `card_assignees` после `UPDATE`/`INSERT assignee` (актуальный состав).
+  - **Клиент:** `reorderBoardCardsAction` → единственный RPC `reorder_board_cards` (`web/src/app/boards/[boardId]/actions.ts`); DnD (`board-columns-dnd.tsx`) вызывает только этот action.
+  - **Realtime DO из 0616:** однократно при проходе миграции 0616; NT55 его не дублирует — ожидаемо.
+  - Применено: `npx supabase db push --yes` → **Remote database is up to date.**
+  - **Как проверить у себя:** smoke из журнала NT5.5 (переносы между типами колонок, без уведомления при сортировке внутри колонки); опционально в SQL: `select pg_get_functiondef('public.reorder_board_cards(uuid,jsonb)'::regprocedure);` — в теле есть `v_set_responsible` и цикл `enqueue_notification_event`.
+- **2026-04-07 — NT5.7**
+  - Спецификация §4.4–4.6: получатели — все строки `card_assignees` по карточке, кроме автора перемещения.
+  - Реализация (`20260407250000_nt55_...`): после `UPDATE`/`INSERT assignee` цикл `FOR r_assignee IN SELECT ... card_assignees WHERE card_id = v_old.id` + `enqueue_notification_event(..., v_uid, ...)`; при совпадении получателя и актёра функция ставит `skipped` и не вставляет записи (`20260407200000_enqueue_notification_event_nt43_...`).
+  - **Как проверить:** сценарий из NT5.5; перенос в `in_work` с автодобавлением актёра в assignees — уведомления у других участников есть, у перетаскивающего нет.
+- **2026-04-07 — NT6 (NT6.1–NT6.5)**
+  - **NT6.1:** `settings/page.tsx` — только `notification_preferences`, инициализация всех пар из `NOTIFICATION_EVENT_TYPES × NOTIFICATION_CHANNELS` с `true`, затем слияние строк БД; `notification_user_settings` не используется.
+  - **NT6.2:** `notification-settings-client.tsx` — toggle-переключатели заменены на `<input type="checkbox">` (доступность: `aria-label` по типу и каналу); таблица 6 строк × 2 канала без изменений структуры.
+  - **NT6.3:** плашка «Вы не получаете уведомления, где являетесь автором действий.» (§6).
+  - **NT6.4:** прежний `submitPreference` + `upsert` одной записи за клик.
+  - **NT6.5:** `actions.ts` — только `setNotificationPreferenceEnabledAction`, валидация `isNotificationChannel` / `isNotificationEventType`.
+  - Проверка: `npm run build` в `web/` — успешно.
+  - **Следующий шаг по плану:** EPIC NT7 (browser permission + native notifications).

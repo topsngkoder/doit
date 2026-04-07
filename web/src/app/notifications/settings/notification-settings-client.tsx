@@ -24,41 +24,6 @@ function buildKey(eventType: NotificationEventType, channel: NotificationChannel
   return `${eventType}:${channel}`;
 }
 
-function Switch({
-  checked,
-  disabled,
-  onChange,
-  label
-}: {
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (next: boolean) => void;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange(!checked)}
-      className={cn(
-        "relative inline-flex h-6 w-11 items-center rounded-full border transition-colors",
-        checked ? "border-sky-400/60 bg-sky-500/30" : "border-slate-700 bg-slate-900/40",
-        disabled ? "opacity-60" : "hover:border-slate-500"
-      )}
-    >
-      <span
-        className={cn(
-          "inline-block h-5 w-5 translate-x-0.5 rounded-full bg-slate-200 shadow transition-transform",
-          checked ? "translate-x-5 bg-sky-200" : "translate-x-0.5 bg-slate-200"
-        )}
-      />
-    </button>
-  );
-}
-
 export function NotificationSettingsClient({
   initialPreferences,
   setPreferenceEnabledAction
@@ -131,16 +96,25 @@ export function NotificationSettingsClient({
                   <div className="mt-0.5 text-xs text-slate-500">{eventType}</div>
                 </div>
 
-                {NOTIFICATION_CHANNELS.map((channel) => (
-                  <div key={channel} className="flex justify-center">
-                    <Switch
-                      checked={!!prefs[buildKey(eventType, channel)]}
-                      disabled={isPending}
-                      label={`${NOTIFICATION_EVENT_TYPE_LABEL[eventType]} · ${NOTIFICATION_CHANNEL_LABEL[channel]}`}
-                      onChange={(next) => submitPreference(eventType, channel, next)}
-                    />
-                  </div>
-                ))}
+                {NOTIFICATION_CHANNELS.map((channel) => {
+                  const label = `${NOTIFICATION_EVENT_TYPE_LABEL[eventType]} · ${NOTIFICATION_CHANNEL_LABEL[channel]}`;
+                  return (
+                    <div key={channel} className="flex justify-center">
+                      <input
+                        type="checkbox"
+                        className={cn(
+                          "h-4 w-4 cursor-pointer rounded border-slate-600 bg-slate-900",
+                          "text-sky-500 accent-sky-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500/60",
+                          "disabled:cursor-not-allowed disabled:opacity-60"
+                        )}
+                        checked={!!prefs[buildKey(eventType, channel)]}
+                        disabled={isPending}
+                        aria-label={label}
+                        onChange={(e) => submitPreference(eventType, channel, e.target.checked)}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             );
           })}
