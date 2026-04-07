@@ -38,6 +38,12 @@ export default function RootLayout({
                 Вход
               </Link>
               <Link
+                href="/signup"
+                className="rounded-md px-3 py-1.5 hover:bg-slate-800 hover:text-slate-50"
+              >
+                Регистрация
+              </Link>
+              <Link
                 href="/notifications"
                 className="rounded-md px-3 py-1.5 hover:bg-slate-800 hover:text-slate-50"
               >

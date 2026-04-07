@@ -142,14 +142,14 @@
 ### EPIC PC7 — Регистрация `/signup` (чтобы имя/фамилия были обязательны при создании аккаунта)
 Цель: выполнить твоё требование “просить заполнить имя и фамилию при регистрации”.
 
-- [ ] **PC7.1 (todo)** Страница `web/src/app/signup/page.tsx`
+- [x] **PC7.1 (done)** Страница `web/src/app/signup/page.tsx`
   - форма: email, password, first_name, last_name, (опц.) position, department
   - валидации: те же правила длины/trim, что в профиле
-- [ ] **PC7.2 (todo)** Server action `signUpAction`
+- [x] **PC7.2 (done)** Server action `signUpAction`
   - `supabase.auth.signUp({ email, password, options: { data: { first_name, last_name, position, department }}})`
   - UX:
     - при успехе: либо сразу redirect на `/boards` (если сессия появилась), либо показать сообщение “Проверьте почту” (если confirm email включён)
-- [ ] **PC7.3 (todo)** Ссылка на регистрацию
+- [x] **PC7.3 (done)** Ссылка на регистрацию
   - добавить линк “Регистрация” на `/login` и/или в header.
 - [ ] **PC7.4 (todo)** Проверка триггера `handle_new_auth_user`
   - убедиться, что метаданные попадают и создают `profiles` с `first_name/last_name`.

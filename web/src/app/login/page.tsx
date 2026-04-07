@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Toast } from "@/components/ui/toast";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -26,6 +27,12 @@ export default async function LoginPage() {
       </header>
       <section className="space-y-4 rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-5 text-sm text-slate-200">
         <LoginForm />
+        <p className="text-center text-xs text-slate-400">
+          Нет аккаунта?{" "}
+          <Link href="/signup" className="font-medium text-sky-400 hover:text-sky-300 hover:underline">
+            Регистрация
+          </Link>
+        </p>
         <Toast
           title="Локальная разработка"
           message="Если видите «Email not confirmed» — в Dashboard: Authentication → Providers → Email → отключите «Confirm email» или подтвердите письмо."
