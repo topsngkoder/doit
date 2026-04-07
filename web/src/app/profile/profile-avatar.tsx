@@ -51,15 +51,34 @@ function deleteCachedSignedUrl(path: string) {
 type Props = {
   userId: string;
   initialAvatarPath: string | null;
+  firstName: string | null;
+  lastName: string | null;
   email: string | null;
   displayName: string | null;
   uploadAvatarAction: (file: File) => Promise<AvatarMutationResult>;
   deleteAvatarAction: () => Promise<AvatarMutationResult>;
 };
 
+function getInitials(firstName: string | null, lastName: string | null): string | null {
+  const first = firstName?.trim().charAt(0) ?? "";
+  const last = lastName?.trim().charAt(0) ?? "";
+  const initials = `${first}${last}`.trim().toUpperCase();
+  return initials || null;
+}
+
+function getAvatarFallback(firstName: string | null, lastName: string | null, email: string | null): string {
+  const initials = getInitials(firstName, lastName);
+  if (initials) return initials;
+  const emailInitial = email?.trim().charAt(0).toUpperCase();
+  if (emailInitial) return emailInitial;
+  return "?";
+}
+
 export function ProfileAvatar({
   userId,
   initialAvatarPath,
+  firstName,
+  lastName,
   email,
   displayName,
   uploadAvatarAction,
@@ -71,6 +90,7 @@ export function ProfileAvatar({
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [message, setMessage] = useState<{ text: string; variant: "success" | "error" } | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const avatarFallback = getAvatarFallback(firstName, lastName, email);
 
   useEffect(() => {
     let cancelled = false;
@@ -185,7 +205,9 @@ export function ProfileAvatar({
             {signedUrl ? (
               <img src={signedUrl} alt="Аватар профиля" className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-xs text-slate-500">Нет фото</div>
+              <div className="flex h-full w-full items-center justify-center text-xl font-semibold text-slate-300">
+                {avatarFallback}
+              </div>
             )}
           </button>
           {avatarPath ? (

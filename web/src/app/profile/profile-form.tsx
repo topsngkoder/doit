@@ -10,6 +10,7 @@ type Props = {
   initialLastName: string;
   initialPosition: string;
   initialDepartment: string;
+  requiresNameCompletion: boolean;
   updateProfileAction: (input: {
     firstName: string;
     lastName: string;
@@ -38,6 +39,7 @@ export function ProfileForm({
   initialLastName,
   initialPosition,
   initialDepartment,
+  requiresNameCompletion,
   updateProfileAction
 }: Props) {
   const [isPending, startTransition] = useTransition();
@@ -104,6 +106,12 @@ export function ProfileForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-4 rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-5">
+      {requiresNameCompletion ? (
+        <p className="rounded-md border border-amber-600/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+          Профиль считается заполненным только после ввода имени и фамилии.
+        </p>
+      ) : null}
+
       <div className="grid gap-4 md:grid-cols-2">
         <label className="flex flex-col gap-1.5 text-sm text-slate-200">
           <span className="text-xs text-slate-400">Имя *</span>

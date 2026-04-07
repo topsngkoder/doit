@@ -355,8 +355,27 @@ function BoardCardRow({
               }
               if (item.itemType === "comments_count") {
                 return (
-                  <span key={item.id} className="rounded bg-slate-800/80 px-1.5 py-0.5 text-[11px] text-slate-300">
-                    {`Комментарии: ${card.commentsCount}`}
+                  <span
+                    key={item.id}
+                    className="inline-flex items-center gap-1 rounded bg-slate-800/80 px-1.5 py-0.5 text-[11px] text-slate-300"
+                    title={`Комментариев: ${card.commentsCount}`}
+                    aria-label={`Комментариев: ${card.commentsCount}`}
+                  >
+                    <svg
+                      viewBox="0 0 16 16"
+                      className="h-3.5 w-3.5 text-slate-400"
+                      aria-hidden="true"
+                      focusable="false"
+                    >
+                      <path
+                        d="M3 3.5h10v6H8l-3 3v-3H3z"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.2"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    <span>{card.commentsCount}</span>
                   </span>
                 );
               }

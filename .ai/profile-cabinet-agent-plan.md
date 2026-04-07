@@ -40,7 +40,7 @@
     - `first_name/last_name/position/department` (как `NULLIF(btrim(...),'')`)
     - `display_name = btrim(first_name || ' ' || last_name)` если оба присутствуют; иначе fallback на текущий алгоритм (local-part email)
   - **DoD**: новый пользователь после signup получает строку `profiles` с `first_name/last_name`.
-- [ ] **PC1.3 (blocked)** Протокол “первый заход в `/profile`”
+- [x] **PC1.3 (done)** Протокол “первый заход в `/profile`”
   - на уровне UI/логики запретить “считать профиль заполненным”, если `first_name` или `last_name` отсутствуют/пустые после `trim`
   - **DoD**: существующий пользователь (с null‑полями) видит требование заполнить.
 
@@ -123,9 +123,9 @@
   - кнопки:
     - “Загрузить” → file picker → нормализация (PC4) → server action upload (PC3.2)
     - “Удалить” → server action delete (PC3.3)
-- [ ] **PC5.5 (todo)** Инициалы, если аватара нет
+- [x] **PC5.5 (done)** Инициалы, если аватара нет
   - показывать первые буквы `first_name` и `last_name` (верхний регистр)
-- [ ] **PC5.6 (todo)** Сценарий “имя/фамилия ещё не заполнены”
+- [x] **PC5.6 (done)** Сценарий “имя/фамилия ещё не заполнены”
   - если `first_name/last_name` null/пустые → в UI:
     - показать заметный блок “Заполните имя/фамилию”
     - в аватар‑превью показывать fallback (например, “?” или первую букву email), пока нет инициалов
@@ -187,4 +187,7 @@
 ## 5) Примечания по совместимости
 - `display_name` остаётся в таблице и продолжает использоваться в существующих местах (например, snapshot доски), но должен быть **производным** от `first_name/last_name` после первого сохранения профиля/регистрации.
 - Поля `first_name/last_name` вводятся как nullable из-за сценария A; UI обеспечивает обязательность.
+- Вне плана: для `web/src/app/boards/[boardId]/page.tsx` добавлена серверная генерация signed URL для `profiles.avatar_url` (bucket `avatars`), чтобы аватары в карточках/участниках корректно отображались с приватным bucket.
+- Bugfix (2026-04-07): добавлена миграция `supabase/migrations/20260407170000_avatars_storage_select_all_authenticated.sql` — `SELECT` в `storage.objects` для bucket `avatars` открыт всем `authenticated` (иначе в карточках/участниках отображался только собственный аватар, а чужие signed URL не генерировались из-за RLS). Права `INSERT/UPDATE/DELETE` остаются только на свой путь `<auth.uid()>/avatar.jpg`.
+- UI tweak (2026-04-07): в `web/src/app/boards/[boardId]/board-columns-dnd.tsx` в карточках заменён текст `Комментарии: N` на компактное отображение `иконка комментария + N` для более минималистичного дизайна.
 

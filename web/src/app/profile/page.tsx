@@ -20,6 +20,8 @@ export default async function ProfilePage() {
     .select("first_name,last_name,position,department,avatar_url,display_name")
     .eq("user_id", user.id)
     .maybeSingle();
+  const profileNeedsNameCompletion =
+    !profile?.first_name?.trim() || !profile?.last_name?.trim();
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-8">
@@ -46,9 +48,19 @@ export default async function ProfilePage() {
         />
       ) : (
         <>
+          {profileNeedsNameCompletion ? (
+            <Toast
+              title="Профиль не заполнен"
+              message="Чтобы завершить настройку личного кабинета, заполните имя и фамилию и нажмите «Сохранить»."
+              variant="error"
+            />
+          ) : null}
+
           <ProfileAvatar
             userId={user.id}
             initialAvatarPath={profile.avatar_url}
+            firstName={profile.first_name ?? null}
+            lastName={profile.last_name ?? null}
             email={user.email ?? null}
             displayName={profile.display_name}
             uploadAvatarAction={uploadAvatarAction}
@@ -60,6 +72,7 @@ export default async function ProfilePage() {
             initialLastName={profile.last_name ?? ""}
             initialPosition={profile.position ?? ""}
             initialDepartment={profile.department ?? ""}
+            requiresNameCompletion={profileNeedsNameCompletion}
             updateProfileAction={updateProfileAction}
           />
         </>

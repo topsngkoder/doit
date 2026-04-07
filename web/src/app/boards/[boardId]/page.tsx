@@ -17,6 +17,9 @@ import { BoardCardPreviewButton } from "./board-card-preview-button";
 import { BoardBackgroundButton } from "./board-background-button";
 import { InviteMemberButton } from "./invite-member-button";
 
+const AVATARS_BUCKET = "avatars";
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+
 type BoardPageProps = {
   params: Promise<{ boardId: string }>;
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -304,6 +307,27 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
     list.sort((a, b) => a.position - b.position);
   }
 
+  const avatarPaths = Array.from(
+    new Set(
+      (snapshot.members ?? [])
+        .map((m) => m.avatar_url)
+        .filter((path): path is string => typeof path === "string" && path.length > 0)
+    )
+  );
+  const signedAvatarByPath = new Map<string, string>();
+  if (avatarPaths.length > 0) {
+    await Promise.all(
+      avatarPaths.map(async (path) => {
+        const { data, error } = await supabase.storage
+          .from(AVATARS_BUCKET)
+          .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
+        if (!error && data?.signedUrl) {
+          signedAvatarByPath.set(path, data.signedUrl);
+        }
+      })
+    );
+  }
+
   const members: BoardMemberPublic[] = (snapshot.members ?? []).map((row) => {
     return {
       userId: row.user_id,
@@ -311,7 +335,7 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
       isOwner: row.is_owner,
       displayName: row.display_name?.trim() || "Участник",
       email: row.email ?? "",
-      avatarUrl: row.avatar_url ?? null,
+      avatarUrl: row.avatar_url ? signedAvatarByPath.get(row.avatar_url) ?? null : null,
       roleName: row.role_name ?? "",
       roleKey: row.role_key ?? ""
     };
