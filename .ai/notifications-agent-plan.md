@@ -179,18 +179,18 @@
   - **DoD**: Telegram-данные не влияют на пользовательское поведение уведомлений.
 
 ### EPIC NT4 — Переписать SQL-слой доставки уведомлений
-- [ ] **NT4.1 (todo)** Переписать `public.enqueue_notification_event(...)`
+- [x] **NT4.1 (done)** Переписать `public.enqueue_notification_event(...)`
   - поддержать 6 event type;
   - применять правило “не уведомлять автора”;
   - при `browser` preference = true создавать запись в `internal_notifications`;
   - при `email` preference = true создавать запись в `notification_outbox` с `channel='email'`;
   - по умолчанию при отсутствии preference считать канал включённым.
   - **DoD**: функция соответствует разделам 2.4, 3.2, 8, 9.
-- [ ] **NT4.2 (todo)** Обновить возвращаемый контракт функции
+- [x] **NT4.2 (done)** Обновить возвращаемый контракт функции
   - вместо `internal_inserted` / `telegram_inserted` вернуть семантику `browser_inserted` / `email_inserted` или аналогично понятный контракт;
   - не допускать legacy-терминов в новых JSON-ключах.
   - **DoD**: результат функции отражает новую модель каналов.
-- [ ] **NT4.3 (todo)** Проверить текстовые поля уведомления
+- [x] **NT4.3 (done)** Проверить текстовые поля уведомления
   - title/body/link_url должны позволять формировать одинаковые данные для внутреннего центра и email;
   - обязательные данные: доска, карточка, автор, описание, ссылка.
   - **DoD**: SQL-слой не теряет обязательные поля из раздела 10.2.
@@ -198,7 +198,7 @@
 ### EPIC NT5 — Подключить создание уведомлений к доменным событиям
 
 #### NT5.A — `added_to_card`
-- [ ] **NT5.1 (todo)** Найти и обновить место, где пользователь добавляется в `card_assignees`
+- [x] **NT5.1 (done)** Найти и обновить место, где пользователь добавляется в `card_assignees`
   - событие должно создаваться только если пользователь действительно не был участником карточки до этого;
   - получатель: только добавленный пользователь;
   - если пользователь добавил сам себя, уведомление не создавать.
@@ -491,3 +491,24 @@
   - **SQL:** чтение `profiles.telegram_chat_id` и ветка `channel = 'telegram'` остались только в `enqueue_notification_event` (`20260407153000_notification_delivery_filters.sql`); вызовов этой функции из других миграций нет — целевая «новая» доставка снимается в **NT4** (browser/email, без линка на Telegram).
   - Таблицы `profiles.telegram_*` и `telegram_link_tokens` **не удалялись** (как в задаче).
   - **Проверка:** повторить `rg -i telegram web` (или поиск в IDE по `web/`); убедиться, что в настройках уведомлений нет колонки/копира про Telegram.
+- **2026-04-07 — NT4.1 + NT4.2**
+  - Миграция `supabase/migrations/20260407185000_enqueue_notification_event_browser_email.sql`: `enqueue_notification_event` принимает шесть `event_type` (`card_in_progress`, `card_ready` добавлены); предпочтения читаются по каналам `browser` и `email`; при отсутствии строки в `notification_preferences` подканал считается включённым (`COALESCE(..., true)`); при совпадении получателя и актёра возвращается `skipped=true`, вставок нет; внутренний центр — только при включённом `browser`; outbox — только при включённом `email`, `channel = 'email'` (без `profiles.telegram_chat_id`).
+  - JSON-ответ: `browser_inserted` / `email_inserted` вместо legacy-ключей; при пропуске по автору оба `false`.
+  - Применено: `supabase db push` (remote).
+  - **Как проверить:** в SQL Editor подставить реальные uuid из своей БД —  
+    `select public.enqueue_notification_event('<recipient>', 'card_ready', '<recipient>', '<board>', '<card>', 'текст тела с контекстом', 'https://app.example/board/...');` → при совпадении получателя и актёра ожидается `skipped=true` (см. NT4.3: отдельный аргумент title убран);  
+    с другим `p_actor_user_id` и включёнными prefs — две вставки или одна, если один канал выключен в `notification_preferences`.
+- **2026-04-07 — NT4.3**
+  - Миграция `supabase/migrations/20260407200000_enqueue_notification_event_nt43_text_contract.sql`: одна и та же пара `title`/`body`/`link_url` пишется и в `internal_notifications`, и в `notification_outbox`; `title` вычисляется из `event_type` по спецификации §10.1 (вызов больше не принимает `p_title`).
+  - Проверки перед вставкой: `p_board_id` и `p_card_id` NOT NULL; `p_body` и `p_link_url` после `trim` не пустые. Содержимое §10.2 (имя автора, названия доски/карточки в тексте) остаётся ответственностью вызывающего кода в `p_body`.
+  - Применено: `supabase db push`.
+  - **Следующий шаг по плану:** NT5.1 (`added_to_card`).
+  - **Как проверить:** вызов с пустым `p_body` или без `p_link_url` → `ERROR`; с валидными аргументами — одинаковые `title`/`body`/`link_url` в обеих таблицах (`title` для типа совпадает с §10.1).
+- **2026-04-07 — NT5.1**
+  - Миграция `supabase/migrations/20260407210000_nt51_added_to_card_enqueue.sql`:
+    - `mutate_card_assignee`: после успешного `INSERT ... ON CONFLICT DO NOTHING` и `GET DIAGNOSTICS` только при `v_ins_count > 0` вызывается `enqueue_notification_event` для **добавленного** пользователя; повторное добавление уже существующего участника не шлёт уведомление; `p_actor_user_id = auth.uid()`; совпадение с получателем обрабатывается внутри `enqueue_notification_event`.
+    - `create_card_with_details`: после вставки всех `card_assignees` цикл по `p_assignee_user_ids` с тем же `enqueue` (создатель в списке участников не получает уведомление сам себе).
+  - Тело уведомления: доска и карточка + автор; ссылка `/boards/{board_id}?card={card_id}`.
+  - Применено: `supabase db push`.
+  - **Следующий шаг:** NT5.2 (`made_responsible`).
+  - **Проверка:** на доске добавить **другого** участника карточки через UI → во внутреннем центре у очереди появилась запись `added_to_card`; добавить себя в список при создании карточки / самоссылка mutate — уведомления «себе» нет; повторно добавить того же assignee (без удаления) — второго уведомления нет.
