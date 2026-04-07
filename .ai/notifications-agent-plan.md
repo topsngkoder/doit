@@ -215,7 +215,7 @@
   - целевой вариант: создание комментария через server action или RPC, где можно централизованно вызвать `enqueue_notification_event`;
   - сохранить текущие RLS-ограничения и поведение reply.
   - **DoD**: после создания комментария корректно создаются уведомления всем текущим участникам карточки, кроме автора.
-- [ ] **NT5.4 (todo)** Обеспечить фильтрацию удалённых комментариев
+- [x] **NT5.4 (done)** Обеспечить фильтрацию удалённых комментариев
   - событие только для нового комментария, который не является удалённым.
   - **DoD**: soft delete/update не создают `card_comment_new`.
 
@@ -520,6 +520,12 @@
   - После вставки: для каждого `card_assignees.user_id` вызывается `enqueue_notification_event(..., 'card_comment_new', ...)`; автор исключается правилом в `enqueue_notification_event`.
   - Клиент: `web/src/app/boards/[boardId]/card-comments-sidebar.tsx` — отправка формы через `supabase.rpc('create_card_comment', ...)` вместо прямого `insert`.
   - Применено: `supabase db push`. Сборка: `npm run build` в `web/` — успешно.
-  - **Замечание к NT5.4:** событие `card_comment_new` создаётся только из этого RPC после новой строки; правка/soft-delete комментария по-прежнему через server actions без `enqueue` — отдельную задачу можно закрыть как верификацию.
-  - **Следующий шаг по плану:** NT5.4 (при необходимости явно зафиксировать отсутствие уведомлений на update/soft-delete) или NT5.5.
   - **Проверка:** карточка с участниками A и B; A пишет комментарий — у B запись `card_comment_new`, у A нет; ответ с `reply` — то же; пользователь без `comments.create` — RPC с ошибкой прав.
+- **2026-04-07 — NT5.4**
+  - Миграция `supabase/migrations/20260407240000_nt54_card_comment_new_skip_deleted.sql`:
+    - триггер `BEFORE INSERT` `card_comments_insert_not_deleted`: запрет строки с `deleted_at IS NOT NULL` при создании;
+    - `create_card_comment`: в `INSERT` явно `deleted_at NULL`; цикл `enqueue_notification_event` выполняется только если вставленная строка существует с `deleted_at IS NULL` (контракт после вставки).
+  - Правка текста и soft-delete по-прежнему через server actions (`updateCardCommentAction` / `softDeleteCardCommentAction`) — вызовов `enqueue` нет.
+  - Применено: `supabase db push` (remote).
+  - **Проверка:** создать комментарий — уведомления участникам как раньше; удалить комментарий (soft-delete) — новых `card_comment_new` нет; попытка `INSERT` в `card_comments` с `deleted_at` не NULL (например из SQL) — ошибка триггера.
+  - **Следующий шаг по плану:** NT5.5 (уведомления при перемещении карточки).
