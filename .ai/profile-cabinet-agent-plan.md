@@ -24,7 +24,7 @@
 Статусы: `todo | doing | blocked | done`.
 
 ### EPIC PC1 — БД: расширение `profiles` под персональные поля
-- [ ] **PC1.1 (todo)** Добавить миграцию: поля в `public.profiles`
+- [x] **PC1.1 (done)** Добавить миграцию: поля в `public.profiles`
   - **DDL**:
     - добавить `first_name text null`, `last_name text null`, `position text null`, `department text null`
     - оставить `display_name` и `avatar_url` как есть (совместимость)
@@ -34,7 +34,7 @@
     - `CHECK (position IS NULL OR char_length(btrim(position)) BETWEEN 1 AND 100)`
     - `CHECK (department IS NULL OR char_length(btrim(department)) BETWEEN 1 AND 100)`
   - **DoD**: миграция применяется, существующие строки не ломаются.
-- [ ] **PC1.2 (todo)** Обновить триггер `public.handle_new_auth_user()`
+- [x] **PC1.2 (done)** Обновить триггер `public.handle_new_auth_user()`
   - читать из `NEW.raw_user_meta_data` значения `first_name`, `last_name`, `position`, `department`
   - писать:
     - `first_name/last_name/position/department` (как `NULLIF(btrim(...),'')`)
