@@ -40,17 +40,17 @@
     - `first_name/last_name/position/department` (как `NULLIF(btrim(...),'')`)
     - `display_name = btrim(first_name || ' ' || last_name)` если оба присутствуют; иначе fallback на текущий алгоритм (local-part email)
   - **DoD**: новый пользователь после signup получает строку `profiles` с `first_name/last_name`.
-- [ ] **PC1.3 (todo)** Протокол “первый заход в `/profile`”
+- [ ] **PC1.3 (blocked)** Протокол “первый заход в `/profile`”
   - на уровне UI/логики запретить “считать профиль заполненным”, если `first_name` или `last_name` отсутствуют/пустые после `trim`
   - **DoD**: существующий пользователь (с null‑полями) видит требование заполнить.
 
 ### EPIC PC2 — Supabase Storage: bucket `avatars` + политики
-- [ ] **PC2.1 (todo)** Миграция: создать bucket `avatars`
+- [x] **PC2.1 (done)** Миграция: создать bucket `avatars`
   - `private`
   - `allowed_mime_types = ['image/jpeg']`
   - `file_size_limit = 102400` (100 КБ)
   - **DoD**: bucket существует и принимает только JPEG ≤100KB.
-- [ ] **PC2.2 (todo)** Политики `storage.objects` для `avatars`
+- [x] **PC2.2 (done)** Политики `storage.objects` для `avatars`
   - Разрешить `SELECT/INSERT/UPDATE/DELETE` только для `authenticated`
   - Ограничение пути: **строго** `<auth.uid()>/avatar.jpg`
   - Подход: как у `board-backgrounds` — через `SECURITY DEFINER` helper‑функции, чтобы безопасно парсить имя объекта и не падать на “кривых” строках.
@@ -59,7 +59,7 @@
 ### EPIC PC3 — Server Actions: профиль и аватар (без обхода RLS)
 Цель: все операции происходят под сессией пользователя и проходят RLS/Storage policies.
 
-- [ ] **PC3.1 (todo)** `updateProfileAction`
+- [x] **PC3.1 (done)** `updateProfileAction`
   - Локация: `web/src/app/profile/actions.ts` (паттерн как `web/src/app/boards/[boardId]/actions.ts`)
   - Вход: `{ firstName, lastName, position?, department? }`
   - Нормализация:
@@ -70,7 +70,7 @@
     - `display_name = first_name + ' ' + last_name`
   - Сообщения ошибок: строго по спецификации (раздел 11).
   - **DoD**: “Профиль сохранен” после успеха, при ошибке — “Не удалось сохранить профиль. Повторите попытку”.
-- [ ] **PC3.2 (todo)** `uploadAvatarAction(normalizedJpegFile: File)`
+- [x] **PC3.2 (done)** `uploadAvatarAction(normalizedJpegFile: File)`
   - Проверки на “серверной стороне” (спецификация 10.3):
     - пользователь авторизован
     - итоговый размер `<= 102400`
@@ -82,7 +82,7 @@
   - DB update: `profiles.avatar_url = '<user_id>/avatar.jpg'`
   - Ошибка: “Не удалось загрузить аватар. Повторите попытку”.
   - **DoD**: после загрузки превью обновляется сразу, `avatar_url` в БД обновлён.
-- [ ] **PC3.3 (todo)** `deleteAvatarAction()`
+- [x] **PC3.3 (done)** `deleteAvatarAction()`
   - удалить объект (если есть) и поставить `profiles.avatar_url = null`
   - ошибки: “Не удалось удалить аватар. Повторите попытку”.
   - **DoD**: превью переходит на инициалы, объект удалён.
@@ -90,19 +90,19 @@
 ### EPIC PC4 — Клиентская обработка изображения (строго по разделу 8)
 Локация: `web/src/lib/images/avatar-normalize.ts` (или аналогичный модуль).
 
-- [ ] **PC4.1 (todo)** Декодирование “любого формата, который умеет браузер”
+- [x] **PC4.1 (done)** Декодирование “любого формата, который умеет браузер”
   - вход: `File`
   - попытка декодировать через `createImageBitmap` или `<img src=ObjectURL>`
   - если декодирование невозможно → показать “Файл не поддерживается на вашем устройстве”
-- [ ] **PC4.2 (todo)** Масштабирование (max side ≤ 512, без апскейла)
-- [ ] **PC4.3 (todo)** Прозрачность → белый фон `#FFFFFF`
-- [ ] **PC4.4 (todo)** Алгоритм сжатия до 100KB (фиксированный порядок)
+- [x] **PC4.2 (done)** Масштабирование (max side ≤ 512, без апскейла)
+- [x] **PC4.3 (done)** Прозрачность → белый фон `#FFFFFF`
+- [x] **PC4.4 (done)** Алгоритм сжатия до 100KB (фиксированный порядок)
   - quality старт 0.85, шаг 0.05, минимум 0.40
   - если всё ещё >100KB на 0.40 → уменьшать max side на 10% и повторять цикл
   - минимальная сторона 128px; если не получилось → “Не удалось уменьшить файл до 100 КБ”
-- [ ] **PC4.5 (todo)** Анимированные GIF/WEBP → первый кадр
+- [x] **PC4.5 (done)** Анимированные GIF/WEBP → первый кадр
   - (для большинства браузеров “первый кадр” получается автоматически при рисовании в canvas; важно не пытаться сохранять анимацию)
-- [ ] **PC4.6 (todo)** Контракт результата нормализации
+- [x] **PC4.6 (done)** Контракт результата нормализации
   - вернуть `File`/`Blob` с `type: image/jpeg`, именем `avatar.jpg`, и метаданными (`width/height/bytes`) для дебага/UX (не обязателен UI‑показ).
 
 ### EPIC PC5 — UI `/profile`: экран личного кабинета
