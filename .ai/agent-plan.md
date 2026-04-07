@@ -331,7 +331,12 @@
     - **Проверка:** залогиниться → открыть `/notifications/settings` → сменить timezone и тумблеры; в Supabase Table Editor убедиться, что:
       - в `notification_user_settings` есть строка с `user_id` текущего пользователя и обновлённым `timezone`;
       - в `notification_preferences` появляются/обновляются строки `(user_id, channel, event_type, enabled)` для переключённых тумблеров.
-- [ ] **K4 (todo)** Применение правила “не уведомлять автора” (10.6.2) и фильтрация по preferences. DoD: автор не получает ни internal, ни tg.
+- [x] **K4 (done)** Применение правила “не уведомлять автора” (10.6.2) и фильтрация по preferences. DoD: автор не получает ни internal, ни tg.
+    - **БД:** добавлена миграция `supabase/migrations/20260407153000_notification_delivery_filters.sql` с функцией `public.enqueue_notification_event(...)` (`SECURITY DEFINER`).
+    - **Логика K4 в функции:** если `actor_user_id = user_id` → событие пропускается целиком (ни `internal_notifications`, ни `notification_outbox`); иначе каналы фильтруются по `notification_preferences` (если записи нет — `enabled=true` по умолчанию).
+    - **Каналы:** при `internal`=enabled создаётся запись в `internal_notifications`; при `telegram`=enabled и наличии `profiles.telegram_chat_id` создаётся запись в `notification_outbox` со статусом `pending`.
+    - **Применение миграции:** выполнено `npx supabase db push --yes`, миграция применена на remote без ошибок.
+    - **Проверка:** в SQL Editor вызвать `select public.enqueue_notification_event(...)` с одинаковыми `p_user_id` и `p_actor_user_id` — ожидаемо `skipped=true` и новых строк нет; затем с разными id и отключённым `notification_preferences.enabled=false` для канала — запись в этот канал не создаётся.
 
 ### EPIC L — Telegram привязка + бот + outbox (10.1–10.4)
 - [ ] **L1 (todo)** Генерация одноразового токена (15 мин) + deep-link `t.me/<bot>?start=<token>`. DoD: токен одноразовый, used_at ставится.
