@@ -1813,6 +1813,7 @@ export async function reorderBoardCardsAction(
 const MAX_CARD_DESCRIPTION_LENGTH = 50_000;
 
 export type CardMutationResult = { ok: true } | { ok: false; message: string };
+export type CommentMutationResult = { ok: true } | { ok: false; message: string };
 
 export async function updateCardAction(
   boardId: string,
@@ -2011,6 +2012,153 @@ export async function deleteCardAction(
       return { ok: false, message: "Нет права удалять эту карточку." };
     }
     return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function updateCardCommentAction(
+  boardId: string,
+  cardId: string,
+  commentId: string,
+  bodyRaw: string
+): Promise<CommentMutationResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const body = bodyRaw.trim();
+  if (body.length < 1 || body.length > 5000) {
+    return { ok: false, message: "Комментарий: от 1 до 5000 символов." };
+  }
+
+  const { data: commentRow, error: commentError } = await supabase
+    .from("card_comments")
+    .select("id, card_id, author_user_id, body, deleted_at")
+    .eq("id", commentId)
+    .maybeSingle();
+  if (commentError) {
+    return { ok: false, message: commentError.message };
+  }
+  if (!commentRow || commentRow.card_id !== cardId) {
+    return { ok: false, message: "Комментарий не найден в этой карточке." };
+  }
+  if (commentRow.deleted_at) {
+    return { ok: false, message: "Удалённый комментарий нельзя редактировать." };
+  }
+
+  const { data: cardRow, error: cardError } = await supabase
+    .from("cards")
+    .select("id, board_id")
+    .eq("id", cardId)
+    .maybeSingle();
+  if (cardError) {
+    return { ok: false, message: cardError.message };
+  }
+  if (!cardRow || cardRow.board_id !== boardId) {
+    return { ok: false, message: "Карточка не найдена на этой доске." };
+  }
+  if (commentRow.body === body) {
+    return { ok: true };
+  }
+
+  const { error: updateError } = await supabase
+    .from("card_comments")
+    .update({ body })
+    .eq("id", commentId)
+    .eq("card_id", cardId)
+    .is("deleted_at", null);
+  if (updateError) {
+    if (updateError.code === "42501") {
+      return { ok: false, message: "Нет права редактировать этот комментарий." };
+    }
+    return { ok: false, message: updateError.message };
+  }
+
+  const { error: activityError } = await supabase.from("card_activity").insert({
+    card_id: cardId,
+    actor_user_id: user.id,
+    activity_type: "comment_updated",
+    message: "Комментарий отредактирован",
+    payload: { comment_id: commentId }
+  });
+  if (activityError) {
+    return { ok: false, message: `Комментарий обновлён, но история не записана: ${activityError.message}` };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function softDeleteCardCommentAction(
+  boardId: string,
+  cardId: string,
+  commentId: string
+): Promise<CommentMutationResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: commentRow, error: commentError } = await supabase
+    .from("card_comments")
+    .select("id, card_id, deleted_at")
+    .eq("id", commentId)
+    .maybeSingle();
+  if (commentError) {
+    return { ok: false, message: commentError.message };
+  }
+  if (!commentRow || commentRow.card_id !== cardId) {
+    return { ok: false, message: "Комментарий не найден в этой карточке." };
+  }
+  if (commentRow.deleted_at) {
+    return { ok: true };
+  }
+
+  const { data: cardRow, error: cardError } = await supabase
+    .from("cards")
+    .select("id, board_id")
+    .eq("id", cardId)
+    .maybeSingle();
+  if (cardError) {
+    return { ok: false, message: cardError.message };
+  }
+  if (!cardRow || cardRow.board_id !== boardId) {
+    return { ok: false, message: "Карточка не найдена на этой доске." };
+  }
+
+  const { error: updateError } = await supabase
+    .from("card_comments")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", commentId)
+    .eq("card_id", cardId)
+    .is("deleted_at", null);
+  if (updateError) {
+    if (updateError.code === "42501") {
+      return { ok: false, message: "Нет права удалять этот комментарий." };
+    }
+    return { ok: false, message: updateError.message };
+  }
+
+  const { error: activityError } = await supabase.from("card_activity").insert({
+    card_id: cardId,
+    actor_user_id: user.id,
+    activity_type: "comment_deleted",
+    message: "Комментарий удалён",
+    payload: { comment_id: commentId }
+  });
+  if (activityError) {
+    return { ok: false, message: `Комментарий удалён, но история не записана: ${activityError.message}` };
   }
 
   revalidatePath(`/boards/${boardId}`);

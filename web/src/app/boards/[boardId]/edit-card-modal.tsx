@@ -76,6 +76,10 @@ type EditCardModalProps = {
   canManageLabels: boolean;
   canDelete: boolean;
   canCreateComment: boolean;
+  canEditOwnComment: boolean;
+  canDeleteOwnComment: boolean;
+  canModerate: boolean;
+  currentUserId: string;
   boardMembers: NewCardMemberOption[];
   fieldDefinitions: NewCardFieldDefinition[];
   onClose: () => void;
@@ -91,6 +95,10 @@ export function EditCardModal({
   canManageLabels,
   canDelete,
   canCreateComment,
+  canEditOwnComment,
+  canDeleteOwnComment,
+  canModerate,
+  currentUserId,
   boardMembers,
   fieldDefinitions,
   onClose
@@ -853,9 +861,14 @@ export function EditCardModal({
           aria-label="Комментарии к карточке"
         >
           <CardCommentsSidebar
+            boardId={boardId}
             cardId={card.id}
             open={open}
             canCreate={canCreateComment}
+            canEditOwn={canEditOwnComment}
+            canDeleteOwn={canDeleteOwnComment}
+            canModerate={canModerate}
+            currentUserId={currentUserId}
             boardMembers={boardMembers}
             onMutation={() => router.refresh()}
           />

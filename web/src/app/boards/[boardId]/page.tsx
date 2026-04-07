@@ -66,6 +66,9 @@ export default async function BoardPage({ params }: BoardPageProps) {
   let canDeleteCardOwn = false;
   let canMoveCards = false;
   let canCreateComment = false;
+  let canEditOwnComment = false;
+  let canDeleteOwnComment = false;
+  let canModerateComments = false;
   let canManageBoardLabels = false;
   let canManageCardFields = false;
   let canManageCardPreview = false;
@@ -90,6 +93,9 @@ export default async function BoardPage({ params }: BoardPageProps) {
         "columns.delete",
         "cards.move",
         "comments.create",
+        "comments.edit_own",
+        "comments.delete_own",
+        "comments.moderate",
         "card_fields.manage",
         "card_preview.manage",
         "board.change_background"
@@ -111,6 +117,9 @@ export default async function BoardPage({ params }: BoardPageProps) {
       if (p.permission === "columns.delete") canDeleteColumn = true;
       if (p.permission === "cards.move") canMoveCards = true;
       if (p.permission === "comments.create") canCreateComment = true;
+      if (p.permission === "comments.edit_own") canEditOwnComment = true;
+      if (p.permission === "comments.delete_own") canDeleteOwnComment = true;
+      if (p.permission === "comments.moderate") canModerateComments = true;
       if (p.permission === "card_fields.manage") canManageCardFields = true;
       if (p.permission === "card_preview.manage") canManageCardPreview = true;
       if (p.permission === "board.change_background") canChangeBoardBackground = true;
@@ -467,6 +476,9 @@ export default async function BoardPage({ params }: BoardPageProps) {
         }}
         canMoveCards={canMoveCards}
         canCreateComment={canCreateComment}
+        canEditOwnComment={canEditOwnComment}
+        canDeleteOwnComment={canDeleteOwnComment}
+        canModerateComments={canModerateComments}
         board={{
           backgroundType: board.background_type as "color" | "image",
           backgroundColor: board.background_color,

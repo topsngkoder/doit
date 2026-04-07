@@ -243,8 +243,16 @@
     - **Hotfix 4 (app):** в `web/src/app/boards/[boardId]/actions.ts` при установке фона-изображения `updateBoardBackgroundImageAction` теперь явно записывает `background_color = null` вместе с `background_type='image'` и `background_image_path`, чтобы соблюдать constraint `boards_background_check`.
 
 ### EPIC I — Комментарии: ответы, права, soft-delete
-- [ ] **I1 (todo)** Создание комментария + reply_to_comment_id, UI “Ответить” + контекст ответа. DoD: 4.6.2.
-- [ ] **I2 (todo)** Редактирование/удаление комментариев по правам (own/moderate), soft-delete через `deleted_at`. DoD: удалённые не считаются в `comments_count`.
+- [x] **I1 (done)** Создание комментария + reply_to_comment_id, UI “Ответить” + контекст ответа. DoD: 4.6.2.
+    - **Приложение:** `web/src/app/boards/[boardId]/card-comments-sidebar.tsx` уже реализует весь поток I1: загрузка `card_comments` (только `deleted_at IS NULL`), создание комментария через `insert` с полями `card_id`, `author_user_id`, `body`, `reply_to_comment_id`; кнопка «Ответить» на каждом сообщении; контекст ответа над формой (автор + текст родительского комментария) и превью parent-комментария в ленте.
+    - **Права:** отправка доступна только при `comments.create` (`canCreate`), без права поле ввода и кнопка отправки отключены; чтение списка комментариев работает в рамках `board.view` и RLS.
+    - **Миграции:** не требовались (схема и RLS для `card_comments` уже закрыты в EPIC C).
+    - **Проверка:** открыть карточку под ролью с `comments.create` → отправить обычный комментарий → нажать «Ответить» на нём → отправить reply; ожидание: в `card_comments` у ответа заполнен `reply_to_comment_id`, в UI у ответа виден контекст родителя. Под ролью без `comments.create` — отправка недоступна.
+- [x] **I2 (done)** Редактирование/удаление комментариев по правам (own/moderate), soft-delete через `deleted_at`. DoD: удалённые не считаются в `comments_count`.
+    - **БД:** миграция `supabase/migrations/20260407130000_card_comments_soft_delete.sql` — отключён `DELETE` policy для `card_comments` (жёсткое удаление пользователями), `UPDATE` policy расширен для `comments.delete_own` + `comments.moderate`, добавлен триггер `enforce_card_comments_soft_delete_scope` (запрет редактировать уже удалённый комментарий и запрет “restore” через `deleted_at -> NULL`).
+    - **Приложение:** `web/src/app/boards/[boardId]/card-comments-sidebar.tsx` — inline-редактирование комментария, кнопка удаления (soft-delete) с подтверждением; кнопки показываются по правам (`comments.edit_own`, `comments.delete_own`, `comments.moderate`) и авторству. Добавлены server actions `updateCardCommentAction` и `softDeleteCardCommentAction` в `actions.ts`, включая запись `card_activity` (`comment_updated` / `comment_deleted`).
+    - **Права в UI:** `page.tsx` теперь считывает `comments.edit_own`, `comments.delete_own`, `comments.moderate` и прокидывает флаги до модалки карточки.
+    - **comments_count:** счётчик комментариев на карточке уже считает только `deleted_at IS NULL` (без изменений логики), что соответствует DoD.
 - [ ] **I3 (todo)** Ограничение reply_to: только в рамках той же карточки. DoD: constraint/trigger/RPC не позволяет нарушить 11.12.
 
 ### EPIC J — Realtime синхронизация (13.1)

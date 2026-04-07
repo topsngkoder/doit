@@ -23,6 +23,9 @@ type BoardCanvasProps = {
   columnPermissions: BoardColumnPermissions;
   canMoveCards: boolean;
   canCreateComment: boolean;
+  canEditOwnComment: boolean;
+  canDeleteOwnComment: boolean;
+  canModerateComments: boolean;
   cardContentPermissions: CardContentPermissions;
   board: {
     backgroundType: "color" | "image";
@@ -50,6 +53,9 @@ export function BoardCanvas({
   columnPermissions,
   canMoveCards,
   canCreateComment,
+  canEditOwnComment,
+  canDeleteOwnComment,
+  canModerateComments,
   cardContentPermissions,
   board,
   columns,
@@ -89,6 +95,9 @@ export function BoardCanvas({
         columnPermissions={columnPermissions}
         canMoveCards={canMoveCards}
         canCreateComment={canCreateComment}
+        canEditOwnComment={canEditOwnComment}
+        canDeleteOwnComment={canDeleteOwnComment}
+        canModerateComments={canModerateComments}
         cardContentPermissions={cardContentPermissions}
         columns={columns}
         cardsByColumnId={cardsByColumnId}

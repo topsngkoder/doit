@@ -395,6 +395,9 @@ type BoardColumnsDnDProps = {
   canCreateCard: boolean;
   canMoveCards: boolean;
   canCreateComment: boolean;
+  canEditOwnComment: boolean;
+  canDeleteOwnComment: boolean;
+  canModerateComments: boolean;
   membersForNewCard: NewCardMemberOption[];
   boardLabels: BoardLabelOption[];
   previewItems: BoardCardPreviewItem[];
@@ -733,6 +736,9 @@ export function BoardColumnsDnD({
   canCreateCard,
   canMoveCards,
   canCreateComment,
+  canEditOwnComment,
+  canDeleteOwnComment,
+  canModerateComments,
   membersForNewCard,
   boardLabels,
   previewItems,
@@ -944,6 +950,10 @@ export function BoardColumnsDnD({
         : false
       }
       canCreateComment={canCreateComment}
+      canEditOwnComment={canEditOwnComment}
+      canDeleteOwnComment={canDeleteOwnComment}
+      canModerate={canModerateComments}
+      currentUserId={currentUserId}
       boardMembers={membersForNewCard}
       fieldDefinitions={fieldDefinitions}
       onClose={() => setEditingCardId(null)}

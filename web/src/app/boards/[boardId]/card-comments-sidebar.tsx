@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import type { NewCardMemberOption } from "./create-card-modal";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { softDeleteCardCommentAction, updateCardCommentAction } from "./actions";
 
 const textareaClass =
   "w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600";
@@ -49,17 +50,27 @@ function MemberAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string | 
 }
 
 type CardCommentsSidebarProps = {
+  boardId: string;
   cardId: string;
   open: boolean;
   canCreate: boolean;
+  canEditOwn: boolean;
+  canDeleteOwn: boolean;
+  canModerate: boolean;
+  currentUserId: string;
   boardMembers: NewCardMemberOption[];
   onMutation?: () => void;
 };
 
 export function CardCommentsSidebar({
+  boardId,
   cardId,
   open,
   canCreate,
+  canEditOwn,
+  canDeleteOwn,
+  canModerate,
+  currentUserId,
   boardMembers,
   onMutation
 }: CardCommentsSidebarProps) {
@@ -69,6 +80,9 @@ export function CardCommentsSidebar({
   const [draft, setDraft] = React.useState("");
   const [replyToId, setReplyToId] = React.useState<string | null>(null);
   const [submitting, setSubmitting] = React.useState(false);
+  const [editingCommentId, setEditingCommentId] = React.useState<string | null>(null);
+  const [editingBody, setEditingBody] = React.useState("");
+  const [mutatingCommentId, setMutatingCommentId] = React.useState<string | null>(null);
   const inputRef = React.useRef<HTMLTextAreaElement>(null);
 
   const load = React.useCallback(async () => {
@@ -111,6 +125,16 @@ export function CardCommentsSidebar({
     queueMicrotask(() => inputRef.current?.focus());
   };
 
+  const canEditComment = React.useCallback(
+    (comment: CardCommentRow) => canModerate || (canEditOwn && comment.authorUserId === currentUserId),
+    [canModerate, canEditOwn, currentUserId]
+  );
+
+  const canDeleteComment = React.useCallback(
+    (comment: CardCommentRow) => canModerate || (canDeleteOwn && comment.authorUserId === currentUserId),
+    [canModerate, canDeleteOwn, currentUserId]
+  );
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = draft.trim();
@@ -144,6 +168,68 @@ export function CardCommentsSidebar({
   };
 
   const replyTarget = replyToId ? commentById.get(replyToId) : undefined;
+
+  const handleStartEdit = (comment: CardCommentRow) => {
+    setEditingCommentId(comment.id);
+    setEditingBody(comment.body);
+    setError(null);
+  };
+
+  const handleSaveEdit = async (commentId: string) => {
+    const body = editingBody.trim();
+    if (!body) {
+      setError("Комментарий не может быть пустым.");
+      return;
+    }
+    setMutatingCommentId(commentId);
+    setError(null);
+    try {
+      const res = await updateCardCommentAction(
+        boardId,
+        cardId,
+        commentId,
+        body
+      );
+      if (!res.ok) {
+        setError(res.message);
+        return;
+      }
+      setEditingCommentId(null);
+      setEditingBody("");
+      await load();
+      onMutation?.();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Не удалось сохранить комментарий");
+    } finally {
+      setMutatingCommentId(null);
+    }
+  };
+
+  const handleDelete = async (commentId: string) => {
+    if (!window.confirm("Удалить комментарий? Действие необратимо.")) return;
+    setMutatingCommentId(commentId);
+    setError(null);
+    try {
+      const res = await softDeleteCardCommentAction(boardId, cardId, commentId);
+      if (!res.ok) {
+        setError(res.message);
+        return;
+      }
+      if (replyToId === commentId) {
+        setReplyToId(null);
+      }
+      if (editingCommentId === commentId) {
+        setEditingCommentId(null);
+        setEditingBody("");
+      }
+      await load();
+      onMutation?.();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Не удалось удалить комментарий");
+    } finally {
+      setMutatingCommentId(null);
+    }
+  };
 
   return (
     <div className="flex h-full min-h-[240px] flex-col bg-slate-950/50 md:min-h-0">
@@ -209,6 +295,10 @@ export function CardCommentsSidebar({
             const author = memberName(boardMembers, c.authorUserId);
             const av = boardMembers.find((m) => m.userId === c.authorUserId)?.avatarUrl;
             const parent = c.replyToCommentId ? commentById.get(c.replyToCommentId) : undefined;
+            const canEditThis = canEditComment(c);
+            const canDeleteThis = canDeleteComment(c);
+            const isEditing = editingCommentId === c.id;
+            const isPendingComment = mutatingCommentId === c.id;
 
             return (
               <li key={c.id} className="border-b border-slate-800/80 pb-4 last:border-0 last:pb-0">
@@ -234,16 +324,70 @@ export function CardCommentsSidebar({
                         {formatCommentDate(c.createdAt)}
                       </time>
                     </div>
-                    <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-200">
-                      {c.body}
-                    </p>
-                    <button
-                      type="button"
-                      className="mt-2 text-xs text-sky-500 hover:text-sky-400"
-                      onClick={() => handleReply(c.id)}
-                    >
-                      Ответить
-                    </button>
+                    {isEditing ?
+                      <div className="mt-2 space-y-2">
+                        <textarea
+                          className={`${textareaClass} min-h-[72px] resize-y`}
+                          value={editingBody}
+                          onChange={(e) => setEditingBody(e.target.value)}
+                          maxLength={5000}
+                          disabled={isPendingComment}
+                        />
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            disabled={isPendingComment || editingBody.trim().length === 0}
+                            onClick={() => void handleSaveEdit(c.id)}
+                          >
+                            Сохранить
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            disabled={isPendingComment}
+                            onClick={() => {
+                              setEditingCommentId(null);
+                              setEditingBody("");
+                            }}
+                          >
+                            Отмена
+                          </Button>
+                        </div>
+                      </div>
+                    : <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-200">{c.body}</p>}
+                    {!isEditing ?
+                      <div className="mt-2 flex items-center gap-3">
+                        <button
+                          type="button"
+                          className="text-xs text-sky-500 hover:text-sky-400"
+                          onClick={() => handleReply(c.id)}
+                        >
+                          Ответить
+                        </button>
+                        {canEditThis ?
+                          <button
+                            type="button"
+                            className="text-xs text-slate-400 hover:text-slate-200"
+                            onClick={() => handleStartEdit(c)}
+                            disabled={isPendingComment}
+                          >
+                            Редактировать
+                          </button>
+                        : null}
+                        {canDeleteThis ?
+                          <button
+                            type="button"
+                            className="text-xs text-rose-400 hover:text-rose-300"
+                            onClick={() => void handleDelete(c.id)}
+                            disabled={isPendingComment}
+                          >
+                            Удалить
+                          </button>
+                        : null}
+                      </div>
+                    : null}
                   </div>
                 </div>
               </li>
