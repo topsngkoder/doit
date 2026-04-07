@@ -49,6 +49,12 @@ export default function RootLayout({
               >
                 Мои доски
               </Link>
+              <Link
+                href="/profile"
+                className="rounded-md px-3 py-1.5 hover:bg-slate-800 hover:text-slate-50"
+              >
+                Личный кабинет
+              </Link>
             </nav>
           </header>
           <main className="flex-1">{children}</main>

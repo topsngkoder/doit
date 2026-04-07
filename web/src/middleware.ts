@@ -33,6 +33,8 @@ export async function middleware(request: NextRequest) {
   const isProtected =
     pathname === "/boards" ||
     pathname.startsWith("/boards/") ||
+    pathname === "/profile" ||
+    pathname.startsWith("/profile/") ||
     pathname === "/notifications" ||
     pathname.startsWith("/notifications/");
 
