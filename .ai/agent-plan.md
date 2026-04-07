@@ -275,18 +275,31 @@
 ### EPIC P — Оптимизация запросов экрана доски (DB/Auth/Storage)
 Цель: снизить “шум” запросов (особенно при `router.refresh()`/realtime), чтобы маленькая доска (2 пользователя, 5 карточек) не генерировала сотни/тысячи запросов в час без реальной активности.
 
-- [ ] **P1 (todo)** Бюджет и измерение запросов для `/boards/[boardId]`. DoD: есть целевые лимиты + повторяемая проверка.
-    - **Что фиксируем:** сколько DB/Auth/Storage запросов допускается на (a) первую загрузку, (b) один refresh, (c) 10 действий подряд (DnD/комменты/метки).
-    - **Проверка:** Supabase dashboard → metrics (“Last 60 minutes”): 2 вкладки на одной доске → (1) idle 5 мин, (2) 10 действий → сравнить DB/Auth/Storage до/после оптимизаций.
+- [x] **P1 (done)** Бюджет и измерение запросов для `/boards/[boardId]`. DoD: есть целевые лимиты + повторяемая проверка.
+    - **Инструментация (dev):** на странице доски добавлена панель “Perf: SSR запросы Supabase”, включается query‑параметром `?perf=1` (или `?__perf=1`). Считает SSR‑обращения Supabase по категориям: **DB** (`/rest/v1`), **Auth** (`/auth/v1`), **Storage** (`/storage/v1`) и **Other**.
+      - Реализация: `web/src/lib/supabase/server.ts` (обёртка `fetch` при создании server client) + `web/src/app/boards/[boardId]/page.tsx` (агрегация и вывод).
+    - **Что фиксируем:** сколько запросов допускается на (a) первую SSR‑загрузку, (b) один `router.refresh()`‑snapshot, (c) 10 действий подряд (DnD/комменты/метки) в 2 вкладках.
+    - **Целевые бюджеты (после P2–P4):**
+      - **(a) Первая SSR‑загрузка:** `DB <= 3`, `Auth <= 1`, `Storage <= 1` (только если фон‑картинка), `Total <= 6`.
+      - **(b) Один refresh:** `DB <= 2`, `Auth <= 0`, `Storage <= 0`, `Total <= 2`.
+      - **(c) 10 действий в 2 вкладках:** `DB <= 25` суммарно (в идеале \(~10–15\)), без “шторма” из десятков refresh на одно действие.
+    - **Baseline (ожидаемо сейчас, до P2):** `DB ~ 15`, `Auth ~ 1`, `Storage 0–1` на одну SSR‑загрузку доски (зависит от фона).
+    - **Повторяемая проверка (локально):**
+      - Открыть `/boards/[boardId]?perf=1` и записать цифры панели.
+      - Нажать `Ctrl+R` (или триггернуть `router.refresh()` через действие) и сравнить “до/после”.
+      - Открыть 2 вкладки одной доски, выполнить 10 действий (DnD карточек, создать/удалить коммент, добавить/снять метку) и убедиться, что цифры не “взрываются” от refresh‑шторма.
+    - **Повторяемая проверка (в Supabase):**
+      - Supabase dashboard → Metrics (“Last 60 minutes”): 2 вкладки на одной доске → (1) idle 5 мин, (2) 10 действий → сравнить DB/Auth/Storage до/после оптимизаций.
 
-- [ ] **P2 (todo)** Свести “snapshot доски” к 1–3 обращениям к БД. DoD: вместо 10–15+ запросов на SSR.
-    - **Предпочтительно:** RPC `get_board_snapshot(board_id)` возвращает JSON со всеми сущностями, нужными для рендера доски (columns, cards, assignees, labels, card_labels, field_defs+options, field_values, preview_items, comments_count, activity).
-    - **Альтернатива:** агрегация через PostgREST embedded select там, где возможно, и уменьшение числа отдельных запросов.
-    - **Миграции:** потребуются (применяю сам).
+- [x] **P2 (done)** Свести “snapshot доски” к 1–3 обращениям к БД. DoD: вместо 10–15+ запросов на SSR.
+    - **БД:** добавлен RPC `public.get_board_snapshot(board_id)` (агрегированный JSON snapshot) в миграции `supabase/migrations/20260407140000_get_board_snapshot_rpc.sql` (применена на remote через `supabase db push`).
+    - **Приложение:** `web/src/app/boards/[boardId]/page.tsx` переведена с 10+ отдельных `.from(...).select(...)` на один вызов `supabase.rpc('get_board_snapshot', { p_board_id })`; отдельно остаётся только Storage signed URL (если фон = image).
+    - **Проверка:** открыть `/boards/[boardId]?perf=1` и сравнить счётчик DB с baseline — ожидаемо `DB ≈ 1` (RPC snapshot) + `Auth ≈ 1` + `Storage 0–1`.
 
-- [ ] **P3 (todo)** Снизить Auth/Storage запросы при refresh. DoD: signed URL и auth-проверки не выполняются “лишний раз”.
-    - **Storage:** кэшировать signed URL фона с TTL (например, 30–60 минут) и обновлять только при смене `background_image_path`.
-    - **Auth:** минимизировать повторные `auth.getUser()` в рамках одного запроса/рендера; избегать лишних SSR проходов без необходимости.
+- [x] **P3 (done)** Снизить Auth/Storage запросы при refresh. DoD: signed URL и auth-проверки не выполняются “лишний раз”.
+    - **Auth (SSR):** `auth.getUser()` убран со страницы доски — текущий пользователь берётся из snapshot. Для этого RPC `get_board_snapshot` теперь возвращает `current_user_id` (миграция `supabase/migrations/20260407150000_get_board_snapshot_include_current_user_id.sql`, применена на remote через `supabase db push`).
+    - **Storage (SSR):** создание signed URL перенесено на клиент и закэшировано в `localStorage` (TTL ~55 мин, ключ по `background_image_path`) в `web/src/app/boards/[boardId]/board-background-frame.tsx`. SSR больше не делает Storage‑запрос на каждый `router.refresh()`.
+    - **Проверка:** открыть `/boards/[boardId]?perf=1` → ожидаемо `Auth = 0` и `Storage = 0` в SSR‑панели; если фон = image — фон подгружается через секунду на клиенте, без “шторма” запросов при `router.refresh()`.
 
 - [ ] **P4 (todo)** Уменьшить число полных `router.refresh()` на realtime-события. DoD: мелкие изменения обновляются точечно.
     - **Подход:** разделить сущности на “обновляем локально по событию” vs “нужен snapshot”; для локальных обновлений поддерживать минимальный client-state (например, карточки/комменты/labels в памяти) и применять изменения по payload.

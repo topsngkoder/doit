@@ -11,7 +11,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export async function createSupabaseServerClient() {
+export type SupabaseServerClientInstrumentation = {
+  onFetch?: (url: string) => void;
+};
+
+export async function createSupabaseServerClient(options?: {
+  instrumentation?: SupabaseServerClientInstrumentation;
+}) {
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
       "Supabase env переменные не заданы. Проверьте NEXT_PUBLIC_SUPABASE_URL и NEXT_PUBLIC_SUPABASE_ANON_KEY."
@@ -19,6 +25,19 @@ export async function createSupabaseServerClient() {
   }
 
   const cookieStore = await cookies();
+
+  const baseFetch = globalThis.fetch.bind(globalThis);
+  const instrumentedFetch: typeof fetch = async (input, init) => {
+    try {
+      if (options?.instrumentation?.onFetch) {
+        const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        options.instrumentation.onFetch(url);
+      }
+    } catch {
+      // Инструментация не должна ломать реальный запрос.
+    }
+    return baseFetch(input as never, init as never);
+  };
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -34,6 +53,9 @@ export async function createSupabaseServerClient() {
           /* Server Component: куки только для чтения; refresh — в middleware */
         }
       }
+    },
+    global: {
+      fetch: options?.instrumentation?.onFetch ? instrumentedFetch : baseFetch
     }
   });
 }

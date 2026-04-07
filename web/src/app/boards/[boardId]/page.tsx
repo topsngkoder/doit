@@ -18,221 +18,191 @@ import { InviteMemberButton } from "./invite-member-button";
 
 type BoardPageProps = {
   params: Promise<{ boardId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function BoardPage({ params }: BoardPageProps) {
+export default async function BoardPage({ params, searchParams }: BoardPageProps) {
   const { boardId } = await params;
 
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-    error: authError
-  } = await supabase.auth.getUser();
+  const perfParams = (await searchParams) ?? {};
+  const perfEnabledRaw = perfParams["perf"] ?? perfParams["__perf"];
+  const perfEnabled =
+    typeof perfEnabledRaw === "string" ? perfEnabledRaw === "1" : Array.isArray(perfEnabledRaw)
+      ? perfEnabledRaw.includes("1")
+      : false;
 
-  const isSessionMissing = authError?.message === "Auth session missing!";
-  const isAuthenticated = !!user && !(authError && !isSessionMissing);
+  const perf =
+    perfEnabled && process.env.NODE_ENV !== "production"
+      ? {
+          total: 0,
+          db: 0,
+          auth: 0,
+          storage: 0,
+          other: 0
+        }
+      : null;
 
-  if (!isAuthenticated) {
-    redirect("/login");
-  }
+  const supabase = await createSupabaseServerClient({
+    instrumentation: perf
+      ? {
+          onFetch(url) {
+            perf.total += 1;
+            if (url.includes("/rest/v1/")) perf.db += 1;
+            else if (url.includes("/auth/v1/")) perf.auth += 1;
+            else if (url.includes("/storage/v1/")) perf.storage += 1;
+            else perf.other += 1;
+          }
+        }
+      : undefined
+  });
 
-  const { data: board, error: boardError } = await supabase
-    .from("boards")
-    .select("id, name, background_type, background_color, background_image_path")
-    .eq("id", boardId)
-    .maybeSingle();
+  const { data: snapshotRaw, error: snapshotError } = await supabase.rpc("get_board_snapshot", {
+    p_board_id: boardId
+  });
 
-  if (boardError || !board) {
+  if (snapshotError || !snapshotRaw) {
+    const msg = snapshotError?.message ?? "";
+    if (/not authenticated|auth session missing|jwt|invalid jwt|missing jwt/i.test(msg)) {
+      redirect("/login");
+    }
     notFound();
   }
 
-  const { data: memberRow } = await supabase
-    .from("board_members")
-    .select("board_role_id")
-    .eq("board_id", boardId)
-    .eq("user_id", user!.id)
-    .maybeSingle();
+  type SnapshotBoard = {
+    id: string;
+    name: string;
+    background_type: "color" | "image";
+    background_color: string | null;
+    background_image_path: string | null;
+  };
 
-  let canInvite = false;
-  let canManageRoles = false;
-  let canCreateCard = false;
-  let canCreateColumn = false;
-  let canRenameColumn = false;
-  let canReorderColumn = false;
-  let canDeleteColumn = false;
-  let canEditCardAny = false;
-  let canEditCardOwn = false;
-  let canDeleteCardAny = false;
-  let canDeleteCardOwn = false;
-  let canMoveCards = false;
-  let canCreateComment = false;
-  let canEditOwnComment = false;
-  let canDeleteOwnComment = false;
-  let canModerateComments = false;
-  let canManageBoardLabels = false;
-  let canManageCardFields = false;
-  let canManageCardPreview = false;
-  let canChangeBoardBackground = false;
-  if (memberRow?.board_role_id) {
-    const { data: perms } = await supabase
-      .from("board_role_permissions")
-      .select("permission, allowed")
-      .eq("board_role_id", memberRow.board_role_id)
-      .in("permission", [
-        "board.invite_members",
-        "roles.manage",
-        "labels.manage",
-        "cards.create",
-        "cards.edit_any",
-        "cards.edit_own",
-        "cards.delete_any",
-        "cards.delete_own",
-        "columns.create",
-        "columns.rename",
-        "columns.reorder",
-        "columns.delete",
-        "cards.move",
-        "comments.create",
-        "comments.edit_own",
-        "comments.delete_own",
-        "comments.moderate",
-        "card_fields.manage",
-        "card_preview.manage",
-        "board.change_background"
-      ]);
+  type SnapshotRole = { id: string; key: string; name: string };
+  type SnapshotMember = {
+    user_id: string;
+    board_role_id: string;
+    is_owner: boolean;
+    display_name: string;
+    email: string;
+    avatar_url: string | null;
+    role_name: string;
+    role_key: string;
+  };
+  type SnapshotColumn = { id: string; name: string; column_type: string; position: number };
+  type SnapshotCard = {
+    id: string;
+    column_id: string;
+    title: string;
+    description: string;
+    position: number;
+    created_by_user_id: string;
+    responsible_user_id: string | null;
+  };
+  type SnapshotLabel = { id: string; name: string; color: string; position: number };
+  type SnapshotFieldOption = { id: string; name: string; color: string; position: number };
+  type SnapshotFieldDefinition = {
+    id: string;
+    name: string;
+    field_type: string;
+    is_required: boolean;
+    position: number;
+    select_options: SnapshotFieldOption[];
+  };
+  type SnapshotPreviewItem = {
+    id: string;
+    item_type: string;
+    field_definition_id: string | null;
+    enabled: boolean;
+    position: number;
+  };
+  type SnapshotCardAssignee = { card_id: string; user_id: string };
+  type SnapshotCardLabel = { card_id: string; label_id: string };
+  type SnapshotCardFieldValue = {
+    card_id: string;
+    field_definition_id: string;
+    text_value: string | null;
+    date_value: string | null;
+    link_url: string | null;
+    link_text: string | null;
+    select_option_id: string | null;
+  };
+  type SnapshotActivity = {
+    id: string;
+    card_id: string;
+    actor_user_id: string;
+    actor_display_name: string;
+    activity_type: string;
+    message: string;
+    created_at: string;
+  };
 
-    for (const p of perms ?? []) {
-      if (p.allowed !== true) continue;
-      if (p.permission === "board.invite_members") canInvite = true;
-      if (p.permission === "roles.manage") canManageRoles = true;
-      if (p.permission === "labels.manage") canManageBoardLabels = true;
-      if (p.permission === "cards.create") canCreateCard = true;
-      if (p.permission === "cards.edit_any") canEditCardAny = true;
-      if (p.permission === "cards.edit_own") canEditCardOwn = true;
-      if (p.permission === "cards.delete_any") canDeleteCardAny = true;
-      if (p.permission === "cards.delete_own") canDeleteCardOwn = true;
-      if (p.permission === "columns.create") canCreateColumn = true;
-      if (p.permission === "columns.rename") canRenameColumn = true;
-      if (p.permission === "columns.reorder") canReorderColumn = true;
-      if (p.permission === "columns.delete") canDeleteColumn = true;
-      if (p.permission === "cards.move") canMoveCards = true;
-      if (p.permission === "comments.create") canCreateComment = true;
-      if (p.permission === "comments.edit_own") canEditOwnComment = true;
-      if (p.permission === "comments.delete_own") canDeleteOwnComment = true;
-      if (p.permission === "comments.moderate") canModerateComments = true;
-      if (p.permission === "card_fields.manage") canManageCardFields = true;
-      if (p.permission === "card_preview.manage") canManageCardPreview = true;
-      if (p.permission === "board.change_background") canChangeBoardBackground = true;
-    }
-  }
+  type Snapshot = {
+    current_user_id: string;
+    board: SnapshotBoard;
+    is_system_admin: boolean;
+    my_role_id: string | null;
+    allowed_permissions: string[];
+    roles: SnapshotRole[];
+    members: SnapshotMember[];
+    columns: SnapshotColumn[];
+    cards: SnapshotCard[];
+    labels: SnapshotLabel[];
+    field_definitions: SnapshotFieldDefinition[];
+    preview_items: SnapshotPreviewItem[];
+    card_assignees: SnapshotCardAssignee[];
+    card_labels: SnapshotCardLabel[];
+    card_field_values: SnapshotCardFieldValue[];
+    comments_count_by_card: Record<string, number>;
+    activity: SnapshotActivity[];
+  };
 
-  let boardBackgroundImageUrl: string | null = null;
-  if (board.background_type === "image" && board.background_image_path) {
-    const { data: signedData } = await supabase.storage
-      .from("board-backgrounds")
-      .createSignedUrl(board.background_image_path, 60 * 60);
-    boardBackgroundImageUrl = signedData?.signedUrl ?? null;
-  }
+  const snapshot = snapshotRaw as unknown as Snapshot;
 
-  const { data: roleRows } = await supabase
-    .from("board_roles")
-    .select("id, key, name")
-    .eq("board_id", boardId);
+  const board = snapshot.board;
+  const allowed = new Set(snapshot.allowed_permissions ?? []);
+  const has = (p: string) => snapshot.is_system_admin || allowed.has(p);
 
-  const boardRoles: BoardRoleOption[] = (roleRows ?? []).map((r) => ({
+  const canInvite = has("board.invite_members");
+  const canManageRoles = has("roles.manage");
+  const canCreateCard = has("cards.create");
+  const canCreateColumn = has("columns.create");
+  const canRenameColumn = has("columns.rename");
+  const canReorderColumn = has("columns.reorder");
+  const canDeleteColumn = has("columns.delete");
+  const canEditCardAny = has("cards.edit_any");
+  const canEditCardOwn = has("cards.edit_own");
+  const canDeleteCardAny = has("cards.delete_any");
+  const canDeleteCardOwn = has("cards.delete_own");
+  const canMoveCards = has("cards.move");
+  const canCreateComment = has("comments.create");
+  const canEditOwnComment = has("comments.edit_own");
+  const canDeleteOwnComment = has("comments.delete_own");
+  const canModerateComments = has("comments.moderate");
+  const canManageBoardLabels = has("labels.manage");
+  const canManageCardFields = has("card_fields.manage");
+  const canManageCardPreview = has("card_preview.manage");
+  const canChangeBoardBackground = has("board.change_background");
+
+  const boardRoles: BoardRoleOption[] = (snapshot.roles ?? []).map((r) => ({
     id: r.id,
     key: r.key,
     name: r.name
   }));
 
-  const { data: memberRowsRaw } = await supabase
-    .from("board_members")
-    .select(
-      `
-      user_id,
-      board_role_id,
-      is_owner,
-      profiles ( display_name, email, avatar_url ),
-      board_roles ( name, key )
-    `
-    )
-    .eq("board_id", boardId);
-
-  type ProfileEmbed = { display_name: string; email: string; avatar_url: string | null };
-  type RoleEmbed = { name: string; key: string };
-
-  function unwrapOne<T>(v: T | T[] | null | undefined): T | null {
-    if (v == null) return null;
-    return Array.isArray(v) ? (v[0] ?? null) : v;
-  }
-
-  const { data: columnRows, error: columnsError } = await supabase
-    .from("board_columns")
-    .select("id, name, column_type, position")
-    .eq("board_id", boardId)
-    .order("position", { ascending: true });
-
-  const { data: cardRows, error: cardsError } = await supabase
-    .from("cards")
-    .select("id, column_id, title, description, position, created_by_user_id, responsible_user_id")
-    .eq("board_id", boardId)
-    .order("position", { ascending: true });
-
-  const { data: labelRows } = await supabase
-    .from("labels")
-    .select("id, name, color, position")
-    .eq("board_id", boardId)
-    .order("position", { ascending: true });
-
-  const boardLabels: BoardLabelOption[] = (labelRows ?? []).map((l) => ({
+  const boardLabels: BoardLabelOption[] = (snapshot.labels ?? []).map((l) => ({
     id: l.id,
     name: l.name,
     color: l.color,
     position: Number(l.position)
   }));
 
-  const { data: fieldDefRows } = await supabase
-    .from("board_field_definitions")
-    .select(
-      `
-      id,
-      name,
-      field_type,
-      is_required,
-      position,
-      board_field_select_options ( id, name, color, position )
-    `
-    )
-    .eq("board_id", boardId)
-    .order("position", { ascending: true });
-
-  const { data: previewRows } = await supabase
-    .from("board_card_preview_items")
-    .select("id, item_type, field_definition_id, enabled, position")
-    .eq("board_id", boardId)
-    .order("position", { ascending: true });
-
-  type OptRow = { id: string; name: string; color: string; position: number };
-  type DefRow = {
-    id: string;
-    name: string;
-    field_type: string;
-    is_required: boolean;
-    position: number;
-    board_field_select_options: OptRow | OptRow[] | null;
-  };
-
-  const fieldDefinitions: NewCardFieldDefinition[] = (fieldDefRows ?? []).map((row) => {
-    const d = row as unknown as DefRow;
-    const raw = d.board_field_select_options;
-    const opts: OptRow[] = Array.isArray(raw) ? raw : raw ? [raw] : [];
+  const fieldDefinitions: NewCardFieldDefinition[] = (snapshot.field_definitions ?? []).map((d) => {
     return {
       id: d.id,
       name: d.name,
       fieldType: d.field_type as NewCardFieldDefinition["fieldType"],
       isRequired: d.is_required,
       position: Number(d.position),
-      selectOptions: opts.map((o) => ({
+      selectOptions: (d.select_options ?? []).map((o) => ({
         id: o.id,
         name: o.name,
         color: o.color,
@@ -241,15 +211,14 @@ export default async function BoardPage({ params }: BoardPageProps) {
     };
   });
 
-  const columns =
-    columnRows?.map((c) => ({
-      id: c.id,
-      name: c.name,
-      columnType: c.column_type,
-      position: c.position
-    })) ?? [];
+  const columns = (snapshot.columns ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    columnType: c.column_type,
+    position: c.position
+  }));
 
-  const previewItems: BoardCardPreviewItem[] = (previewRows ?? []).map((row) => ({
+  const previewItems: BoardCardPreviewItem[] = (snapshot.preview_items ?? []).map((row) => ({
     id: row.id,
     itemType: row.item_type as BoardCardPreviewItem["itemType"],
     fieldDefinitionId: row.field_definition_id,
@@ -257,84 +226,52 @@ export default async function BoardPage({ params }: BoardPageProps) {
     position: Number(row.position)
   }));
 
-  const cardIds = (cardRows ?? []).map((r) => r.id);
+  const cardIds = (snapshot.cards ?? []).map((r) => r.id);
   const assigneesByCard = new Map<string, string[]>();
   const labelIdsByCard = new Map<string, string[]>();
   const commentsCountByCard = new Map<string, number>();
   const fieldValuesByCard = new Map<string, Record<string, CardFieldValueSnapshot>>();
   const activityByCard = new Map<string, CardActivityEntry[]>();
-  if (cardIds.length > 0) {
-    const { data: assigneeRows } = await supabase
-      .from("card_assignees")
-      .select("card_id, user_id")
-      .in("card_id", cardIds);
-    for (const a of assigneeRows ?? []) {
-      const cur = assigneesByCard.get(a.card_id) ?? [];
-      cur.push(a.user_id);
-      assigneesByCard.set(a.card_id, cur);
-    }
 
-    const { data: cardLabelRows } = await supabase
-      .from("card_labels")
-      .select("card_id, label_id")
-      .in("card_id", cardIds);
-    for (const cl of cardLabelRows ?? []) {
-      const cur = labelIdsByCard.get(cl.card_id) ?? [];
-      cur.push(cl.label_id);
-      labelIdsByCard.set(cl.card_id, cur);
-    }
+  for (const a of snapshot.card_assignees ?? []) {
+    const cur = assigneesByCard.get(a.card_id) ?? [];
+    cur.push(a.user_id);
+    assigneesByCard.set(a.card_id, cur);
+  }
 
-    const { data: cardFieldValueRows } = await supabase
-      .from("card_field_values")
-      .select(
-        "card_id, field_definition_id, text_value, date_value, link_url, link_text, select_option_id"
-      )
-      .in("card_id", cardIds);
-    for (const fv of cardFieldValueRows ?? []) {
-      const cur = fieldValuesByCard.get(fv.card_id) ?? {};
-      const dv = fv.date_value as string | null;
-      cur[fv.field_definition_id] = {
-        textValue: fv.text_value,
-        dateValue: dv,
-        linkUrl: fv.link_url,
-        linkText: fv.link_text,
-        selectOptionId: fv.select_option_id
-      };
-      fieldValuesByCard.set(fv.card_id, cur);
-    }
+  for (const cl of snapshot.card_labels ?? []) {
+    const cur = labelIdsByCard.get(cl.card_id) ?? [];
+    cur.push(cl.label_id);
+    labelIdsByCard.set(cl.card_id, cur);
+  }
 
-    const { data: commentRows } = await supabase
-      .from("card_comments")
-      .select("card_id")
-      .in("card_id", cardIds)
-      .is("deleted_at", null);
-    for (const c of commentRows ?? []) {
-      commentsCountByCard.set(c.card_id, (commentsCountByCard.get(c.card_id) ?? 0) + 1);
-    }
+  for (const fv of snapshot.card_field_values ?? []) {
+    const cur = fieldValuesByCard.get(fv.card_id) ?? {};
+    cur[fv.field_definition_id] = {
+      textValue: fv.text_value,
+      dateValue: fv.date_value,
+      linkUrl: fv.link_url,
+      linkText: fv.link_text,
+      selectOptionId: fv.select_option_id
+    };
+    fieldValuesByCard.set(fv.card_id, cur);
+  }
 
-    const { data: activityRows } = await supabase
-      .from("card_activity")
-      .select("id, card_id, actor_user_id, activity_type, message, created_at")
-      .in("card_id", cardIds)
-      .order("created_at", { ascending: false });
+  for (const [cid, cnt] of Object.entries(snapshot.comments_count_by_card ?? {})) {
+    commentsCountByCard.set(cid, Number(cnt));
+  }
 
-    const actorNamesById = new Map<string, string>();
-    for (const row of memberRowsRaw ?? []) {
-      const profile = unwrapOne(row.profiles as ProfileEmbed | ProfileEmbed[] | null);
-      actorNamesById.set(row.user_id, profile?.display_name?.trim() || "Участник");
-    }
-    for (const a of activityRows ?? []) {
-      const cur = activityByCard.get(a.card_id) ?? [];
-      cur.push({
-        id: a.id,
-        activityType: a.activity_type,
-        message: a.message ?? "",
-        createdAt: a.created_at,
-        actorUserId: a.actor_user_id,
-        actorDisplayName: actorNamesById.get(a.actor_user_id) ?? "Участник"
-      });
-      activityByCard.set(a.card_id, cur);
-    }
+  for (const a of snapshot.activity ?? []) {
+    const cur = activityByCard.get(a.card_id) ?? [];
+    cur.push({
+      id: a.id,
+      activityType: a.activity_type,
+      message: a.message ?? "",
+      createdAt: a.created_at,
+      actorUserId: a.actor_user_id,
+      actorDisplayName: a.actor_display_name ?? "Участник"
+    });
+    activityByCard.set(a.card_id, cur);
   }
 
   const cardsByColumnId = new Map<
@@ -356,7 +293,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
     cardsByColumnId.set(col.id, []);
   }
 
-  for (const row of cardRows ?? []) {
+  for (const row of snapshot.cards ?? []) {
     const list = cardsByColumnId.get(row.column_id);
     if (list) {
       list.push({
@@ -379,18 +316,16 @@ export default async function BoardPage({ params }: BoardPageProps) {
     list.sort((a, b) => a.position - b.position);
   }
 
-  const members: BoardMemberPublic[] = (memberRowsRaw ?? []).map((row) => {
-    const profile = unwrapOne(row.profiles as ProfileEmbed | ProfileEmbed[] | null);
-    const role = unwrapOne(row.board_roles as RoleEmbed | RoleEmbed[] | null);
+  const members: BoardMemberPublic[] = (snapshot.members ?? []).map((row) => {
     return {
       userId: row.user_id,
       roleId: row.board_role_id,
       isOwner: row.is_owner,
-      displayName: profile?.display_name?.trim() || "Участник",
-      email: profile?.email ?? "",
-      avatarUrl: profile?.avatar_url ?? null,
-      roleName: role?.name ?? "",
-      roleKey: role?.key ?? ""
+      displayName: row.display_name?.trim() || "Участник",
+      email: row.email ?? "",
+      avatarUrl: row.avatar_url ?? null,
+      roleName: row.role_name ?? "",
+      roleKey: row.role_key ?? ""
     };
   });
 
@@ -448,15 +383,9 @@ export default async function BoardPage({ params }: BoardPageProps) {
           <InviteMemberButton boardId={board.id} canInvite={canInvite} />
         </div>
       </div>
-      {(columnsError || cardsError) && (
-        <p className="rounded-lg border border-amber-900/60 bg-amber-950/40 px-3 py-2 text-sm text-amber-100">
-          Не удалось загрузить колонки или карточки. Проверьте сеть и права{" "}
-          <code className="text-amber-50/90">board.view</code>.
-        </p>
-      )}
       <BoardCanvas
         boardId={board.id}
-        currentUserId={user!.id}
+        currentUserId={snapshot.current_user_id}
         canCreateCard={canCreateCard}
         membersForNewCard={membersForNewCard}
         boardLabels={boardLabels}
@@ -482,12 +411,44 @@ export default async function BoardPage({ params }: BoardPageProps) {
         board={{
           backgroundType: board.background_type as "color" | "image",
           backgroundColor: board.background_color,
-          backgroundImagePath: board.background_image_path,
-          backgroundImageUrl: boardBackgroundImageUrl
+          backgroundImagePath: board.background_image_path
         }}
         columns={columns}
         cardsByColumnId={cardsByColumnId}
       />
+
+      {perf && (
+        <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-200">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="font-medium text-slate-100">Perf: SSR запросы Supabase</div>
+            <div className="text-slate-400">
+              Включено через <code className="text-slate-200">?perf=1</code>
+            </div>
+          </div>
+          <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-5">
+            <div className="rounded-md bg-slate-900/60 px-2 py-1">
+              <div className="text-slate-400">Всего</div>
+              <div className="text-slate-50">{perf.total}</div>
+            </div>
+            <div className="rounded-md bg-slate-900/60 px-2 py-1">
+              <div className="text-slate-400">DB</div>
+              <div className="text-slate-50">{perf.db}</div>
+            </div>
+            <div className="rounded-md bg-slate-900/60 px-2 py-1">
+              <div className="text-slate-400">Auth</div>
+              <div className="text-slate-50">{perf.auth}</div>
+            </div>
+            <div className="rounded-md bg-slate-900/60 px-2 py-1">
+              <div className="text-slate-400">Storage</div>
+              <div className="text-slate-50">{perf.storage}</div>
+            </div>
+            <div className="rounded-md bg-slate-900/60 px-2 py-1">
+              <div className="text-slate-400">Other</div>
+              <div className="text-slate-50">{perf.other}</div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

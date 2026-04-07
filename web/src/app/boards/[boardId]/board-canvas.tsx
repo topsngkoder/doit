@@ -1,4 +1,3 @@
-import type { CSSProperties } from "react";
 import { AddBoardColumnButton } from "./add-board-column-button";
 import { BoardColumnsDnD } from "./board-columns-dnd";
 import type { NewCardFieldDefinition, NewCardMemberOption } from "./create-card-modal";
@@ -9,6 +8,7 @@ import type {
   BoardCardPreviewItem,
   CardContentPermissions
 } from "./column-types";
+import { BoardBackgroundFrame } from "./board-background-frame";
 
 export type { BoardColumnPermissions, BoardCardListItem, BoardLabelOption, CardContentPermissions };
 
@@ -31,7 +31,6 @@ type BoardCanvasProps = {
     backgroundType: "color" | "image";
     backgroundColor: string | null;
     backgroundImagePath: string | null;
-    backgroundImageUrl: string | null;
   };
   columns: Array<{
     id: string;
@@ -61,25 +60,12 @@ export function BoardCanvas({
   columns,
   cardsByColumnId
 }: BoardCanvasProps) {
-  const backdropClass =
-    board.backgroundType === "color" && board.backgroundColor
-      ? ""
-      : "bg-slate-900/40";
-
-  const backdropStyle: CSSProperties = {};
-  if (board.backgroundType === "color" && board.backgroundColor) {
-    backdropStyle.backgroundColor = board.backgroundColor;
-  }
-  if (board.backgroundType === "image" && board.backgroundImageUrl) {
-    backdropStyle.backgroundImage = `linear-gradient(rgba(2, 6, 23, 0.25), rgba(2, 6, 23, 0.25)), url("${board.backgroundImageUrl}")`;
-    backdropStyle.backgroundSize = "cover";
-    backdropStyle.backgroundPosition = "center";
-  }
-
   return (
-    <section
-      className={`flex min-h-[320px] flex-col gap-4 rounded-xl border border-slate-800/80 p-4 ${backdropClass}`}
-      style={backdropStyle}
+    <BoardBackgroundFrame
+      backgroundType={board.backgroundType}
+      backgroundColor={board.backgroundColor}
+      backgroundImagePath={board.backgroundImagePath}
+      className="flex min-h-[320px] flex-col gap-4 rounded-xl border border-slate-800/80 p-4"
     >
       <div className="flex flex-wrap items-center gap-2">
         <AddBoardColumnButton boardId={boardId} canCreate={columnPermissions.canCreate} />
@@ -102,6 +88,6 @@ export function BoardCanvas({
         columns={columns}
         cardsByColumnId={cardsByColumnId}
       />
-    </section>
+    </BoardBackgroundFrame>
   );
 }
