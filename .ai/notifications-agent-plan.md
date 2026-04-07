@@ -267,16 +267,16 @@
   - **DoD**: server actions соответствуют новой модели.
 
 ### EPIC NT7 — Добавить блок browser permission и native browser notifications
-- [ ] **NT7.1 (todo)** Добавить client-side определение `Notification.permission`
+- [x] **NT7.1 (done)** Добавить client-side определение `Notification.permission`
   - состояния: `default | granted | denied`;
   - корректно обрабатывать отсутствие API в браузере.
   - **DoD**: UI знает текущее состояние разрешения без БД.
-- [ ] **NT7.2 (todo)** Добавить блок разрешения на странице настроек
+- [x] **NT7.2 (done)** Добавить блок разрешения на странице настроек
   - при `default`: активная кнопка “Включить уведомления в браузере”;
   - при `granted`: статус “Браузерные уведомления включены”;
   - при `denied`: статус с инструкцией разрешить вручную в браузере и обновить страницу.
   - **DoD**: блок соответствует разделу 7.
-- [ ] **NT7.3 (todo)** Реализовать вызов `Notification.requestPermission()`
+- [x] **NT7.3 (done)** Реализовать вызов `Notification.requestPermission()`
   - после ответа браузера UI должен сразу обновить статус;
   - при `default` после закрытия системного диалога без выбора сохранить это состояние в UI.
   - **DoD**: поведение соответствует разделу 7.3–7.4.
@@ -558,3 +558,16 @@
   - **NT6.5:** `actions.ts` — только `setNotificationPreferenceEnabledAction`, валидация `isNotificationChannel` / `isNotificationEventType`.
   - Проверка: `npm run build` в `web/` — успешно.
   - **Следующий шаг по плану:** EPIC NT7 (browser permission + native notifications).
+- **2026-04-07 — NT7.1**
+  - Добавлены `web/src/lib/notifications/browser-notification-permission.ts` (`readBrowserNotificationPermission`, типы `StandardBrowserNotificationPermission` / `BrowserNotificationPermissionStatus`: `ready` + `default|granted|denied` либо `unsupported` при отсутствии `window`/`Notification`) и `web/src/lib/notifications/use-browser-notification-permission.ts` (хук: первичное чтение после mount, обновление по `window` `focus` и `document` `visibilitychange` при `visible`).
+  - `notification-settings-client.tsx`: вызов хука; на корне `<section>` атрибут `data-browser-notification-permission` со значениями `pending` (до клиента) | `unsupported` | `default` | `granted` | `denied` — для проверки без БД; пользовательский блок кнопок/текста — **NT7.2**.
+  - Миграции не требовались.
+  - Проверка: `npm run build` в `web/` после очистки `web/.next` (если сборка ругалась на отсутствующий chunk — артефакт кэша). Вручную: открыть `/notifications/settings`, в DevTools у `section.space-y-5` смотреть `data-browser-notification-permission`; сменить разрешение сайта для уведомлений → вернуться на вкладку / фокус окна — атрибут должен обновиться.
+  - **Далее:** NT7.2–NT7.3 (см. журнал ниже).
+- **2026-04-07 — NT7.2 + NT7.3**
+  - Порядок по §6.1: блок «Уведомления в браузере» **выше** плашки про автора и таблицы предпочтений.
+  - `use-browser-notification-permission.ts`: хук возвращает `{ status, refresh }` для перечитывания после `requestPermission` и при фокусе/видимости (как раньше).
+  - `notification-settings-client.tsx`: карточка с подзаголовком §7.1 (не подменяет таблицу / email / внутренний центр); состояния — текст при `pending` и `unsupported`; при `granted` — «Браузерные уведомления включены»; при `denied` — дословно §7.2; при `default` — кнопка «Включить уведомления в браузере» → `Notification.requestPermission()`, затем `refresh` в `finally` (ошибки контекста — тоже перечитать состояние, §7.4).
+  - Миграции не требовались.
+  - Проверка: `npm run build` в `web/` — успешно. Вручную на `/notifications/settings`: до клика — кнопка при первом заходе; после разрешения/запрета — нужный текст; заблокировать сайту уведомления в настройках браузера → обновить страницу — ветка `denied`; снять блокировку и обновить — снова запрос или `default`/`granted` в зависимости от браузера.
+  - **Следующий шаг по плану:** NT7.4 (точка запуска native notifications / provider).

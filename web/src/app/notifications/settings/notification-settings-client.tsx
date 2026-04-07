@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   NOTIFICATION_CHANNEL_LABEL,
@@ -10,6 +11,8 @@ import {
   type NotificationChannel,
   type NotificationEventType
 } from "@/lib/notifications/constants";
+import type { BrowserNotificationPermissionStatus } from "@/lib/notifications/browser-notification-permission";
+import { useBrowserNotificationPermission } from "@/lib/notifications/use-browser-notification-permission";
 
 type PreferenceKey = `${NotificationEventType}:${NotificationChannel}`;
 
@@ -24,6 +27,19 @@ function buildKey(eventType: NotificationEventType, channel: NotificationChannel
   return `${eventType}:${channel}`;
 }
 
+/** Для проверки NT7.1: значение `data-browser-notification-permission` на корне секции. */
+function browserPermissionDataAttribute(
+  status: BrowserNotificationPermissionStatus | null
+): "pending" | "unsupported" | "default" | "granted" | "denied" {
+  if (status === null) {
+    return "pending";
+  }
+  if (status.kind === "unsupported") {
+    return "unsupported";
+  }
+  return status.permission;
+}
+
 export function NotificationSettingsClient({
   initialPreferences,
   setPreferenceEnabledAction
@@ -31,6 +47,9 @@ export function NotificationSettingsClient({
   const [isPending, startTransition] = useTransition();
   const [prefs, setPrefs] = useState<Record<PreferenceKey, boolean>>(initialPreferences);
   const [lastMessage, setLastMessage] = useState<string | null>(null);
+  const [isRequestingBrowserPermission, setIsRequestingBrowserPermission] = useState(false);
+  const { status: browserNotificationPermission, refresh: refreshBrowserNotificationPermission } =
+    useBrowserNotificationPermission();
 
   function setToastFromResult(result: ServerResult) {
     if (result.ok) {
@@ -55,8 +74,58 @@ export function NotificationSettingsClient({
     });
   }
 
+  async function handleRequestBrowserNotificationPermission() {
+    if (typeof Notification === "undefined") {
+      return;
+    }
+    setIsRequestingBrowserPermission(true);
+    try {
+      await Notification.requestPermission();
+    } catch {
+      // небезопасный контекст / ограничения браузера — перечитываем фактическое состояние
+    } finally {
+      refreshBrowserNotificationPermission();
+      setIsRequestingBrowserPermission(false);
+    }
+  }
+
   return (
-    <section className="space-y-5">
+    <section
+      className="space-y-5"
+      data-browser-notification-permission={browserPermissionDataAttribute(browserNotificationPermission)}
+    >
+      <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+        <h2 className="text-sm font-semibold text-slate-100">Уведомления в браузере</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Системные уведомления ОС при открытом приложении. Не влияют на таблицу ниже и не включают email.
+        </p>
+        <div className="mt-3">
+          {browserNotificationPermission === null ? (
+            <p className="text-xs text-slate-400">Проверяем доступ к уведомлениям…</p>
+          ) : browserNotificationPermission.kind === "unsupported" ? (
+            <p className="text-xs text-slate-300">
+              В этом браузере недоступны системные уведомления (нет API или открыт небезопасный адрес). Внутренний центр
+              уведомлений по-прежнему работает.
+            </p>
+          ) : browserNotificationPermission.permission === "granted" ? (
+            <p className="text-xs font-medium text-emerald-200/90">Браузерные уведомления включены</p>
+          ) : browserNotificationPermission.permission === "denied" ? (
+            <p className="text-xs text-amber-100/90">
+              Браузер запретил уведомления. Разрешите их вручную в настройках браузера и обновите страницу.
+            </p>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              disabled={isRequestingBrowserPermission || isPending}
+              onClick={() => void handleRequestBrowserNotificationPermission()}
+            >
+              {isRequestingBrowserPermission ? "Запрос…" : "Включить уведомления в браузере"}
+            </Button>
+          )}
+        </div>
+      </div>
+
       <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
         <div className="rounded-md border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-300">
           Вы не получаете уведомления, где являетесь автором действий.
