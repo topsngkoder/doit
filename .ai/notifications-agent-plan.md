@@ -132,26 +132,26 @@
   - **DoD**: сборка не падает из-за старых union type и label map.
 
 ### EPIC NT2 — Обновить схему БД под `browser + email` и 6 event types
-- [ ] **NT2.1 (todo)** Добавить миграцию на `notification_preferences`
+- [x] **NT2.1 (done)** Добавить миграцию на `notification_preferences`
   - допустимые `channel`: только `browser`, `email`;
   - допустимые `event_type`: все 6 значений;
   - сохранить уникальность `(user_id, channel, event_type)`.
   - **DoD**: схема таблицы соответствует спецификации 11.1.
-- [ ] **NT2.2 (todo)** Добавить миграцию на `notification_outbox`
+- [x] **NT2.2 (done)** Добавить миграцию на `notification_outbox`
   - допустимый `channel`: только `email`;
   - допустимые `event_type`: все 6 значений;
   - статусы `pending | sent | failed` оставить;
   - лимит попыток до 5 сохранить.
   - **DoD**: схема таблицы соответствует спецификации 11.2.
-- [ ] **NT2.3 (todo)** Добавить миграцию на `internal_notifications`
+- [x] **NT2.3 (done)** Добавить миграцию на `internal_notifications`
   - расширить допустимые `event_type` до 6 значений.
   - **DoD**: схема таблицы соответствует спецификации 11.3.
-- [ ] **NT2.4 (todo)** Убрать `notification_user_settings` из целевой модели
+- [x] **NT2.4 (done)** Убрать `notification_user_settings` из целевой модели
   - удалить таблицу или перевести проект в состояние полной независимости от неё;
   - убрать связанные `updated_at` trigger references, если они завязаны на существование таблицы;
   - убрать её из server/UI-кода.
   - **DoD**: приложение, UI и логика уведомлений не читают и не пишут `notification_user_settings`.
-- [ ] **NT2.5 (todo)** Проверить RLS после миграций
+- [x] **NT2.5 (done)** Проверить RLS после миграций
   - `notification_preferences`: CRUD только своих строк;
   - `internal_notifications`: select/update только своих строк;
   - `notification_outbox`: без пользовательских политик на прямой доступ.
@@ -451,3 +451,23 @@
   - `notification-settings-client.tsx`: убраны упоминания Telegram/тихих часов у блока временной зоны; нейтральная подпись про отсутствие влияния на доставку.
   - Импорты `@/lib/notifications/constants` по репозиторию: только модуль настроек уведомлений.
   - Проверка: `npx next build` в `web/` — успешно.
+- **2026-04-07 — NT2.1**
+  - Добавлена миграция `supabase/migrations/20260407180000_notification_preferences_browser_email.sql`: снятие старых CHECK на таблице, `UPDATE` каналов `internal` → `browser`, `telegram` → `email`, новые ограничения `channel IN ('browser','email')` и шесть значений `event_type` (включая `card_in_progress`, `card_ready`); уникальность `(user_id, channel, event_type)` не менялась.
+  - Локальный `supabase status` недоступен (Docker Desktop не запущен); миграция применена к связанной remote БД: `supabase db push`.
+  - Замечание: полное соответствие доставки новой модели по-прежнему в NT4 (`enqueue_notification_event` ещё смотрит на старые имена каналов в SQL).
+  - Проверка у себя: при необходимости локально — запустить Docker, `supabase db reset` или `migration up`; для remote — убедиться, что в dashboard нет ошибок и `select distinct channel, event_type from notification_preferences` даёт только допустимые значения.
+- **2026-04-07 — NT2.2**
+  - Миграция `supabase/migrations/20260407181000_notification_outbox_email_channel.sql`: снятие CHECK на `notification_outbox`, `UPDATE channel` с `telegram` на `email`, новые ограничения — `channel = 'email'`, шесть `event_type`, `status` и диапазон `attempts` сохранены как в исходной схеме.
+  - Применено к remote: `supabase db push`.
+  - Пока `enqueue_notification_event` вставляет `channel = 'telegram'`, новые строки в outbox падать будут до NT4 — ожидаемо.
+- **2026-04-07 — NT2.3**
+  - Миграция `supabase/migrations/20260407182000_internal_notifications_six_event_types.sql`: пересоздан один CHECK на `event_type` — шесть значений; существующие строки с четырьмя старыми типами остаются валидными.
+  - Применено к remote: `supabase db push`.
+- **2026-04-07 — NT2.4**
+  - Миграция `supabase/migrations/20260407183000_drop_notification_user_settings.sql`: `DROP TABLE` для `notification_user_settings` (триггер `updated_at` и RLS удаляются вместе с таблицей).
+  - Код: `settings/page.tsx` без запроса к таблице; `actions.ts` без `updateNotificationTimezoneAction`; `notification-settings-client.tsx` без блока временной зоны.
+  - Применено к remote: `supabase db push`. Проверка: `npm run build` в `web/` — успешно.
+- **2026-04-07 — NT2.5**
+  - Ревизия по `supabase/migrations/20260317146000_rls_activity_notifications_preview.sql`: для `notification_preferences` — SELECT/UPDATE/DELETE по `user_id = auth.uid()` (и bypass `is_system_admin()`), INSERT с `WITH CHECK ( user_id = auth.uid() )`; для `internal_notifications` — SELECT и UPDATE только своих, политик INSERT/DELETE для `authenticated` нет (вставка через service role / SECURITY DEFINER); для `notification_outbox` — RLS включён, политик для `authenticated` нет.
+  - Миграции NT2.1–NT2.4 не меняли эти политики; удаление `notification_user_settings` убрало таблицу и её политики вместе с `DROP TABLE`.
+  - Доп. проверка в SQL Editor (по желанию): политики на оставшихся таблицах — `SELECT tablename, policyname, cmd, roles FROM pg_policies WHERE schemaname = 'public' AND tablename IN ('notification_preferences','internal_notifications','notification_outbox') ORDER BY tablename, policyname;` для `notification_outbox` список должен быть пустым.

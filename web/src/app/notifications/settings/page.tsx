@@ -11,7 +11,7 @@ import {
   type NotificationEventType
 } from "@/lib/notifications/constants";
 import { NotificationSettingsClient } from "./notification-settings-client";
-import { setNotificationPreferenceEnabledAction, updateNotificationTimezoneAction } from "./actions";
+import { setNotificationPreferenceEnabledAction } from "./actions";
 
 type PreferenceKey = `${NotificationEventType}:${NotificationChannel}`;
 
@@ -32,20 +32,12 @@ export default async function NotificationSettingsPage() {
     redirect("/login");
   }
 
-  const { data: settingsRow, error: settingsError } = await supabase
-    .from("notification_user_settings")
-    .select("timezone")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
   const { data: prefRows, error: prefsError } = await supabase
     .from("notification_preferences")
     .select("channel, event_type, enabled")
     .eq("user_id", user.id)
     .in("channel", [...NOTIFICATION_CHANNELS])
     .in("event_type", [...NOTIFICATION_EVENT_TYPES]);
-
-  const initialTimezone = settingsRow?.timezone ?? "Europe/Moscow";
 
   const initialPreferences: Record<PreferenceKey, boolean> = Object.fromEntries(
     NOTIFICATION_EVENT_TYPES.flatMap((eventType) =>
@@ -82,17 +74,12 @@ export default async function NotificationSettingsPage() {
         </div>
       </header>
 
-      {settingsError ? (
-        <Toast title="Ошибка загрузки настроек" message={settingsError.message} variant="error" />
-      ) : null}
       {prefsError ? (
         <Toast title="Ошибка загрузки предпочтений" message={prefsError.message} variant="error" />
       ) : null}
 
       <NotificationSettingsClient
-        initialTimezone={initialTimezone}
         initialPreferences={initialPreferences}
-        updateTimezoneAction={updateNotificationTimezoneAction}
         setPreferenceEnabledAction={setNotificationPreferenceEnabledAction}
       />
     </main>

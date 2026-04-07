@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { cn } from "@/lib/utils";
 import {
   NOTIFICATION_CHANNEL_LABEL,
@@ -16,40 +16,12 @@ type PreferenceKey = `${NotificationEventType}:${NotificationChannel}`;
 type ServerResult = { ok: true } | { ok: false; message: string };
 
 type Props = {
-  initialTimezone: string;
   initialPreferences: Record<PreferenceKey, boolean>;
-  updateTimezoneAction: (formData: FormData) => Promise<ServerResult>;
   setPreferenceEnabledAction: (formData: FormData) => Promise<ServerResult>;
 };
 
 function buildKey(eventType: NotificationEventType, channel: NotificationChannel): PreferenceKey {
   return `${eventType}:${channel}`;
-}
-
-function detectTimezones(): string[] {
-  const anyIntl = Intl as unknown as {
-    supportedValuesOf?: (key: "timeZone") => string[];
-  };
-  if (typeof anyIntl.supportedValuesOf === "function") {
-    try {
-      return anyIntl.supportedValuesOf("timeZone");
-    } catch {
-      // ignore
-    }
-  }
-  return [
-    "Europe/Moscow",
-    "Europe/Kaliningrad",
-    "Europe/Samara",
-    "Asia/Yekaterinburg",
-    "Asia/Novosibirsk",
-    "Asia/Krasnoyarsk",
-    "Asia/Irkutsk",
-    "Asia/Yakutsk",
-    "Asia/Vladivostok",
-    "Asia/Magadan",
-    "Asia/Kamchatka"
-  ];
 }
 
 function Switch({
@@ -88,17 +60,12 @@ function Switch({
 }
 
 export function NotificationSettingsClient({
-  initialTimezone,
   initialPreferences,
-  updateTimezoneAction,
   setPreferenceEnabledAction
 }: Props) {
   const [isPending, startTransition] = useTransition();
-  const [timezone, setTimezone] = useState(initialTimezone);
   const [prefs, setPrefs] = useState<Record<PreferenceKey, boolean>>(initialPreferences);
   const [lastMessage, setLastMessage] = useState<string | null>(null);
-
-  const timezones = useMemo(() => detectTimezones(), []);
 
   function setToastFromResult(result: ServerResult) {
     if (result.ok) {
@@ -106,18 +73,6 @@ export function NotificationSettingsClient({
       return;
     }
     setLastMessage(result.message);
-  }
-
-  function submitTimezone(nextTz: string) {
-    setTimezone(nextTz);
-    setLastMessage(null);
-
-    startTransition(async () => {
-      const fd = new FormData();
-      fd.set("timezone", nextTz);
-      const result = await updateTimezoneAction(fd);
-      setToastFromResult(result);
-    });
   }
 
   function submitPreference(eventType: NotificationEventType, channel: NotificationChannel, enabled: boolean) {
@@ -138,37 +93,7 @@ export function NotificationSettingsClient({
   return (
     <section className="space-y-5">
       <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-1">
-            <div className="text-sm font-semibold text-slate-100">Временная зона</div>
-            <div className="text-xs text-slate-400">
-              Сейчас не влияет на уведомления в приложении и по почте.
-            </div>
-          </div>
-
-          <form
-            action={async (formData) => {
-              await updateTimezoneAction(formData);
-            }}
-            className="flex items-center gap-2"
-          >
-            <select
-              name="timezone"
-              value={timezone}
-              disabled={isPending}
-              onChange={(e) => submitTimezone(e.target.value)}
-              className="h-9 w-full min-w-[240px] rounded-md border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 outline-none focus:border-sky-500 sm:w-auto"
-            >
-              {timezones.map((tz) => (
-                <option key={tz} value={tz}>
-                  {tz}
-                </option>
-              ))}
-            </select>
-          </form>
-        </div>
-
-        <div className="mt-4 rounded-md border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-300">
+        <div className="rounded-md border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-300">
           Вы не получаете уведомления, где являетесь автором действий.
         </div>
 
@@ -228,4 +153,3 @@ export function NotificationSettingsClient({
     </section>
   );
 }
-
