@@ -158,22 +158,22 @@
   - **DoD**: после миграций существующая модель доступа не сломана.
 
 ### EPIC NT3 — Миграция данных со старой модели на новую
-- [ ] **NT3.1 (todo)** Перенести пользовательские preference по старым 4 типам
+- [x] **NT3.1 (done)** Перенести пользовательские preference по старым 4 типам
   - сохранить existing enabled/disabled значения для старых типов;
   - сопоставление каналов:
     - `internal -> browser`
     - `telegram -> email`
   - если в текущих данных есть оба канала, перенести каждый независимо.
   - **DoD**: пользовательские значения по 4 старым типам не теряются.
-- [ ] **NT3.2 (todo)** Инициализировать новые типы `card_in_progress` и `card_ready`
+- [x] **NT3.2 (done)** Инициализировать новые типы `card_in_progress` и `card_ready`
   - если явных записей нет, default трактуется как `browser = true`, `email = true`;
   - при необходимости можно не материализовать строки в БД, если server/UI уже корректно применяют fallback `true`.
   - **DoD**: новый пользователь и существующий пользователь без явной записи получают `true` по умолчанию.
-- [ ] **NT3.3 (todo)** Обработать legacy timezone / quiet hours
+- [x] **NT3.3 (done)** Обработать legacy timezone / quiet hours
   - старые данные не должны участвовать в UI и доставке;
   - никакой попытки “мигрировать” quiet hours в новую логику не требуется.
   - **DoD**: старые настройки считаются устаревшими и нигде не используются.
-- [ ] **NT3.4 (todo)** Проверить legacy Telegram-данные
+- [x] **NT3.4 (done)** Проверить legacy Telegram-данные
   - `profiles.telegram_*` и `telegram_link_tokens` не использовать в новой логике уведомлений;
   - не удалять автоматически, если это не требуется отдельной задачей.
   - **DoD**: Telegram-данные не влияют на пользовательское поведение уведомлений.
@@ -471,3 +471,23 @@
   - Ревизия по `supabase/migrations/20260317146000_rls_activity_notifications_preview.sql`: для `notification_preferences` — SELECT/UPDATE/DELETE по `user_id = auth.uid()` (и bypass `is_system_admin()`), INSERT с `WITH CHECK ( user_id = auth.uid() )`; для `internal_notifications` — SELECT и UPDATE только своих, политик INSERT/DELETE для `authenticated` нет (вставка через service role / SECURITY DEFINER); для `notification_outbox` — RLS включён, политик для `authenticated` нет.
   - Миграции NT2.1–NT2.4 не меняли эти политики; удаление `notification_user_settings` убрало таблицу и её политики вместе с `DROP TABLE`.
   - Доп. проверка в SQL Editor (по желанию): политики на оставшихся таблицах — `SELECT tablename, policyname, cmd, roles FROM pg_policies WHERE schemaname = 'public' AND tablename IN ('notification_preferences','internal_notifications','notification_outbox') ORDER BY tablename, policyname;` для `notification_outbox` список должен быть пустым.
+- **2026-04-07 — NT3.1**
+  - Отдельная миграция не добавлялась: перенос уже сделан в `supabase/migrations/20260407180000_notification_preferences_browser_email.sql` (шаг NT2.1): перед новыми CHECK выполняется `UPDATE ... SET channel = CASE ... internal→browser, telegram→email` только для строк со старыми каналами; столбец `enabled` не трогается — значения по четырём старым `event_type` сохраняются; строки с разными каналами остаются разными строками (`UNIQUE (user_id, channel, event_type)`).
+  - `supabase db push`: remote «up to date».
+  - **Как проверить у себя** (SQL Editor): `SELECT channel, event_type, enabled, count(*) FROM notification_preferences GROUP BY 1,2,3 ORDER BY 1,2;` — не должно быть `internal`/`telegram`; для каждой комбинации из четырёх старых типов смотрите, что флаги соответствуют ожиданиям пользователей.
+- **2026-04-07 — NT3.2**
+  - Миграция `supabase/migrations/20260407184000_notification_preferences_new_event_defaults.sql`: для каждого `profiles.user_id` вставлены четыре строки `(browser|email × card_in_progress|card_ready, enabled=true)` с `ON CONFLICT (user_id, channel, event_type) DO NOTHING`.
+  - UI: `settings/page.tsx` по-прежнему инициализирует все 6×2 ключей значением `true` до наложения строк из БД — для **новых** пользователей после миграции без строк в таблице поведение остаётся «всё включено», пока они не переключат чекбокс (тогда появится явная запись через upsert).
+  - Применено: `supabase db push`.
+  - **Проверка:** `SELECT count(*) FROM notification_preferences WHERE event_type IN ('card_in_progress','card_ready') AND enabled = false` — ожидаемо 0 сразу после миграции (пока никто не отключал); сравнить `count(distinct user_id)` в `profiles` и число пользователей, у кого ровно по две строки на каждый из двух типов (опционально).
+  - **NT4:** в `enqueue_notification_event` обязательно трактовать отсутствие строки как «канал включён» (например `COALESCE((SELECT enabled FROM ... LIMIT 1), true)`), иначе пользователи без материализованных prefs для старых типов могут не получать доставку.
+- **2026-04-07 — NT3.3**
+  - Отдельная миграция не требуется: legacy-данные timezone / quiet hours хранились только в `notification_user_settings` и **удалены вместе с таблицей** в `20260407183000_drop_notification_user_settings.sql` (NT2.4); перенос тихих часов в новую модель **не делался** и не планируется.
+  - **Web:** в `web/src/app/notifications` нет обращений к `notification_user_settings`, timezone и quiet hours (поиск по каталогу).
+  - **SQL:** `public.enqueue_notification_event` и прочие миграции доставки не используют timezone/quiet hours.
+  - **Проверка:** `SELECT to_regclass('public.notification_user_settings');` — ожидаемо `NULL`; локально при необходимости `supabase db reset` и убедиться, что цепочка миграций проходит без ошибок.
+- **2026-04-07 — NT3.4**
+  - **Web:** поиск по `web/` (`telegram` / `Telegram`) — вхождений нет; экраны и экшены уведомлений на Telegram и `telegram_link_tokens` не опираются.
+  - **SQL:** чтение `profiles.telegram_chat_id` и ветка `channel = 'telegram'` остались только в `enqueue_notification_event` (`20260407153000_notification_delivery_filters.sql`); вызовов этой функции из других миграций нет — целевая «новая» доставка снимается в **NT4** (browser/email, без линка на Telegram).
+  - Таблицы `profiles.telegram_*` и `telegram_link_tokens` **не удалялись** (как в задаче).
+  - **Проверка:** повторить `rg -i telegram web` (или поиск в IDE по `web/`); убедиться, что в настройках уведомлений нет колонки/копира про Telegram.
