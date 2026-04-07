@@ -10,6 +10,7 @@ import type {
 import type { NewCardFieldDefinition } from "./card-field-drafts";
 import { BoardMembersPanel, type BoardMemberPublic, type BoardRoleOption } from "./board-members";
 import { BoardLabelsButton } from "./board-labels-button";
+import { BoardFieldsButton } from "./board-fields-button";
 import { InviteMemberButton } from "./invite-member-button";
 
 type BoardPageProps = {
@@ -63,6 +64,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
   let canMoveCards = false;
   let canCreateComment = false;
   let canManageBoardLabels = false;
+  let canManageCardFields = false;
   if (memberRow?.board_role_id) {
     const { data: perms } = await supabase
       .from("board_role_permissions")
@@ -82,7 +84,8 @@ export default async function BoardPage({ params }: BoardPageProps) {
         "columns.reorder",
         "columns.delete",
         "cards.move",
-        "comments.create"
+        "comments.create",
+        "card_fields.manage"
       ]);
 
     for (const p of perms ?? []) {
@@ -101,6 +104,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
       if (p.permission === "columns.delete") canDeleteColumn = true;
       if (p.permission === "cards.move") canMoveCards = true;
       if (p.permission === "comments.create") canCreateComment = true;
+      if (p.permission === "card_fields.manage") canManageCardFields = true;
     }
   }
 
@@ -372,6 +376,11 @@ export default async function BoardPage({ params }: BoardPageProps) {
             boardId={board.id}
             canManage={canManageBoardLabels}
             labels={boardLabels}
+          />
+          <BoardFieldsButton
+            boardId={board.id}
+            canManage={canManageCardFields}
+            fieldDefinitions={fieldDefinitions}
           />
           <InviteMemberButton boardId={board.id} canInvite={canInvite} />
         </div>

@@ -213,7 +213,12 @@
     - **Проверка:** открыть карточку, перейти на вкладку «История» — видны последние события (`card_moved`, `responsible_set`, `field_value_updated` и т.д.) в обратном хронологическом порядке; после нового действия и `router.refresh()` событие появляется сверху.
 
 ### EPIC H — Управление схемой: кастомные поля, метки, preview карточек, фон доски
-- [ ] **H1 (todo)** UI “Поля” (board_admin): CRUD field_definitions + reorder + required + select options. DoD: соответствует 7.3–7.4.
+- [x] **H1 (done)** UI “Поля” (board_admin): CRUD field_definitions + reorder + required + select options. DoD: соответствует 7.3–7.4.
+    - **Приложение:** добавлен компонент `web/src/app/boards/[boardId]/board-fields-button.tsx` (кнопка «Поля» в шапке доски, модал управления схемой): создание/редактирование/удаление поля, переключение `is_required`, смена типа (`text|date|select|link`), изменение порядка полей (↑/↓). Для `select`-полей реализован CRUD вариантов + порядок (↑/↓) и изменение цвета.
+    - **Server actions:** в `web/src/app/boards/[boardId]/actions.ts` добавлены мутации `create/update/delete/move` для `board_field_definitions` и `board_field_select_options` с валидацией (длины, тип поля, формат цвета `#RRGGBB`, принадлежность к доске/полю) и `revalidatePath`.
+    - **Права:** в `web/src/app/boards/[boardId]/page.tsx` добавлено чтение permission `card_fields.manage`; UI «Поля» показывается только при этом праве (RLS остаётся источником истины на БД).
+    - **Миграции:** не требовались (`board_field_definitions` / `board_field_select_options` и RLS из C3.8 уже покрывают сценарий).
+    - **Проверка:** под ролью с `card_fields.manage` открыть доску → «Поля»; создать поле каждого типа, включить/выключить обязательность, поменять порядок, удалить поле. Для поля `select` добавить/обновить/удалить варианты и поменять порядок; убедиться в изменениях в таблицах `board_field_definitions` и `board_field_select_options`. Под ролью без `card_fields.manage` кнопка «Поля» не отображается, прямые мутации блокируются RLS.
 - [ ] **H2 (todo)** UI “Метки” (labels.manage): CRUD + reorder. DoD: удаление метки каскадит `card_labels` и добавляет activity на карточки.
 - [ ] **H3 (todo)** UI “Отображение карточек” (card_preview.manage): включение/выключение/порядок элементов + выбор custom_fields. DoD: 14.5 соблюдён, title всегда включён и первый.
 - [ ] **H4 (todo)** Фон доски (board.change_background): цвет или изображение (Storage). DoD: загрузка файла, сохранение path, отображение.

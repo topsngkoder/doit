@@ -180,6 +180,509 @@ export async function deleteBoardLabelAction(
   return { ok: true };
 }
 
+const BOARD_FIELD_TYPES = ["text", "date", "select", "link"] as const;
+type BoardFieldType = (typeof BOARD_FIELD_TYPES)[number];
+
+function isBoardFieldType(v: string): v is BoardFieldType {
+  return (BOARD_FIELD_TYPES as readonly string[]).includes(v);
+}
+
+function normalizeBoardFieldName(raw: string): string {
+  return raw.trim();
+}
+
+function normalizeSelectOptionName(raw: string): string {
+  return raw.trim();
+}
+
+export type BoardFieldCatalogResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+export async function createBoardFieldDefinitionAction(
+  boardId: string,
+  payload: {
+    name: string;
+    fieldType: string;
+    isRequired: boolean;
+  }
+): Promise<BoardFieldCatalogResult> {
+  const name = normalizeBoardFieldName(payload.name);
+  if (name.length < 1 || name.length > 50) {
+    return { ok: false, message: "Название поля: от 1 до 50 символов." };
+  }
+  if (!isBoardFieldType(payload.fieldType)) {
+    return { ok: false, message: "Некорректный тип поля." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: maxRow, error: maxError } = await supabase
+    .from("board_field_definitions")
+    .select("position")
+    .eq("board_id", boardId)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (maxError) {
+    return { ok: false, message: maxError.message };
+  }
+
+  const nextPosition = maxRow?.position != null ? Number(maxRow.position) + 1 : 0;
+  const { error } = await supabase.from("board_field_definitions").insert({
+    board_id: boardId,
+    name,
+    field_type: payload.fieldType,
+    is_required: payload.isRequired,
+    position: nextPosition
+  });
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права управлять полями доски." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function updateBoardFieldDefinitionAction(
+  boardId: string,
+  fieldDefinitionId: string,
+  payload: {
+    name: string;
+    fieldType: string;
+    isRequired: boolean;
+  }
+): Promise<BoardFieldCatalogResult> {
+  const name = normalizeBoardFieldName(payload.name);
+  if (name.length < 1 || name.length > 50) {
+    return { ok: false, message: "Название поля: от 1 до 50 символов." };
+  }
+  if (!isBoardFieldType(payload.fieldType)) {
+    return { ok: false, message: "Некорректный тип поля." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: row, error: readError } = await supabase
+    .from("board_field_definitions")
+    .select("id, board_id")
+    .eq("id", fieldDefinitionId)
+    .maybeSingle();
+
+  if (readError) {
+    return { ok: false, message: readError.message };
+  }
+  if (!row || row.board_id !== boardId) {
+    return { ok: false, message: "Поле не найдено на этой доске." };
+  }
+
+  const { error } = await supabase
+    .from("board_field_definitions")
+    .update({
+      name,
+      field_type: payload.fieldType,
+      is_required: payload.isRequired
+    })
+    .eq("id", fieldDefinitionId)
+    .eq("board_id", boardId);
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права управлять полями доски." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function deleteBoardFieldDefinitionAction(
+  boardId: string,
+  fieldDefinitionId: string
+): Promise<BoardFieldCatalogResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: row, error: readError } = await supabase
+    .from("board_field_definitions")
+    .select("id, board_id")
+    .eq("id", fieldDefinitionId)
+    .maybeSingle();
+
+  if (readError) {
+    return { ok: false, message: readError.message };
+  }
+  if (!row || row.board_id !== boardId) {
+    return { ok: false, message: "Поле не найдено на этой доске." };
+  }
+
+  const { error } = await supabase
+    .from("board_field_definitions")
+    .delete()
+    .eq("id", fieldDefinitionId)
+    .eq("board_id", boardId);
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права управлять полями доски." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function moveBoardFieldDefinitionAction(
+  boardId: string,
+  fieldDefinitionId: string,
+  direction: "up" | "down"
+): Promise<BoardFieldCatalogResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: rows, error: listError } = await supabase
+    .from("board_field_definitions")
+    .select("id, position")
+    .eq("board_id", boardId)
+    .order("position", { ascending: true });
+  if (listError) {
+    return { ok: false, message: listError.message };
+  }
+
+  const defs = rows ?? [];
+  const idx = defs.findIndex((d) => d.id === fieldDefinitionId);
+  if (idx === -1) {
+    return { ok: false, message: "Поле не найдено на этой доске." };
+  }
+
+  const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= defs.length) {
+    return { ok: true };
+  }
+
+  const current = defs[idx];
+  const target = defs[swapIdx];
+  const posCurrent = Number(current.position);
+  const posTarget = Number(target.position);
+
+  const { error: firstError } = await supabase
+    .from("board_field_definitions")
+    .update({ position: posTarget })
+    .eq("id", current.id)
+    .eq("board_id", boardId);
+  if (firstError) {
+    if (firstError.code === "42501") {
+      return { ok: false, message: "Нет права менять порядок полей доски." };
+    }
+    return { ok: false, message: firstError.message };
+  }
+
+  const { error: secondError } = await supabase
+    .from("board_field_definitions")
+    .update({ position: posCurrent })
+    .eq("id", target.id)
+    .eq("board_id", boardId);
+  if (secondError) {
+    await supabase
+      .from("board_field_definitions")
+      .update({ position: posCurrent })
+      .eq("id", current.id)
+      .eq("board_id", boardId);
+    if (secondError.code === "42501") {
+      return { ok: false, message: "Нет права менять порядок полей доски." };
+    }
+    return { ok: false, message: secondError.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function createBoardFieldSelectOptionAction(
+  boardId: string,
+  fieldDefinitionId: string,
+  payload: { name: string; color: string }
+): Promise<BoardFieldCatalogResult> {
+  const name = normalizeSelectOptionName(payload.name);
+  const color = normalizeBoardLabelHexColor(payload.color);
+
+  if (name.length < 1 || name.length > 50) {
+    return { ok: false, message: "Название варианта: от 1 до 50 символов." };
+  }
+  if (!color) {
+    return { ok: false, message: "Цвет варианта: формат #RRGGBB." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: defRow, error: defError } = await supabase
+    .from("board_field_definitions")
+    .select("id, board_id, field_type")
+    .eq("id", fieldDefinitionId)
+    .maybeSingle();
+  if (defError) {
+    return { ok: false, message: defError.message };
+  }
+  if (!defRow || defRow.board_id !== boardId) {
+    return { ok: false, message: "Поле не найдено на этой доске." };
+  }
+  if (defRow.field_type !== "select") {
+    return { ok: false, message: "Варианты доступны только для поля типа select." };
+  }
+
+  const { data: maxRow, error: maxError } = await supabase
+    .from("board_field_select_options")
+    .select("position")
+    .eq("field_definition_id", fieldDefinitionId)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (maxError) {
+    return { ok: false, message: maxError.message };
+  }
+  const nextPosition = maxRow?.position != null ? Number(maxRow.position) + 1 : 0;
+
+  const { error } = await supabase.from("board_field_select_options").insert({
+    field_definition_id: fieldDefinitionId,
+    name,
+    color,
+    position: nextPosition
+  });
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права управлять полями доски." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function updateBoardFieldSelectOptionAction(
+  boardId: string,
+  fieldDefinitionId: string,
+  optionId: string,
+  payload: { name: string; color: string }
+): Promise<BoardFieldCatalogResult> {
+  const name = normalizeSelectOptionName(payload.name);
+  const color = normalizeBoardLabelHexColor(payload.color);
+
+  if (name.length < 1 || name.length > 50) {
+    return { ok: false, message: "Название варианта: от 1 до 50 символов." };
+  }
+  if (!color) {
+    return { ok: false, message: "Цвет варианта: формат #RRGGBB." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: defRow, error: defError } = await supabase
+    .from("board_field_definitions")
+    .select("id, board_id, field_type")
+    .eq("id", fieldDefinitionId)
+    .maybeSingle();
+  if (defError) {
+    return { ok: false, message: defError.message };
+  }
+  if (!defRow || defRow.board_id !== boardId) {
+    return { ok: false, message: "Поле не найдено на этой доске." };
+  }
+  if (defRow.field_type !== "select") {
+    return { ok: false, message: "Варианты доступны только для поля типа select." };
+  }
+
+  const { data: row, error: readError } = await supabase
+    .from("board_field_select_options")
+    .select("id, field_definition_id")
+    .eq("id", optionId)
+    .maybeSingle();
+  if (readError) {
+    return { ok: false, message: readError.message };
+  }
+  if (!row || row.field_definition_id !== fieldDefinitionId) {
+    return { ok: false, message: "Вариант не найден у этого поля." };
+  }
+
+  const { error } = await supabase
+    .from("board_field_select_options")
+    .update({ name, color })
+    .eq("id", optionId)
+    .eq("field_definition_id", fieldDefinitionId);
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права управлять полями доски." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function deleteBoardFieldSelectOptionAction(
+  boardId: string,
+  fieldDefinitionId: string,
+  optionId: string
+): Promise<BoardFieldCatalogResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: row, error: readError } = await supabase
+    .from("board_field_select_options")
+    .select("id, field_definition_id")
+    .eq("id", optionId)
+    .maybeSingle();
+  if (readError) {
+    return { ok: false, message: readError.message };
+  }
+  if (!row || row.field_definition_id !== fieldDefinitionId) {
+    return { ok: false, message: "Вариант не найден у этого поля." };
+  }
+
+  const { error } = await supabase
+    .from("board_field_select_options")
+    .delete()
+    .eq("id", optionId)
+    .eq("field_definition_id", fieldDefinitionId);
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права управлять полями доски." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function moveBoardFieldSelectOptionAction(
+  boardId: string,
+  fieldDefinitionId: string,
+  optionId: string,
+  direction: "up" | "down"
+): Promise<BoardFieldCatalogResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: rows, error: listError } = await supabase
+    .from("board_field_select_options")
+    .select("id, position")
+    .eq("field_definition_id", fieldDefinitionId)
+    .order("position", { ascending: true });
+  if (listError) {
+    return { ok: false, message: listError.message };
+  }
+
+  const options = rows ?? [];
+  const idx = options.findIndex((o) => o.id === optionId);
+  if (idx === -1) {
+    return { ok: false, message: "Вариант не найден у этого поля." };
+  }
+
+  const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= options.length) {
+    return { ok: true };
+  }
+
+  const current = options[idx];
+  const target = options[swapIdx];
+  const posCurrent = Number(current.position);
+  const posTarget = Number(target.position);
+
+  const { error: firstError } = await supabase
+    .from("board_field_select_options")
+    .update({ position: posTarget })
+    .eq("id", current.id)
+    .eq("field_definition_id", fieldDefinitionId);
+  if (firstError) {
+    if (firstError.code === "42501") {
+      return { ok: false, message: "Нет права менять порядок вариантов." };
+    }
+    return { ok: false, message: firstError.message };
+  }
+
+  const { error: secondError } = await supabase
+    .from("board_field_select_options")
+    .update({ position: posCurrent })
+    .eq("id", target.id)
+    .eq("field_definition_id", fieldDefinitionId);
+  if (secondError) {
+    await supabase
+      .from("board_field_select_options")
+      .update({ position: posCurrent })
+      .eq("id", current.id)
+      .eq("field_definition_id", fieldDefinitionId);
+    if (secondError.code === "42501") {
+      return { ok: false, message: "Нет права менять порядок вариантов." };
+    }
+    return { ok: false, message: secondError.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
 export type UpdateBoardMemberRoleResult =
   | { ok: true }
   | { ok: false; message: string };
