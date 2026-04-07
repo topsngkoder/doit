@@ -15,6 +15,171 @@ function normalizeEmail(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
+const BOARD_BACKGROUNDS_BUCKET = "board-backgrounds";
+const MAX_BACKGROUND_FILE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_BACKGROUND_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif"
+]);
+
+export type BoardBackgroundMutationResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+function normalizeHexColor(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!/^#[0-9A-Fa-f]{6}$/.test(trimmed)) {
+    return null;
+  }
+  return trimmed.toUpperCase();
+}
+
+function extensionForMimeType(mimeType: string): string | null {
+  if (mimeType === "image/jpeg") return "jpg";
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/webp") return "webp";
+  if (mimeType === "image/gif") return "gif";
+  return null;
+}
+
+export async function updateBoardBackgroundColorAction(
+  boardId: string,
+  colorRaw: string
+): Promise<BoardBackgroundMutationResult> {
+  const color = normalizeHexColor(colorRaw);
+  if (!color) {
+    return { ok: false, message: "Некорректный цвет: нужен формат #RRGGBB." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: boardRow, error: boardReadError } = await supabase
+    .from("boards")
+    .select("id, background_image_path")
+    .eq("id", boardId)
+    .maybeSingle();
+  if (boardReadError) {
+    return { ok: false, message: boardReadError.message };
+  }
+  if (!boardRow) {
+    return { ok: false, message: "Доска не найдена." };
+  }
+
+  const previousPath = boardRow.background_image_path;
+  const { error: updateError } = await supabase
+    .from("boards")
+    .update({
+      background_type: "color",
+      background_color: color,
+      background_image_path: null
+    })
+    .eq("id", boardId);
+
+  if (updateError) {
+    if (updateError.code === "42501") {
+      return { ok: false, message: "Нет права менять фон доски." };
+    }
+    return { ok: false, message: updateError.message };
+  }
+
+  if (previousPath) {
+    await supabase.storage.from(BOARD_BACKGROUNDS_BUCKET).remove([previousPath]);
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function updateBoardBackgroundImageAction(
+  boardId: string,
+  file: File
+): Promise<BoardBackgroundMutationResult> {
+  if (!(file instanceof File)) {
+    return { ok: false, message: "Выберите файл изображения." };
+  }
+  if (file.size <= 0) {
+    return { ok: false, message: "Файл пустой." };
+  }
+  if (file.size > MAX_BACKGROUND_FILE_BYTES) {
+    return { ok: false, message: "Файл слишком большой: максимум 5 МБ." };
+  }
+  if (!ALLOWED_BACKGROUND_MIME_TYPES.has(file.type)) {
+    return { ok: false, message: "Допустимы JPEG, PNG, WEBP или GIF." };
+  }
+  const extension = extensionForMimeType(file.type);
+  if (!extension) {
+    return { ok: false, message: "Не удалось определить расширение файла." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: boardRow, error: boardReadError } = await supabase
+    .from("boards")
+    .select("id, background_image_path")
+    .eq("id", boardId)
+    .maybeSingle();
+  if (boardReadError) {
+    return { ok: false, message: boardReadError.message };
+  }
+  if (!boardRow) {
+    return { ok: false, message: "Доска не найдена." };
+  }
+
+  const previousPath = boardRow.background_image_path;
+  const nextPath = `${boardId}/${crypto.randomUUID()}.${extension}`;
+  const { error: uploadError } = await supabase.storage
+    .from(BOARD_BACKGROUNDS_BUCKET)
+    .upload(nextPath, file, {
+      contentType: file.type,
+      upsert: false
+    });
+  if (uploadError) {
+    if (uploadError.message.toLowerCase().includes("row-level security")) {
+      return { ok: false, message: "Нет права загружать фон этой доски." };
+    }
+    return { ok: false, message: uploadError.message };
+  }
+
+  const { error: updateError } = await supabase
+    .from("boards")
+    .update({
+      background_type: "image",
+      background_color: null,
+      background_image_path: nextPath
+    })
+    .eq("id", boardId);
+  if (updateError) {
+    await supabase.storage.from(BOARD_BACKGROUNDS_BUCKET).remove([nextPath]);
+    if (updateError.code === "42501") {
+      return { ok: false, message: "Нет права менять фон доски." };
+    }
+    return { ok: false, message: updateError.message };
+  }
+
+  if (previousPath) {
+    await supabase.storage.from(BOARD_BACKGROUNDS_BUCKET).remove([previousPath]);
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
 export async function inviteBoardMemberAction(
   boardId: string,
   _prev: InviteBoardMemberResult | undefined,

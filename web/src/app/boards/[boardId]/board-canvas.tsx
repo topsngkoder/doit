@@ -28,6 +28,7 @@ type BoardCanvasProps = {
     backgroundType: "color" | "image";
     backgroundColor: string | null;
     backgroundImagePath: string | null;
+    backgroundImageUrl: string | null;
   };
   columns: Array<{
     id: string;
@@ -59,22 +60,21 @@ export function BoardCanvas({
       ? ""
       : "bg-slate-900/40";
 
-  const backdropStyle: CSSProperties =
-    board.backgroundType === "color" && board.backgroundColor
-      ? { backgroundColor: board.backgroundColor }
-      : {};
+  const backdropStyle: CSSProperties = {};
+  if (board.backgroundType === "color" && board.backgroundColor) {
+    backdropStyle.backgroundColor = board.backgroundColor;
+  }
+  if (board.backgroundType === "image" && board.backgroundImageUrl) {
+    backdropStyle.backgroundImage = `linear-gradient(rgba(2, 6, 23, 0.25), rgba(2, 6, 23, 0.25)), url("${board.backgroundImageUrl}")`;
+    backdropStyle.backgroundSize = "cover";
+    backdropStyle.backgroundPosition = "center";
+  }
 
   return (
     <section
       className={`flex min-h-[320px] flex-col gap-4 rounded-xl border border-slate-800/80 p-4 ${backdropClass}`}
       style={backdropStyle}
     >
-      {board.backgroundType === "image" && board.backgroundImagePath && (
-        <p className="text-xs text-slate-500">
-          Фон-картинка задан, отображение через Storage будет в H4 (
-          <code className="text-slate-400">{board.backgroundImagePath}</code>).
-        </p>
-      )}
       <div className="flex flex-wrap items-center gap-2">
         <AddBoardColumnButton boardId={boardId} canCreate={columnPermissions.canCreate} />
       </div>

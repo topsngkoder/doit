@@ -13,6 +13,7 @@ import { BoardMembersPanel, type BoardMemberPublic, type BoardRoleOption } from 
 import { BoardLabelsButton } from "./board-labels-button";
 import { BoardFieldsButton } from "./board-fields-button";
 import { BoardCardPreviewButton } from "./board-card-preview-button";
+import { BoardBackgroundButton } from "./board-background-button";
 import { InviteMemberButton } from "./invite-member-button";
 
 type BoardPageProps = {
@@ -68,6 +69,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
   let canManageBoardLabels = false;
   let canManageCardFields = false;
   let canManageCardPreview = false;
+  let canChangeBoardBackground = false;
   if (memberRow?.board_role_id) {
     const { data: perms } = await supabase
       .from("board_role_permissions")
@@ -89,7 +91,8 @@ export default async function BoardPage({ params }: BoardPageProps) {
         "cards.move",
         "comments.create",
         "card_fields.manage",
-        "card_preview.manage"
+        "card_preview.manage",
+        "board.change_background"
       ]);
 
     for (const p of perms ?? []) {
@@ -110,7 +113,16 @@ export default async function BoardPage({ params }: BoardPageProps) {
       if (p.permission === "comments.create") canCreateComment = true;
       if (p.permission === "card_fields.manage") canManageCardFields = true;
       if (p.permission === "card_preview.manage") canManageCardPreview = true;
+      if (p.permission === "board.change_background") canChangeBoardBackground = true;
     }
+  }
+
+  let boardBackgroundImageUrl: string | null = null;
+  if (board.background_type === "image" && board.background_image_path) {
+    const { data: signedData } = await supabase.storage
+      .from("board-backgrounds")
+      .createSignedUrl(board.background_image_path, 60 * 60);
+    boardBackgroundImageUrl = signedData?.signedUrl ?? null;
   }
 
   const { data: roleRows } = await supabase
@@ -418,6 +430,12 @@ export default async function BoardPage({ params }: BoardPageProps) {
             previewItems={previewItems}
             fieldDefinitions={fieldDefinitions}
           />
+          <BoardBackgroundButton
+            boardId={board.id}
+            canManage={canChangeBoardBackground}
+            currentType={board.background_type as "color" | "image"}
+            currentColor={board.background_color}
+          />
           <InviteMemberButton boardId={board.id} canInvite={canInvite} />
         </div>
       </div>
@@ -452,7 +470,8 @@ export default async function BoardPage({ params }: BoardPageProps) {
         board={{
           backgroundType: board.background_type as "color" | "image",
           backgroundColor: board.background_color,
-          backgroundImagePath: board.background_image_path
+          backgroundImagePath: board.background_image_path,
+          backgroundImageUrl: boardBackgroundImageUrl
         }}
         columns={columns}
         cardsByColumnId={cardsByColumnId}
