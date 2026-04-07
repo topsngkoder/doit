@@ -68,9 +68,13 @@ function BrowserNativeNotificationPresenter() {
   const shownIdsRef = React.useRef(new Set<string>());
 
   useInternalNotificationInserts((row) => {
-    void (async () => {
-      if (shownIdsRef.current.has(row.id)) return;
+    const ids = shownIdsRef.current;
+    /** Синхронно до любого await — иначе два INSERT/realtime-дубля запускают параллельные IIFE и оба выходят на new Notification (NT7.6). */
+    if (ids.has(row.id)) return;
+    ids.add(row.id);
+    trimDedupeSet(ids);
 
+    void (async () => {
       if (!shouldOfferNativeBrowserPopup()) return;
 
       const perm = readBrowserNotificationPermission();
@@ -103,9 +107,6 @@ function BrowserNativeNotificationPresenter() {
 
       if (typeof Notification === "undefined") return;
 
-      shownIdsRef.current.add(row.id);
-      trimDedupeSet(shownIdsRef.current);
-
       try {
         const n = new Notification(row.title, {
           body: row.body,
@@ -133,6 +134,7 @@ function BrowserNativeNotificationPresenter() {
  */
 export function BrowserNativeNotificationsProvider({ children }: { children: React.ReactNode }) {
   const listenersRef = React.useRef(new Set<(row: InternalNotificationInsertRow) => void>());
+  const emitDedupeRef = React.useRef(new Set<string>());
 
   const subscribe = React.useCallback((listener: (row: InternalNotificationInsertRow) => void) => {
     listenersRef.current.add(listener);
@@ -142,6 +144,11 @@ export function BrowserNativeNotificationsProvider({ children }: { children: Rea
   }, []);
 
   const emit = React.useCallback((row: InternalNotificationInsertRow) => {
+    const seen = emitDedupeRef.current;
+    if (seen.has(row.id)) return;
+    seen.add(row.id);
+    trimDedupeSet(seen);
+
     for (const fn of listenersRef.current) {
       try {
         fn(row);
