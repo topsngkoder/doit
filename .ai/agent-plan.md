@@ -301,9 +301,14 @@
     - **Storage (SSR):** создание signed URL перенесено на клиент и закэшировано в `localStorage` (TTL ~55 мин, ключ по `background_image_path`) в `web/src/app/boards/[boardId]/board-background-frame.tsx`. SSR больше не делает Storage‑запрос на каждый `router.refresh()`.
     - **Проверка:** открыть `/boards/[boardId]?perf=1` → ожидаемо `Auth = 0` и `Storage = 0` в SSR‑панели; если фон = image — фон подгружается через секунду на клиенте, без “шторма” запросов при `router.refresh()`.
 
-- [ ] **P4 (todo)** Уменьшить число полных `router.refresh()` на realtime-события. DoD: мелкие изменения обновляются точечно.
+- [x] **P4 (done)** Уменьшить число полных `router.refresh()` на realtime-события. DoD: мелкие изменения обновляются точечно.
     - **Подход:** разделить сущности на “обновляем локально по событию” vs “нужен snapshot”; для локальных обновлений поддерживать минимальный client-state (например, карточки/комменты/labels в памяти) и применять изменения по payload.
     - **Fallback:** если точечное применение сложно/опасно — оставить batched refresh, но с более умной фильтрацией (не реагировать на события вне открытой доски, не refresh на собственные optimistic-операции при совпадающей сигнатуре).
+    - **Прогресс (2026-04-07):** в `web/src/app/boards/[boardId]/board-columns-dnd.tsx` реализованы точечные обновления локального state по realtime для самых шумных сущностей: `cards`, `board_columns`, `card_assignees`, `card_labels`, `card_field_values`, `card_comments` (обновление `commentsCount` с учётом soft-delete), `card_activity` (добавление entries в начало с дедупом по `id`). `router.refresh()` оставлен как fallback только когда payload не удалось применить локально.
+    - **Следующий шаг (ускорение, 2026-04-07):** сделать “мгновенное” обновление порядка карточек у других клиентов при DnD: отправлять `broadcast` событие `card_layout` после успешного `reorder_board_cards` и применять layout на клиенте без `router.refresh()`.
+    - **Выполнено (2026-04-07):** добавлен `broadcast` `card_layout` в `web/src/app/boards/[boardId]/board-columns-dnd.tsx`: на успехе DnD карточек компонент рассылает новый `cardOrderByColumn`, а остальные клиенты применяют его сразу (если не в процессе drag). Полный `router.refresh()` на успехе перемещения карточек убран (остался только fallback/очередь во время drag).
+    - **Hotfix (2026-04-07):** добавлен UI‑индикатор статуса Realtime (`SUBSCRIBED`/ошибка) и fallback polling layout (раз в ~1s) для `board_columns` + `cards(id,column_id,position)`, который обновляет порядок карточек/колонок без ручного refresh, если websocket не подключается.
+    - **Hotfix (2026-04-07):** поправлены зависимости realtime-effect в `board-columns-dnd.tsx` (добавлен `currentUserId`), чтобы сравнение `actorUserId === currentUserId` работало корректно даже при смене сессии/пользователя без полного перезапуска страницы.
 
 ### EPIC K — Внутренние уведомления + настройки (10.5–10.6)
 - [ ] **K1 (todo)** Таблицы `internal_notifications`, `notification_preferences`, `notification_user_settings` + RLS. DoD: пользователь видит только своё.

@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import {
   DndContext,
   KeyboardSensor,
@@ -67,6 +68,23 @@ type ColumnRow = {
   position: number;
 };
 
+type BoardLocalState = {
+  columnItems: ColumnRow[];
+  cardsById: Map<string, BoardCardListItem>;
+  cardOrderByColumn: Record<string, string[]>;
+};
+
+type CardLayoutBroadcastPayload = {
+  v: 1;
+  boardId: string;
+  actorUserId: string;
+  sentAt: number;
+  cardOrderByColumn: Record<string, string[]>;
+};
+
+type ColumnLayoutRow = { id: string; name: string; column_type: string; position: number };
+type CardLayoutRow = { id: string; column_id: string; position: number };
+
 function cardOrderSignature(map: Map<string, BoardCardListItem[]>): string {
   const keys = [...map.keys()].sort((a, b) => a.localeCompare(b));
   return keys
@@ -85,6 +103,16 @@ function buildCardOrderRecord(map: Map<string, BoardCardListItem[]>): Record<str
   return o;
 }
 
+function buildCardsById(map: Map<string, BoardCardListItem[]>): Map<string, BoardCardListItem> {
+  const m = new Map<string, BoardCardListItem>();
+  for (const list of map.values()) {
+    for (const c of list) {
+      m.set(c.id, c);
+    }
+  }
+  return m;
+}
+
 function cardOrderRecordSignature(order: Record<string, string[]>): string {
   const keys = Object.keys(order).sort((a, b) => a.localeCompare(b));
   return keys.map((k) => `${k}=${(order[k] ?? []).join(",")}`).join("|");
@@ -95,6 +123,39 @@ function findColumnForCard(cardOrder: Record<string, string[]>, cardId: string):
     if (ids.includes(cardId)) return colId;
   }
   return null;
+}
+
+function sortCardIdsByPosition(ids: string[], cardsById: Map<string, BoardCardListItem>): string[] {
+  return [...ids]
+    .filter((id) => cardsById.has(id))
+    .sort((a, b) => {
+      const ca = cardsById.get(a);
+      const cb = cardsById.get(b);
+      const pa = ca ? Number(ca.position) : 0;
+      const pb = cb ? Number(cb.position) : 0;
+      if (pa !== pb) return pa - pb;
+      return a.localeCompare(b);
+    });
+}
+
+function buildCardOrderFromLayoutRows(
+  columns: ColumnRow[],
+  cardRows: CardLayoutRow[]
+): Record<string, string[]> {
+  const order: Record<string, string[]> = {};
+  for (const col of columns) order[col.id] = [];
+  const byColumn = new Map<string, Array<{ id: string; position: number }>>();
+  for (const row of cardRows) {
+    const colId = String(row.column_id);
+    const list = byColumn.get(colId) ?? [];
+    list.push({ id: String(row.id), position: Number(row.position ?? 0) });
+    byColumn.set(colId, list);
+  }
+  for (const [colId, list] of byColumn) {
+    const sorted = [...list].sort((a, b) => (a.position !== b.position ? a.position - b.position : a.id.localeCompare(b.id)));
+    order[colId] = sorted.map((x) => x.id);
+  }
+  return order;
 }
 
 function resolveCardDropTarget(
@@ -756,18 +817,27 @@ export function BoardColumnsDnD({
   cardsByColumnId
 }: BoardColumnsDnDProps) {
   const router = useRouter();
-  const [columnItems, setColumnItems] = React.useState<ColumnRow[]>(columns);
-  const [cardOrderByColumn, setCardOrderByColumn] = React.useState<Record<string, string[]>>(
-    () => buildCardOrderRecord(cardsByColumnId)
-  );
+  const [local, setLocal] = React.useState<BoardLocalState>(() => {
+    const cardsById = buildCardsById(cardsByColumnId);
+    const cardOrderByColumn = buildCardOrderRecord(cardsByColumnId);
+    return {
+      columnItems: [...columns].sort((a, b) => a.position - b.position),
+      cardsById,
+      cardOrderByColumn
+    };
+  });
   const [persistError, setPersistError] = React.useState<string | null>(null);
   const [editingCardId, setEditingCardId] = React.useState<string | null>(null);
   const [dndMounted, setDndMounted] = React.useState(false);
+  const [realtimeStatus, setRealtimeStatus] = React.useState<string>("connecting");
+  const [realtimeError, setRealtimeError] = React.useState<string | null>(null);
   const pendingColumnSignatureRef = React.useRef<string | null>(null);
   const pendingCardSignatureRef = React.useRef<string | null>(null);
   const refreshTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragInProgressRef = React.useRef(false);
   const refreshQueuedDuringDragRef = React.useRef(false);
+  const supabaseRef = React.useRef<SupabaseClient | null>(null);
+  const channelRef = React.useRef<RealtimeChannel | null>(null);
 
   React.useEffect(() => {
     setDndMounted(true);
@@ -783,7 +853,10 @@ export function BoardColumnsDnD({
         return;
       }
     }
-    setColumnItems(columns);
+    setLocal((prev) => ({
+      ...prev,
+      columnItems: [...columns].sort((a, b) => a.position - b.position)
+    }));
   }, [boardId, colSig]);
 
   const cardSig = cardOrderSignature(cardsByColumnId);
@@ -796,21 +869,15 @@ export function BoardColumnsDnD({
         return;
       }
     }
-    setCardOrderByColumn(buildCardOrderRecord(cardsByColumnId));
+    setLocal((prev) => ({
+      ...prev,
+      cardsById: buildCardsById(cardsByColumnId),
+      cardOrderByColumn: buildCardOrderRecord(cardsByColumnId)
+    }));
   }, [boardId, cardSig]);
 
-  const cardsById = React.useMemo(() => {
-    const m = new Map<string, BoardCardListItem>();
-    for (const list of cardsByColumnId.values()) {
-      for (const c of list) {
-        m.set(c.id, c);
-      }
-    }
-    return m;
-  }, [cardsByColumnId]);
-
   const editingCard =
-    editingCardId != null ? (cardsById.get(editingCardId) ?? null) : null;
+    editingCardId != null ? (local.cardsById.get(editingCardId) ?? null) : null;
   const memberNamesById = React.useMemo(() => {
     const m = new Map<string, string>();
     for (const member of membersForNewCard) {
@@ -842,10 +909,372 @@ export function BoardColumnsDnD({
         }
       }, 120);
     };
+    const applyCardsChange = (payload: any) => {
+      const eventType = String(payload?.eventType ?? "").toUpperCase();
+      const nextRow = payload?.new ?? null;
+      const oldRow = payload?.old ?? null;
+      if (!eventType) return false;
+
+      if (eventType === "INSERT") {
+        if (!nextRow?.id || !nextRow?.column_id) return false;
+        setLocal((prev) => {
+          const cardsById = new Map(prev.cardsById);
+          const existing = cardsById.get(nextRow.id);
+          const merged: BoardCardListItem = {
+            id: nextRow.id,
+            title: String(nextRow.title ?? existing?.title ?? ""),
+            description: String(nextRow.description ?? existing?.description ?? ""),
+            position: Number(nextRow.position ?? existing?.position ?? 0),
+            createdByUserId: String(nextRow.created_by_user_id ?? existing?.createdByUserId ?? ""),
+            responsibleUserId:
+              nextRow.responsible_user_id != null ?
+                String(nextRow.responsible_user_id)
+              : existing?.responsibleUserId ?? null,
+            assigneeUserIds: existing?.assigneeUserIds ?? [],
+            labelIds: existing?.labelIds ?? [],
+            commentsCount: existing?.commentsCount ?? 0,
+            fieldValues: existing?.fieldValues ?? {},
+            activityEntries: existing?.activityEntries ?? []
+          };
+          cardsById.set(merged.id, merged);
+
+          const cardOrderByColumn: Record<string, string[]> = { ...prev.cardOrderByColumn };
+          const colId = String(nextRow.column_id);
+          const ids = [...(cardOrderByColumn[colId] ?? [])];
+          if (!ids.includes(merged.id)) ids.push(merged.id);
+          cardOrderByColumn[colId] = sortCardIdsByPosition(ids, cardsById);
+          return { ...prev, cardsById, cardOrderByColumn };
+        });
+        return true;
+      }
+
+      if (eventType === "UPDATE") {
+        if (!nextRow?.id || !nextRow?.column_id) return false;
+        setLocal((prev) => {
+          const cardsById = new Map(prev.cardsById);
+          const existing = cardsById.get(nextRow.id);
+          if (!existing) {
+            // Если карточку ещё не знаем (например, только что появилась) — попробуем как insert.
+            const merged: BoardCardListItem = {
+              id: nextRow.id,
+              title: String(nextRow.title ?? ""),
+              description: String(nextRow.description ?? ""),
+              position: Number(nextRow.position ?? 0),
+              createdByUserId: String(nextRow.created_by_user_id ?? ""),
+              responsibleUserId: nextRow.responsible_user_id != null ? String(nextRow.responsible_user_id) : null,
+              assigneeUserIds: [],
+              labelIds: [],
+              commentsCount: 0,
+              fieldValues: {},
+              activityEntries: []
+            };
+            cardsById.set(merged.id, merged);
+          } else {
+            cardsById.set(existing.id, {
+              ...existing,
+              title: nextRow.title != null ? String(nextRow.title) : existing.title,
+              description: nextRow.description != null ? String(nextRow.description) : existing.description,
+              position: nextRow.position != null ? Number(nextRow.position) : existing.position,
+              responsibleUserId:
+                nextRow.responsible_user_id === null ?
+                  null
+                : nextRow.responsible_user_id != null ?
+                  String(nextRow.responsible_user_id)
+                : existing.responsibleUserId
+            });
+          }
+
+          const cardId = String(nextRow.id);
+          const newColId = String(nextRow.column_id);
+          const oldColId =
+            oldRow?.column_id != null ? String(oldRow.column_id) : findColumnForCard(prev.cardOrderByColumn, cardId);
+
+          const cardOrderByColumn: Record<string, string[]> = { ...prev.cardOrderByColumn };
+          if (oldColId && oldColId !== newColId) {
+            cardOrderByColumn[oldColId] = (cardOrderByColumn[oldColId] ?? []).filter((id) => id !== cardId);
+          }
+          const newIds = [...(cardOrderByColumn[newColId] ?? [])];
+          if (!newIds.includes(cardId)) newIds.push(cardId);
+          cardOrderByColumn[newColId] = sortCardIdsByPosition(newIds, cardsById);
+
+          if (oldColId && oldColId !== newColId) {
+            cardOrderByColumn[oldColId] = sortCardIdsByPosition(cardOrderByColumn[oldColId] ?? [], cardsById);
+          }
+
+          return { ...prev, cardsById, cardOrderByColumn };
+        });
+        return true;
+      }
+
+      if (eventType === "DELETE") {
+        if (!oldRow?.id) return false;
+        const cardId = String(oldRow.id);
+        const colId = oldRow.column_id != null ? String(oldRow.column_id) : null;
+        setLocal((prev) => {
+          const cardsById = new Map(prev.cardsById);
+          cardsById.delete(cardId);
+          const cardOrderByColumn: Record<string, string[]> = { ...prev.cardOrderByColumn };
+          if (colId) {
+            cardOrderByColumn[colId] = (cardOrderByColumn[colId] ?? []).filter((id) => id !== cardId);
+          } else {
+            for (const k of Object.keys(cardOrderByColumn)) {
+              cardOrderByColumn[k] = (cardOrderByColumn[k] ?? []).filter((id) => id !== cardId);
+            }
+          }
+          return { ...prev, cardsById, cardOrderByColumn };
+        });
+        setEditingCardId((cur) => (cur === cardId ? null : cur));
+        return true;
+      }
+
+      return false;
+    };
+
+    const applyColumnsChange = (payload: any) => {
+      const eventType = String(payload?.eventType ?? "").toUpperCase();
+      const nextRow = payload?.new ?? null;
+      const oldRow = payload?.old ?? null;
+      if (!eventType) return false;
+
+      if (eventType === "INSERT") {
+        if (!nextRow?.id) return false;
+        setLocal((prev) => {
+          const next: ColumnRow = {
+            id: String(nextRow.id),
+            name: String(nextRow.name ?? ""),
+            columnType: String(nextRow.column_type ?? ""),
+            position: Number(nextRow.position ?? 0)
+          };
+          const exists = prev.columnItems.some((c) => c.id === next.id);
+          const columnItems = exists ?
+              prev.columnItems.map((c) => (c.id === next.id ? next : c)).sort((a, b) => a.position - b.position)
+            : [...prev.columnItems, next].sort((a, b) => a.position - b.position);
+          const cardOrderByColumn: Record<string, string[]> = { ...prev.cardOrderByColumn };
+          if (!cardOrderByColumn[next.id]) cardOrderByColumn[next.id] = [];
+          return { ...prev, columnItems, cardOrderByColumn };
+        });
+        return true;
+      }
+
+      if (eventType === "UPDATE") {
+        if (!nextRow?.id) return false;
+        setLocal((prev) => {
+          const nextId = String(nextRow.id);
+          const columnItems = prev.columnItems
+            .map((c) => {
+              if (c.id !== nextId) return c;
+              return {
+                ...c,
+                name: nextRow.name != null ? String(nextRow.name) : c.name,
+                columnType: nextRow.column_type != null ? String(nextRow.column_type) : c.columnType,
+                position: nextRow.position != null ? Number(nextRow.position) : c.position
+              };
+            })
+            .sort((a, b) => a.position - b.position);
+          return { ...prev, columnItems };
+        });
+        return true;
+      }
+
+      if (eventType === "DELETE") {
+        if (!oldRow?.id) return false;
+        const deletedId = String(oldRow.id);
+        setLocal((prev) => {
+          const columnItems = prev.columnItems.filter((c) => c.id !== deletedId);
+          const cardOrderByColumn: Record<string, string[]> = { ...prev.cardOrderByColumn };
+          delete cardOrderByColumn[deletedId];
+          return { ...prev, columnItems, cardOrderByColumn };
+        });
+        return true;
+      }
+
+      return false;
+    };
+
+    const applyCardAssigneesChange = (payload: any) => {
+      const eventType = String(payload?.eventType ?? "").toUpperCase();
+      const nextRow = payload?.new ?? null;
+      const oldRow = payload?.old ?? null;
+      if (!eventType) return false;
+      const cardId =
+        eventType === "DELETE" ? (oldRow?.card_id ? String(oldRow.card_id) : null) : nextRow?.card_id ? String(nextRow.card_id) : null;
+      const userId =
+        eventType === "DELETE" ? (oldRow?.user_id ? String(oldRow.user_id) : null) : nextRow?.user_id ? String(nextRow.user_id) : null;
+      if (!cardId || !userId) return false;
+
+      let applied = false;
+      setLocal((prev) => {
+        const existing = prev.cardsById.get(cardId);
+        if (!existing) return prev;
+        const cardsById = new Map(prev.cardsById);
+        const set = new Set(existing.assigneeUserIds);
+        if (eventType === "INSERT") set.add(userId);
+        if (eventType === "DELETE") set.delete(userId);
+        cardsById.set(cardId, { ...existing, assigneeUserIds: [...set] });
+        applied = true;
+        return { ...prev, cardsById };
+      });
+      return applied;
+    };
+
+    const applyCardLabelsChange = (payload: any) => {
+      const eventType = String(payload?.eventType ?? "").toUpperCase();
+      const nextRow = payload?.new ?? null;
+      const oldRow = payload?.old ?? null;
+      if (!eventType) return false;
+      const cardId =
+        eventType === "DELETE" ? (oldRow?.card_id ? String(oldRow.card_id) : null) : nextRow?.card_id ? String(nextRow.card_id) : null;
+      const labelId =
+        eventType === "DELETE" ? (oldRow?.label_id ? String(oldRow.label_id) : null) : nextRow?.label_id ? String(nextRow.label_id) : null;
+      if (!cardId || !labelId) return false;
+
+      let applied = false;
+      setLocal((prev) => {
+        const existing = prev.cardsById.get(cardId);
+        if (!existing) return prev;
+        const cardsById = new Map(prev.cardsById);
+        const set = new Set(existing.labelIds);
+        if (eventType === "INSERT") set.add(labelId);
+        if (eventType === "DELETE") set.delete(labelId);
+        cardsById.set(cardId, { ...existing, labelIds: [...set] });
+        applied = true;
+        return { ...prev, cardsById };
+      });
+      return applied;
+    };
+
+    const applyCardFieldValuesChange = (payload: any) => {
+      const eventType = String(payload?.eventType ?? "").toUpperCase();
+      const nextRow = payload?.new ?? null;
+      const oldRow = payload?.old ?? null;
+      if (!eventType) return false;
+      const cardId =
+        eventType === "DELETE" ? (oldRow?.card_id ? String(oldRow.card_id) : null) : nextRow?.card_id ? String(nextRow.card_id) : null;
+      const fieldId =
+        eventType === "DELETE"
+          ? oldRow?.field_definition_id ? String(oldRow.field_definition_id) : null
+          : nextRow?.field_definition_id ? String(nextRow.field_definition_id) : null;
+      if (!cardId || !fieldId) return false;
+
+      let applied = false;
+      setLocal((prev) => {
+        const existing = prev.cardsById.get(cardId);
+        if (!existing) return prev;
+        const cardsById = new Map(prev.cardsById);
+        const fieldValues = { ...(existing.fieldValues ?? {}) };
+        if (eventType === "DELETE") {
+          delete fieldValues[fieldId];
+        } else {
+          fieldValues[fieldId] = {
+            textValue: nextRow?.text_value ?? null,
+            dateValue: nextRow?.date_value ?? null,
+            linkUrl: nextRow?.link_url ?? null,
+            linkText: nextRow?.link_text ?? null,
+            selectOptionId: nextRow?.select_option_id ?? null
+          };
+        }
+        cardsById.set(cardId, { ...existing, fieldValues });
+        applied = true;
+        return { ...prev, cardsById };
+      });
+      return applied;
+    };
+
+    const applyCardCommentsChange = (payload: any) => {
+      const eventType = String(payload?.eventType ?? "").toUpperCase();
+      const nextRow = payload?.new ?? null;
+      const oldRow = payload?.old ?? null;
+      if (!eventType) return false;
+      const cardId =
+        eventType === "DELETE" ? (oldRow?.card_id ? String(oldRow.card_id) : null) : nextRow?.card_id ? String(nextRow.card_id) : null;
+      if (!cardId) return false;
+
+      let delta = 0;
+      if (eventType === "INSERT") {
+        // Считаем только не удалённые комментарии.
+        if (nextRow?.deleted_at == null) delta = 1;
+      } else if (eventType === "UPDATE") {
+        const wasDeleted = oldRow?.deleted_at != null;
+        const isDeleted = nextRow?.deleted_at != null;
+        if (!wasDeleted && isDeleted) delta = -1;
+        if (wasDeleted && !isDeleted) delta = 1;
+      } else {
+        // DELETE в приложении для card_comments не используется (soft-delete).
+        return false;
+      }
+
+      if (delta === 0) return true;
+
+      let applied = false;
+      setLocal((prev) => {
+        const existing = prev.cardsById.get(cardId);
+        if (!existing) return prev;
+        const cardsById = new Map(prev.cardsById);
+        const nextCount = Math.max(0, Number(existing.commentsCount ?? 0) + delta);
+        cardsById.set(cardId, { ...existing, commentsCount: nextCount });
+        applied = true;
+        return { ...prev, cardsById };
+      });
+      return applied;
+    };
+
+    const applyCardActivityChange = (payload: any) => {
+      const eventType = String(payload?.eventType ?? "").toUpperCase();
+      const nextRow = payload?.new ?? null;
+      if (eventType !== "INSERT") return false;
+      if (!nextRow?.card_id || !nextRow?.id) return false;
+      const cardId = String(nextRow.card_id);
+      let applied = false;
+      setLocal((prev) => {
+        const existing = prev.cardsById.get(cardId);
+        if (!existing) return prev;
+        const cardsById = new Map(prev.cardsById);
+        const entry = {
+          id: String(nextRow.id),
+          activityType: String(nextRow.activity_type ?? ""),
+          message: String(nextRow.message ?? ""),
+          createdAt: String(nextRow.created_at ?? new Date().toISOString()),
+          actorUserId: String(nextRow.actor_user_id ?? ""),
+          actorDisplayName: String(nextRow.actor_display_name ?? "Участник")
+        };
+        const prevList = existing.activityEntries ?? [];
+        // Новые сверху, id — дедуп для идемпотентности.
+        const nextList = prevList.some((e) => e.id === entry.id) ? prevList : [entry, ...prevList];
+        cardsById.set(cardId, { ...existing, activityEntries: nextList });
+        applied = true;
+        return { ...prev, cardsById };
+      });
+      return applied;
+    };
+
     try {
       const supabase = createSupabaseBrowserClient();
+      supabaseRef.current = supabase;
       const channel = supabase
-        .channel(`realtime:board:${boardId}`)
+        .channel(`realtime:board:${boardId}`, {
+          config: {
+            broadcast: { self: true }
+          }
+        })
+        .on(
+          "broadcast",
+          { event: "card_layout" },
+          (raw) => {
+            const msg = raw?.payload as Partial<CardLayoutBroadcastPayload> | undefined;
+            if (!msg || msg.v !== 1) return;
+            if (msg.boardId !== boardId) return;
+            if (msg.actorUserId === currentUserId) return;
+            if (!msg.cardOrderByColumn) return;
+            if (dragInProgressRef.current) return;
+            setLocal((prev) => {
+              const merged: Record<string, string[]> = { ...prev.cardOrderByColumn };
+              for (const [colId, ids] of Object.entries(msg.cardOrderByColumn ?? {})) {
+                merged[colId] = Array.isArray(ids) ? ids.map(String) : [];
+              }
+              return { ...prev, cardOrderByColumn: merged };
+            });
+          }
+        )
         .on(
           "postgres_changes",
           {
@@ -854,7 +1283,10 @@ export function BoardColumnsDnD({
             table: "cards",
             filter: `board_id=eq.${boardId}`
           },
-          scheduleRefresh
+          (payload) => {
+            const ok = applyCardsChange(payload);
+            if (!ok) scheduleRefresh();
+          }
         )
         .on(
           "postgres_changes",
@@ -864,7 +1296,10 @@ export function BoardColumnsDnD({
             table: "board_columns",
             filter: `board_id=eq.${boardId}`
           },
-          scheduleRefresh
+          (payload) => {
+            const ok = applyColumnsChange(payload);
+            if (!ok) scheduleRefresh();
+          }
         )
         .on(
           "postgres_changes",
@@ -922,7 +1357,10 @@ export function BoardColumnsDnD({
             schema: "public",
             table: "card_assignees"
           },
-          scheduleRefresh
+          (payload) => {
+            const ok = applyCardAssigneesChange(payload);
+            if (!ok) scheduleRefresh();
+          }
         )
         .on(
           "postgres_changes",
@@ -931,7 +1369,10 @@ export function BoardColumnsDnD({
             schema: "public",
             table: "card_labels"
           },
-          scheduleRefresh
+          (payload) => {
+            const ok = applyCardLabelsChange(payload);
+            if (!ok) scheduleRefresh();
+          }
         )
         .on(
           "postgres_changes",
@@ -940,7 +1381,10 @@ export function BoardColumnsDnD({
             schema: "public",
             table: "card_comments"
           },
-          scheduleRefresh
+          (payload) => {
+            const ok = applyCardCommentsChange(payload);
+            if (!ok) scheduleRefresh();
+          }
         )
         .on(
           "postgres_changes",
@@ -949,7 +1393,10 @@ export function BoardColumnsDnD({
             schema: "public",
             table: "card_field_values"
           },
-          scheduleRefresh
+          (payload) => {
+            const ok = applyCardFieldValuesChange(payload);
+            if (!ok) scheduleRefresh();
+          }
         )
         .on(
           "postgres_changes",
@@ -958,22 +1405,101 @@ export function BoardColumnsDnD({
             schema: "public",
             table: "card_activity"
           },
-          scheduleRefresh
+          (payload) => {
+            const ok = applyCardActivityChange(payload);
+            if (!ok) scheduleRefresh();
+          }
         )
-        .subscribe();
+        .subscribe((status, err) => {
+          setRealtimeStatus(status);
+          setRealtimeError(err ? String((err as any)?.message ?? err) : null);
+        });
 
+      channelRef.current = channel;
       return () => {
         cancelled = true;
         if (refreshTimerRef.current) {
           clearTimeout(refreshTimerRef.current);
           refreshTimerRef.current = null;
         }
+        channelRef.current = null;
+        supabaseRef.current = null;
         void supabase.removeChannel(channel);
       };
     } catch {
       return () => {};
     }
-  }, [boardId, router]);
+  }, [boardId, currentUserId, router]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const run = async () => {
+      const supabase = supabaseRef.current;
+      if (!supabase) return;
+      if (document.visibilityState === "hidden") return;
+      if (dragInProgressRef.current) return;
+
+      const [colsRes, cardsRes] = await Promise.all([
+        supabase
+          .from("board_columns")
+          .select("id,name,column_type,position")
+          .eq("board_id", boardId)
+          .order("position", { ascending: true }),
+        supabase
+          .from("cards")
+          .select("id,column_id,position")
+          .eq("board_id", boardId)
+          .order("position", { ascending: true })
+      ]);
+
+      if (cancelled) return;
+      if (colsRes.error || cardsRes.error) return;
+      const cols = (colsRes.data ?? []) as unknown as ColumnLayoutRow[];
+      const cards = (cardsRes.data ?? []) as unknown as CardLayoutRow[];
+
+      const columnItems: ColumnRow[] = cols
+        .map((c) => ({
+          id: String(c.id),
+          name: String(c.name ?? ""),
+          columnType: String(c.column_type ?? ""),
+          position: Number(c.position ?? 0)
+        }))
+        .sort((a, b) => a.position - b.position);
+
+      const cardOrderByColumn = buildCardOrderFromLayoutRows(columnItems, cards);
+
+      setLocal((prev) => {
+        // Обновляем только layout; контент карточек оставляем как был (title/labels/etc),
+        // иначе polling может “затирать” быстрые изменения из других realtime-таблиц.
+        const cardsById = new Map(prev.cardsById);
+        for (const row of cards) {
+          const id = String(row.id);
+          const existing = cardsById.get(id);
+          if (!existing) continue;
+          const nextPos = Number(row.position ?? existing.position);
+          if (existing.position !== nextPos) {
+            cardsById.set(id, { ...existing, position: nextPos });
+          }
+        }
+        return { ...prev, columnItems, cardOrderByColumn, cardsById };
+      });
+    };
+
+    // Если realtime не подключился — включаем лёгкий polling layout.
+    if (realtimeStatus !== "SUBSCRIBED") {
+      void run();
+      timer = setInterval(() => {
+        void run();
+      }, 1000);
+    }
+
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
+  }, [boardId, realtimeStatus]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -1017,13 +1543,13 @@ export function BoardColumnsDnD({
       const overKey = parseColumnDndId(over.id);
       if (activeKey === overKey) return;
 
-      const oldIndex = columnItems.findIndex((c) => c.id === activeKey);
-      const newIndex = columnItems.findIndex((c) => c.id === overKey);
+      const oldIndex = local.columnItems.findIndex((c) => c.id === activeKey);
+      const newIndex = local.columnItems.findIndex((c) => c.id === overKey);
       if (oldIndex < 0 || newIndex < 0) return;
 
-      const previousCols = columnItems;
-      const nextCols = arrayMove(columnItems, oldIndex, newIndex);
-      setColumnItems(nextCols);
+      const previousCols = local.columnItems;
+      const nextCols = arrayMove(local.columnItems, oldIndex, newIndex);
+      setLocal((prev) => ({ ...prev, columnItems: nextCols }));
       pendingColumnSignatureRef.current = columnsSignature(nextCols);
 
       const res = await reorderBoardColumnsAction(
@@ -1033,12 +1559,13 @@ export function BoardColumnsDnD({
 
       if (!res.ok) {
         pendingColumnSignatureRef.current = null;
-        setColumnItems(previousCols);
+        setLocal((prev) => ({ ...prev, columnItems: previousCols }));
         setPersistError(res.message);
         return;
       }
 
-      router.refresh();
+      // На успехе не делаем полный refresh: локальный state уже переставлен,
+      // остальные клиенты получат UPDATE через realtime (board_columns).
       if (refreshQueuedDuringDragRef.current) {
         refreshQueuedDuringDragRef.current = false;
         router.refresh();
@@ -1051,22 +1578,25 @@ export function BoardColumnsDnD({
     if (String(active.id) === String(over.id)) return;
 
     const activeCardId = String(active.id);
-    const fromCol = findColumnForCard(cardOrderByColumn, activeCardId);
+    const fromCol = findColumnForCard(local.cardOrderByColumn, activeCardId);
     if (!fromCol) return;
 
-    const target = resolveCardDropTarget(over.id, cardOrderByColumn);
+    const target = resolveCardDropTarget(over.id, local.cardOrderByColumn);
     if (!target) return;
 
-    if (fromCol === target.columnId && cardOrderByColumn[fromCol].indexOf(activeCardId) === target.index) {
+    if (
+      fromCol === target.columnId &&
+      local.cardOrderByColumn[fromCol].indexOf(activeCardId) === target.index
+    ) {
       return;
     }
 
-    const previousOrder = cardOrderByColumn;
-    const nextOrder = applyCardReorder(cardOrderByColumn, activeCardId, fromCol, target);
-    setCardOrderByColumn(nextOrder);
+    const previousOrder = local.cardOrderByColumn;
+    const nextOrder = applyCardReorder(local.cardOrderByColumn, activeCardId, fromCol, target);
+    setLocal((prev) => ({ ...prev, cardOrderByColumn: nextOrder }));
     pendingCardSignatureRef.current = cardOrderRecordSignature(nextOrder);
 
-    const layout = columnItems.map((c) => ({
+    const layout = local.columnItems.map((c) => ({
       column_id: c.id,
       card_ids: nextOrder[c.id] ?? []
     }));
@@ -1074,12 +1604,32 @@ export function BoardColumnsDnD({
     const res = await reorderBoardCardsAction(boardId, layout);
     if (!res.ok) {
       pendingCardSignatureRef.current = null;
-      setCardOrderByColumn(previousOrder);
+      setLocal((prev) => ({ ...prev, cardOrderByColumn: previousOrder }));
       setPersistError(res.message);
       return;
     }
 
-    router.refresh();
+    // Отправляем "быстрый" broadcast с новым layout, чтобы другие клиенты обновились мгновенно,
+    // не дожидаясь серии postgres_changes + (потенциально) медленного refresh.
+    try {
+      const payload: CardLayoutBroadcastPayload = {
+        v: 1,
+        boardId,
+        actorUserId: currentUserId,
+        sentAt: Date.now(),
+        cardOrderByColumn: nextOrder
+      };
+      await channelRef.current?.send({
+        type: "broadcast",
+        event: "card_layout",
+        payload
+      });
+    } catch {
+      // ignore
+    }
+
+    // На успехе не делаем полный refresh: локальный state уже переставлен,
+    // остальные детали (responsible/activity и т.п.) прилетят точечно через postgres_changes.
     if (refreshQueuedDuringDragRef.current) {
       refreshQueuedDuringDragRef.current = false;
       router.refresh();
@@ -1157,8 +1707,8 @@ export function BoardColumnsDnD({
           memberNamesById={memberNamesById}
           memberAvatarsById={memberAvatarsById}
           columnRows={columns}
-          cardOrderByColumn={cardOrderByColumn}
-          cardsById={cardsById}
+          cardOrderByColumn={local.cardOrderByColumn}
+          cardsById={local.cardsById}
           onOpenCard={(c) => setEditingCardId(c.id)}
         />
       </>
@@ -1177,9 +1727,9 @@ export function BoardColumnsDnD({
           fieldDefinitions={fieldDefinitions}
           columnPermissions={columnPermissions}
           cardContentPermissions={cardContentPermissions}
-          columnRows={columnItems}
-          cardOrderByColumn={cardOrderByColumn}
-          cardsById={cardsById}
+          columnRows={local.columnItems}
+          cardOrderByColumn={local.cardOrderByColumn}
+          cardsById={local.cardsById}
           onOpenCard={(c) => setEditingCardId(c.id)}
         />
       </>
@@ -1189,11 +1739,11 @@ export function BoardColumnsDnD({
   const columnRow =
     showColumnDnd ?
       <SortableContext
-        items={columnItems.map((c) => columnDndId(c.id))}
+        items={local.columnItems.map((c) => columnDndId(c.id))}
         strategy={horizontalListSortingStrategy}
       >
         <div className="flex gap-4 overflow-x-auto pb-2">
-          {columnItems.map((col, index) => (
+          {local.columnItems.map((col, index) => (
             <SortableColumnShell
               key={col.id}
               boardId={boardId}
@@ -1204,11 +1754,11 @@ export function BoardColumnsDnD({
               fieldDefinitions={fieldDefinitions}
               col={col}
               index={index}
-              columnCount={columnItems.length}
+              columnCount={local.columnItems.length}
               columnPermissions={columnPermissions}
               cardContentPermissions={cardContentPermissions}
-              cardIds={cardOrderByColumn[col.id] ?? []}
-              cardsById={cardsById}
+              cardIds={local.cardOrderByColumn[col.id] ?? []}
+              cardsById={local.cardsById}
               boardLabels={boardLabels}
               previewItems={previewItems}
               memberNamesById={memberNamesById}
@@ -1220,7 +1770,7 @@ export function BoardColumnsDnD({
         </div>
       </SortableContext>
     : <div className="flex gap-4 overflow-x-auto pb-2">
-        {columnItems.map((col, index) => (
+        {local.columnItems.map((col, index) => (
           <StaticColumnShell
             key={col.id}
             boardId={boardId}
@@ -1231,11 +1781,11 @@ export function BoardColumnsDnD({
             fieldDefinitions={fieldDefinitions}
             col={col}
             index={index}
-            columnCount={columnItems.length}
+            columnCount={local.columnItems.length}
             columnPermissions={columnPermissions}
             cardContentPermissions={cardContentPermissions}
-            cardIds={cardOrderByColumn[col.id] ?? []}
-            cardsById={cardsById}
+            cardIds={local.cardOrderByColumn[col.id] ?? []}
+            cardsById={local.cardsById}
             boardLabels={boardLabels}
             previewItems={previewItems}
             memberNamesById={memberNamesById}
@@ -1248,6 +1798,15 @@ export function BoardColumnsDnD({
   return (
     <div className="space-y-1">
       {editModal}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[11px] text-slate-500">
+          Realtime:{" "}
+          <span className={realtimeStatus === "SUBSCRIBED" ? "text-emerald-400" : "text-amber-400"}>
+            {realtimeStatus}
+          </span>
+          {realtimeError ? <span className="ml-2 text-rose-400">{realtimeError}</span> : null}
+        </p>
+      </div>
       {persistError ?
         <p className="text-xs text-rose-400" role="alert">
           {persistError}
