@@ -190,4 +190,5 @@
 - Вне плана: для `web/src/app/boards/[boardId]/page.tsx` добавлена серверная генерация signed URL для `profiles.avatar_url` (bucket `avatars`), чтобы аватары в карточках/участниках корректно отображались с приватным bucket.
 - Bugfix (2026-04-07): добавлена миграция `supabase/migrations/20260407170000_avatars_storage_select_all_authenticated.sql` — `SELECT` в `storage.objects` для bucket `avatars` открыт всем `authenticated` (иначе в карточках/участниках отображался только собственный аватар, а чужие signed URL не генерировались из-за RLS). Права `INSERT/UPDATE/DELETE` остаются только на свой путь `<auth.uid()>/avatar.jpg`.
 - UI tweak (2026-04-07): в `web/src/app/boards/[boardId]/board-columns-dnd.tsx` в карточках заменён текст `Комментарии: N` на компактное отображение `иконка комментария + N` для более минималистичного дизайна.
+- UI tweak (2026-04-07): в `web/src/app/boards/[boardId]/board-columns-dnd.tsx` в карточках ответственный пользователь отображается первым среди аватаров исполнителей и выделяется золотистой обводкой.
 

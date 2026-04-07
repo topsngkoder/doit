@@ -266,6 +266,13 @@ function BoardCardRow({
     .map((id) => labelsById.get(id))
     .filter(Boolean) as BoardLabelOption[];
   const primaryLabel = labelsPreviewEnabled ? (cardLabels[0] ?? null) : null;
+  const orderedAssigneeUserIds = React.useMemo(() => {
+    if (!card.assigneeUserIds.length) return [];
+    const assigneeIds = [...card.assigneeUserIds];
+    if (!card.responsibleUserId) return assigneeIds;
+    const withoutResponsible = assigneeIds.filter((id) => id !== card.responsibleUserId);
+    return [card.responsibleUserId, ...withoutResponsible];
+  }, [card.assigneeUserIds, card.responsibleUserId]);
 
   function initials(name: string): string {
     const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -329,16 +336,19 @@ function BoardCardRow({
             .filter((item) => item.itemType !== "title")
             .map((item) => {
               if (item.itemType === "assignees") {
-                if (card.assigneeUserIds.length === 0) return null;
+                if (orderedAssigneeUserIds.length === 0) return null;
                 return (
                   <div key={item.id} className="flex items-center -space-x-1">
-                    {card.assigneeUserIds.slice(0, 4).map((userId) => {
+                    {orderedAssigneeUserIds.slice(0, 4).map((userId) => {
                       const avatarUrl = memberAvatarsById.get(userId);
                       const displayName = memberNamesById.get(userId) ?? "Участник";
+                      const isResponsible = userId === card.responsibleUserId;
                       return (
                         <span
                           key={userId}
-                          className="inline-flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-slate-800 bg-slate-700 text-[10px] font-medium text-slate-100"
+                          className={`inline-flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border bg-slate-700 text-[10px] font-medium text-slate-100 ${
+                            isResponsible ? "border-amber-400" : "border-slate-800"
+                          }`}
                           title={displayName}
                         >
                           {avatarUrl ?
@@ -347,8 +357,8 @@ function BoardCardRow({
                         </span>
                       );
                     })}
-                    {card.assigneeUserIds.length > 4 ?
-                      <span className="ml-1 text-[11px] text-slate-400">{`+${card.assigneeUserIds.length - 4}`}</span>
+                    {orderedAssigneeUserIds.length > 4 ?
+                      <span className="ml-1 text-[11px] text-slate-400">{`+${orderedAssigneeUserIds.length - 4}`}</span>
                     : null}
                   </div>
                 );
