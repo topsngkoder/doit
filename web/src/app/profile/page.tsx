@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { Toast } from "@/components/ui/toast";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { updateProfileAction } from "./actions";
+import { deleteAvatarAction, updateProfileAction, uploadAvatarAction } from "./actions";
+import { ProfileAvatar } from "./profile-avatar";
 import { ProfileForm } from "./profile-form";
 
 export default async function ProfilePage() {
@@ -45,18 +46,14 @@ export default async function ProfilePage() {
         />
       ) : (
         <>
-          <section className="rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-5 text-sm text-slate-200">
-            <div className="grid gap-2 md:grid-cols-2">
-              <div>
-                <div className="text-xs text-slate-400">Email</div>
-                <div className="text-slate-100">{user.email ?? "—"}</div>
-              </div>
-              <div>
-                <div className="text-xs text-slate-400">Отображаемое имя</div>
-                <div className="text-slate-100">{profile.display_name?.trim() || "—"}</div>
-              </div>
-            </div>
-          </section>
+          <ProfileAvatar
+            userId={user.id}
+            initialAvatarPath={profile.avatar_url}
+            email={user.email ?? null}
+            displayName={profile.display_name}
+            uploadAvatarAction={uploadAvatarAction}
+            deleteAvatarAction={deleteAvatarAction}
+          />
 
           <ProfileForm
             initialFirstName={profile.first_name ?? ""}
