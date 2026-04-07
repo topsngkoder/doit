@@ -4,7 +4,7 @@ import { Button } from "./button";
 
 export type ModalProps = {
   open: boolean;
-  title?: string;
+  title?: React.ReactNode;
   onClose?: () => void;
   children: React.ReactNode;
   className?: string;
@@ -31,11 +31,11 @@ export function Modal({ open, title, onClose, children, className, bodyClassName
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-start justify-between gap-3 px-5 pb-2 pt-5">
-          {title ? (
+          {typeof title === "string" ?
             <h2 className="text-base font-semibold text-slate-50">{title}</h2>
-          ) : (
-            <span className="text-sm font-medium text-slate-200">Диалог</span>
-          )}
+          : title ?
+            <div className="min-w-0 flex-1">{title}</div>
+          : <span className="text-sm font-medium text-slate-200">Диалог</span>}
           {onClose && (
             <Button
               variant="ghost"

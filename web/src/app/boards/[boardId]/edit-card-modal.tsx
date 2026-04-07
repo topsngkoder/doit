@@ -113,7 +113,9 @@ export function EditCardModal({
   const [labelPending, setLabelPending] = React.useState(false);
   const [labelQuery, setLabelQuery] = React.useState("");
   const [labelSuggestOpen, setLabelSuggestOpen] = React.useState(false);
+  const [isEditingTitle, setIsEditingTitle] = React.useState(false);
   const labelComboRef = React.useRef<HTMLDivElement>(null);
+  const titleInputRef = React.useRef<HTMLInputElement>(null);
 
   const [fieldDrafts, setFieldDrafts] = React.useState<Record<string, FieldDraft>>({});
 
@@ -129,7 +131,14 @@ export function EditCardModal({
     setError(null);
     setPending(false);
     setConfirmDelete(false);
+    setIsEditingTitle(false);
   }, [open, card?.id, card?.title, card?.description]);
+
+  React.useEffect(() => {
+    if (!isEditingTitle) return;
+    titleInputRef.current?.focus();
+    titleInputRef.current?.select();
+  }, [isEditingTitle]);
 
   React.useEffect(() => {
     if (!open || !card) return;
@@ -311,13 +320,49 @@ export function EditCardModal({
   return (
     <Modal
       open={open}
-      title="Карточка"
+      title={
+        isEditingTitle && canEditContent ?
+          <input
+            ref={titleInputRef}
+            className="w-full max-w-[min(100%,34rem)] rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-base font-semibold text-slate-100 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={() => setIsEditingTitle(false)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                setIsEditingTitle(false);
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                setTitle(card.title);
+                setIsEditingTitle(false);
+              }
+            }}
+            maxLength={200}
+            autoComplete="off"
+            aria-label="Название карточки"
+          />
+        : <button
+            type="button"
+            className={cn(
+              "max-w-[min(100%,34rem)] truncate text-left text-base font-semibold text-slate-50",
+              canEditContent && !pending && "cursor-text hover:text-slate-200"
+            )}
+            onClick={() => {
+              if (!canEditContent || pending) return;
+              setIsEditingTitle(true);
+            }}
+            title={title || "Без названия"}
+          >
+            {title || "Без названия"}
+          </button>
+      }
       onClose={onClose}
-      className="max-w-5xl"
+      className="max-w-6xl"
       bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden px-0 pb-0 pt-0"
     >
       <div className="flex min-h-[min(520px,calc(90vh-5rem))] flex-1 flex-col overflow-hidden md:min-h-[420px] md:flex-row">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-5 pb-5 pt-1">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-5 pb-5 pt-1 md:basis-2/3">
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
               <button
@@ -370,23 +415,6 @@ export function EditCardModal({
                   </ul>}
               </div>
             : <>
-            <div>
-              <label
-                htmlFor={`card-title-${card.id}`}
-                className="mb-1 block text-xs text-slate-400"
-              >
-                Название
-              </label>
-              <input
-                id={`card-title-${card.id}`}
-                className={inputClass}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                disabled={readOnly || pending}
-                maxLength={200}
-                autoComplete="off"
-              />
-            </div>
             <div>
               <label
                 htmlFor={`card-desc-${card.id}`}
@@ -821,7 +849,7 @@ export function EditCardModal({
         </div>
 
         <aside
-          className="flex max-h-[55vh] w-full shrink-0 flex-col border-t border-slate-800 md:max-h-none md:w-[min(100%,20rem)] md:border-l md:border-t-0"
+          className="flex max-h-[55vh] w-full shrink-0 flex-col border-t border-slate-800 md:max-h-none md:basis-1/3 md:border-l md:border-t-0"
           aria-label="Комментарии к карточке"
         >
           <CardCommentsSidebar
