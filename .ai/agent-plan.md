@@ -7,8 +7,8 @@
 - **UI**: Tailwind CSS (без MUI/shadcn по умолчанию).
 - **Backend**: Supabase (Postgres + RLS + Realtime + Storage + Edge Functions).
 - **Realtime scope**: сразу всё из раздела 13.1.
-- **Уведомления**: оба канала — `telegram` + `internal`.
-- **Deeplink карточки из Telegram**: пользователь выбрал “modal-only”. В MVP считаем допустимым, что ссылка ведёт на доску; открытие конкретной карточки по URL — как опциональное улучшение (через query `?card=` на странице доски, без отдельной страницы карточки).
+- **Уведомления**: оба канала — `browser` + `email`.
+- **Deeplink карточки из уведомлений**: режим “modal-only”. В MVP считаем допустимым, что ссылка ведёт на доску; открытие конкретной карточки по URL — как опциональное улучшение (через query `?card=` на странице доски, без отдельной страницы карточки).
 - **Два целевых интерфейса (обязательно)**: приложение должно иметь **отдельно продуманные версии UX для мобильных телефонов и для ПК (настольных)**. Это не «одна вёрстка только с масштабированием»: на телефоне и на большом экране — **разные паттерны навигации и раскладки** там, где это нужно (экран доски, модалки карточки, shell), при **общей** кодовой базе Next.js и общих данных/RLS. Реализация: адаптивные layout-компоненты и/или брейкпоинты Tailwind (`md:` и т.д.) с явным разделением «mobile shell» vs «desktop shell»; детализация — в EPIC O.
 
 ## 1) Цели MVP (что должно работать end‑to‑end)
@@ -17,8 +17,8 @@
 - Доска: колонки, карточки, drag&drop (колонки и карточки), сохранение порядка (`position`), модалки create/view/edit карточки.
 - Роли/права на уровне доски (пресеты + кастомные роли), инвайты по email, owner‑ограничения.
 - Карточка: описание, участники, ответственный (авто/ручной), метки, комментарии с ответами, пользовательские поля, история.
-- Telegram: привязка аккаунта через токен + бот; outbox с ретраями; тихие часы; настройки типов уведомлений; правило “не уведомлять автора”.
-- Внутренние уведомления: создание/чтение в приложении + настройки как в 10.6.
+- Браузерные уведомления: создание/чтение в приложении + настройки типов уведомлений; правило “не уведомлять автора”.
+- Email-уведомления: outbox с ретраями, шаблоны и настройки как в 10.6.
 - Realtime синхронизация для сущностей из 13.1.
 - **Мобильный и настольный UI**: ключевые экраны (логин, список досок, доска, модал карточки, настройки) должны быть **удобны на телефоне и на ПК** в смысле EPIC O (два целевых интерфейса).
 
@@ -311,7 +311,7 @@
     - **Hotfix (2026-04-07):** добавлен UI‑индикатор статуса Realtime (`SUBSCRIBED`/ошибка) и fallback polling layout (раз в ~1s) для `board_columns` + `cards(id,column_id,position)`, который обновляет порядок карточек/колонок без ручного refresh, если websocket не подключается.
     - **Hotfix (2026-04-07):** поправлены зависимости realtime-effect в `board-columns-dnd.tsx` (добавлен `currentUserId`), чтобы сравнение `actorUserId === currentUserId` работало корректно даже при смене сессии/пользователя без полного перезапуска страницы.
 
-### EPIC K — Внутренние уведомления + настройки (10.5–10.6)
+### EPIC K — Браузерные + email уведомления и настройки (10.5–10.6)
 - [x] **K1 (done)** Таблицы `internal_notifications`, `notification_preferences`, `notification_user_settings` + RLS. DoD: пользователь видит только своё.
     - **Схема:** таблицы и constraints определены в `supabase/migrations/20250316100000_initial_schema.sql`.
     - **RLS/policies:** включены и настроены в `supabase/migrations/20260317146000_rls_activity_notifications_preview.sql`:
@@ -325,26 +325,26 @@
     - **Навигация/guard:** добавлена ссылка “Уведомления” в `web/src/app/layout.tsx`, а `web/src/middleware.ts` считает `/notifications` защищённым роутом.
 - [x] **K3 (done)** UI “Настройки уведомлений”: timezone + тумблеры 4 типов × 2 канала, auto-save. DoD: как 10.6.3.
     - **Роут:** добавлен экран `web/src/app/notifications/settings/page.tsx`.
-    - **UI:** `NotificationSettingsClient` — выбор IANA‑timezone, инфо‑плашка про правило “не уведомлять автора”, таблица 4 типов × 2 канала (Telegram/Внутренние) с автосохранением.
+    - **UI:** `NotificationSettingsClient` — выбор IANA‑timezone, инфо‑плашка про правило “не уведомлять автора”, таблица 4 типов × 2 канала (Email/Браузерные) с автосохранением.
     - **Запись в БД:** server actions `updateNotificationTimezoneAction` и `setNotificationPreferenceEnabledAction` (upsert в `notification_user_settings` и `notification_preferences` под RLS).
     - **Навигация:** на `/notifications` добавлена ссылка “Настройки” → `/notifications/settings`.
     - **Проверка:** залогиниться → открыть `/notifications/settings` → сменить timezone и тумблеры; в Supabase Table Editor убедиться, что:
       - в `notification_user_settings` есть строка с `user_id` текущего пользователя и обновлённым `timezone`;
       - в `notification_preferences` появляются/обновляются строки `(user_id, channel, event_type, enabled)` для переключённых тумблеров.
-- [x] **K4 (done)** Применение правила “не уведомлять автора” (10.6.2) и фильтрация по preferences. DoD: автор не получает ни internal, ни tg.
+- [x] **K4 (done)** Применение правила “не уведомлять автора” (10.6.2) и фильтрация по preferences. DoD: автор не получает ни browser, ни email.
     - **БД:** добавлена миграция `supabase/migrations/20260407153000_notification_delivery_filters.sql` с функцией `public.enqueue_notification_event(...)` (`SECURITY DEFINER`).
     - **Логика K4 в функции:** если `actor_user_id = user_id` → событие пропускается целиком (ни `internal_notifications`, ни `notification_outbox`); иначе каналы фильтруются по `notification_preferences` (если записи нет — `enabled=true` по умолчанию).
-    - **Каналы:** при `internal`=enabled создаётся запись в `internal_notifications`; при `telegram`=enabled и наличии `profiles.telegram_chat_id` создаётся запись в `notification_outbox` со статусом `pending`.
+    - **Каналы:** при `browser`=enabled создаётся запись в `internal_notifications`; при `email`=enabled создаётся запись в `notification_outbox` со статусом `pending`.
     - **Применение миграции:** выполнено `npx supabase db push --yes`, миграция применена на remote без ошибок.
     - **Проверка:** в SQL Editor вызвать `select public.enqueue_notification_event(...)` с одинаковыми `p_user_id` и `p_actor_user_id` — ожидаемо `skipped=true` и новых строк нет; затем с разными id и отключённым `notification_preferences.enabled=false` для канала — запись в этот канал не создаётся.
 
-### EPIC L — Telegram привязка + бот + outbox (10.1–10.4)
-- [ ] **L1 (todo)** Генерация одноразового токена (15 мин) + deep-link `t.me/<bot>?start=<token>`. DoD: токен одноразовый, used_at ставится.
-- [ ] **L2 (todo)** Edge Function webhook для бота: принимает `/start <token>`, связывает chat_id с профилем. DoD: профиль хранит `telegram_chat_id`, `telegram_username`, `telegram_linked_at`.
-- [ ] **L3 (todo)** “Отвязать Telegram” в профиле (UI + update). DoD: chat_id очищается.
-- [ ] **L4 (todo)** Outbox producer: при событиях из 10.2 создавать `notification_outbox` (и `internal_notifications` для internal канала). DoD: события корректные, ссылки/тексты формируются.
-- [ ] **L5 (todo)** Outbox worker: обработка pending, ретраи до 5, `failed` с error, backoff. DoD: повторные попытки происходят.
-- [ ] **L6 (todo)** Тихие часы: если включены — Telegram отправка откладывается до окончания окна в локальной timezone. DoD: pending не уходит в тихие часы.
+### EPIC L — Telegram-канал (отложено до следующих версий)
+- [ ] **L1 (todo, future)** Генерация одноразового токена (15 мин) + deep-link `t.me/<bot>?start=<token>`. DoD: токен одноразовый, used_at ставится.
+- [ ] **L2 (todo, future)** Edge Function webhook для бота: принимает `/start <token>`, связывает chat_id с профилем. DoD: профиль хранит `telegram_chat_id`, `telegram_username`, `telegram_linked_at`.
+- [ ] **L3 (todo, future)** “Отвязать Telegram” в профиле (UI + update). DoD: chat_id очищается.
+- [ ] **L4 (todo, future)** Интеграция Telegram как дополнительного канала в существующий outbox-поток уведомлений. DoD: события корректные, ссылки/тексты формируются.
+- [ ] **L5 (todo, future)** Outbox worker для Telegram: обработка pending, ретраи до 5, `failed` с error, backoff. DoD: повторные попытки происходят.
+- [ ] **L6 (todo, future)** Тихие часы для Telegram: если включены — отправка откладывается до окончания окна в локальной timezone. DoD: pending не уходит в тихие часы.
 
 ### EPIC M — Системный админ (6.7)
 - [ ] **M1 (todo)** Конфиг списка system admin (email/user_id) и проверка в SQL helper. DoD: sysadmin может всё даже без membership.
@@ -366,7 +366,7 @@
 ## 4) Карта зависимостей (важные блокировки)
 - **C (RLS)** блокирует почти всё: E/F/G/H/I/K/L.
 - **D (создание доски с дефолтами)** нужен перед F (экран доски) и H (настройки).
-- **L (Telegram)** зависит от K (preferences/settings) и от событий/логики из F/G/I.
+- **L (Telegram, future)** зависит от K (preferences/settings) и от событий/логики из F/G/I.
 - **J (Realtime)** требует готовых таблиц + базовых UI‑состояний.
 - **O (mobile + desktop)** пересекается с **F, G, H, K, N**: экраны доски, модал карточки, настройки и полировка должны закладываться с учётом двух интерфейсов; закрывать O целиком не обязательно до первого UI доски, но **O1–O2** желательно рано, **O3–O4** — вместе с F/G.
 
@@ -390,7 +390,7 @@
 - перенос карточки (F6/F7) + activity + outbox,
 - исключение участника карточки с проверками и responsible-unset (G2/G3),
 - удаление метки с каскадом activity по всем затронутым карточкам (H2),
-- генерация telegram link token (L1),
+- генерация email payload/шаблонов для outbox,
 - outbox worker (L5/L6).
 
 ## 7) Минимальные ручные сценарии проверки (smoke)
@@ -404,11 +404,11 @@
 - Метки добавить/снять.
 - Кастомное поле создать → заполнить в карточке.
 - Включить внутренние уведомления: получить по событию “card_moved”.
-- Привязать Telegram → получить тестовое уведомление через outbox.
+- Включить email-уведомления: получить тестовое письмо по событию “card_moved”.
 
 ## 8) Выходные артефакты (что должно появиться в репозитории)
 - Приложение Next.js (frontend) + Tailwind с **двумя целевыми интерфейсами** (телефон и ПК), см. EPIC O.
 - Supabase SQL миграции (schema + policies + functions).
-- Edge Functions для Telegram webhook и outbox worker (или worker на cron).
+- Worker/Edge Function для email outbox (или worker на cron).
 - Док в `.ai` (этот план + при необходимости отдельный `decisions.md`).
 
