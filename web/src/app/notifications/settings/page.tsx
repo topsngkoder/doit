@@ -5,6 +5,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   NOTIFICATION_CHANNELS,
   NOTIFICATION_EVENT_TYPES,
+  isNotificationChannel,
+  isNotificationEventType,
   type NotificationChannel,
   type NotificationEventType
 } from "@/lib/notifications/constants";
@@ -52,9 +54,9 @@ export default async function NotificationSettingsPage() {
   ) as Record<PreferenceKey, boolean>;
 
   for (const r of prefRows ?? []) {
-    const channel = r.channel as NotificationChannel;
-    const eventType = r.event_type as NotificationEventType;
-    if (!NOTIFICATION_CHANNELS.includes(channel) || !NOTIFICATION_EVENT_TYPES.includes(eventType)) continue;
+    const channel = typeof r.channel === "string" ? r.channel : "";
+    const eventType = typeof r.event_type === "string" ? r.event_type : "";
+    if (!isNotificationChannel(channel) || !isNotificationEventType(eventType)) continue;
     initialPreferences[prefKey(eventType, channel)] = !!r.enabled;
   }
 
@@ -66,7 +68,7 @@ export default async function NotificationSettingsPage() {
             <h1 className="text-2xl font-semibold tracking-tight text-slate-50">Настройки уведомлений</h1>
           </div>
           <p className="text-sm text-slate-400">
-            Канал × событие (4 типа) · автосохранение без отдельной кнопки.
+            Канал × событие (6 типов) · автосохранение без отдельной кнопки.
           </p>
         </div>
 

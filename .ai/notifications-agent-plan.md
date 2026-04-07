@@ -126,7 +126,7 @@
   - расширить event type до 6 значений;
   - обновить русские label для каналов и типов.
   - **DoD**: фронтенд-код больше не использует `telegram/internal` как допустимые пользовательские каналы.
-- [ ] **NT1.2 (todo)** Проверить все импорты `NotificationChannel` / `NotificationEventType`
+- [x] **NT1.2 (done)** Проверить все импорты `NotificationChannel` / `NotificationEventType`
   - исправить места, где код опирается на старые значения;
   - не оставлять runtime-ветки под `telegram` и `internal` в пользовательском UI.
   - **DoD**: сборка не падает из-за старых union type и label map.
@@ -445,3 +445,9 @@
   - `web/src/app/notifications/settings/notification-settings-client.tsx`: колонки и переключатели строятся из `NOTIFICATION_CHANNELS` (без хардкода `telegram`/`internal`); для `form action` часового пояса добавлена обёртка `async (fd) => { await updateTimezoneAction(fd); }` из‑за типов Next.js 15 (возврат `ServerResult` из прямого `action` не допускается).
   - Миграции не делались (шаг NT2).
   - Проверка: в каталоге `web/` выполнен `npm run build` — успешно.
+- **2026-04-07 — NT1.2**
+  - В `constants.ts` добавлены `isNotificationChannel` / `isNotificationEventType`; `settings/actions.ts` переведён на их импорт.
+  - `settings/page.tsx`: разбор строк из БД через type guards (без `as` для channel/event_type), подзаголовок «6 типов».
+  - `notification-settings-client.tsx`: убраны упоминания Telegram/тихих часов у блока временной зоны; нейтральная подпись про отсутствие влияния на доставку.
+  - Импорты `@/lib/notifications/constants` по репозиторию: только модуль настроек уведомлений.
+  - Проверка: `npx next build` в `web/` — успешно.

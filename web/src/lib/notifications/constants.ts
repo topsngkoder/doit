@@ -13,6 +13,14 @@ export const NOTIFICATION_CHANNELS = ["browser", "email"] as const;
 
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
 
+export function isNotificationChannel(v: string): v is NotificationChannel {
+  return (NOTIFICATION_CHANNELS as readonly string[]).includes(v);
+}
+
+export function isNotificationEventType(v: string): v is NotificationEventType {
+  return (NOTIFICATION_EVENT_TYPES as readonly string[]).includes(v);
+}
+
 export const NOTIFICATION_EVENT_TYPE_LABEL: Record<NotificationEventType, string> = {
   added_to_card: "Вас добавили в карточку",
   made_responsible: "Сделали ответственным",

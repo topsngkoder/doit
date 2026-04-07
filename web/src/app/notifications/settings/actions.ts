@@ -3,19 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
-  NOTIFICATION_CHANNELS,
-  NOTIFICATION_EVENT_TYPES,
-  type NotificationChannel,
-  type NotificationEventType
+  isNotificationChannel,
+  isNotificationEventType
 } from "@/lib/notifications/constants";
-
-function isNotificationChannel(v: string): v is NotificationChannel {
-  return (NOTIFICATION_CHANNELS as readonly string[]).includes(v);
-}
-
-function isNotificationEventType(v: string): v is NotificationEventType {
-  return (NOTIFICATION_EVENT_TYPES as readonly string[]).includes(v);
-}
 
 export async function updateNotificationTimezoneAction(formData: FormData) {
   const raw = formData.get("timezone");

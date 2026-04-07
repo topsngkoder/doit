@@ -141,7 +141,9 @@ export function NotificationSettingsClient({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <div className="text-sm font-semibold text-slate-100">Временная зона</div>
-            <div className="text-xs text-slate-400">Используется для тихих часов (Telegram).</div>
+            <div className="text-xs text-slate-400">
+              Сейчас не влияет на уведомления в приложении и по почте.
+            </div>
           </div>
 
           <form
