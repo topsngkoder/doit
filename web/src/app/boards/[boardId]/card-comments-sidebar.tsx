@@ -143,19 +143,12 @@ export function CardCommentsSidebar({
     setError(null);
     try {
       const supabase = createSupabaseBrowserClient();
-      const {
-        data: { user },
-        error: authErr
-      } = await supabase.auth.getUser();
-      if (authErr) throw authErr;
-      if (!user) throw new Error("Нет сессии");
-      const { error: insErr } = await supabase.from("card_comments").insert({
-        card_id: cardId,
-        author_user_id: user.id,
-        body: text,
-        reply_to_comment_id: replyToId
+      const { error: rpcErr } = await supabase.rpc("create_card_comment", {
+        p_card_id: cardId,
+        p_body: text,
+        p_reply_to_comment_id: replyToId
       });
-      if (insErr) throw insErr;
+      if (rpcErr) throw rpcErr;
       setDraft("");
       setReplyToId(null);
       await load();

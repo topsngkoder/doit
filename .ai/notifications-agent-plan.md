@@ -54,8 +54,7 @@
   - обновляет timezone;
   - сохраняет `notification_preferences`.
 - `web/src/app/boards/[boardId]/card-comments-sidebar.tsx`
-  - создаёт комментарии прямым `insert` в `card_comments`;
-  - здесь понадобится интеграция `card_comment_new`.
+  - создание комментария через RPC `create_card_comment` (уведомления `card_comment_new` внутри RPC).
 - SQL-функция `public.enqueue_notification_event(...)`
   - миграция `supabase/migrations/20260407153000_notification_delivery_filters.sql`;
   - сейчас работает только для `internal` + `telegram`;
@@ -205,14 +204,14 @@
   - **DoD**: уведомление создаётся строго по правилам 4.1.
 
 #### NT5.B — `made_responsible`
-- [ ] **NT5.2 (todo)** Подключить уведомление при смене `cards.responsible_user_id`
+- [x] **NT5.2 (done)** Подключить уведомление при смене `cards.responsible_user_id`
   - событие создаётся только для нового ответственного;
   - не создавать, если пользователь назначил ответственным сам себя;
   - не создавать, если значение фактически не изменилось.
   - **DoD**: уведомление создаётся строго по правилам 4.2.
 
 #### NT5.C — `card_comment_new`
-- [ ] **NT5.3 (todo)** Убрать прямой `insert` комментария из чисто клиентского сценария, если это мешает централизованной доставке
+- [x] **NT5.3 (done)** Убрать прямой `insert` комментария из чисто клиентского сценария, если это мешает централизованной доставке
   - целевой вариант: создание комментария через server action или RPC, где можно централизованно вызвать `enqueue_notification_event`;
   - сохранить текущие RLS-ограничения и поведение reply.
   - **DoD**: после создания комментария корректно создаются уведомления всем текущим участникам карточки, кроме автора.
@@ -510,5 +509,17 @@
     - `create_card_with_details`: после вставки всех `card_assignees` цикл по `p_assignee_user_ids` с тем же `enqueue` (создатель в списке участников не получает уведомление сам себе).
   - Тело уведомления: доска и карточка + автор; ссылка `/boards/{board_id}?card={card_id}`.
   - Применено: `supabase db push`.
-  - **Следующий шаг:** NT5.2 (`made_responsible`).
   - **Проверка:** на доске добавить **другого** участника карточки через UI → во внутреннем центре у очереди появилась запись `added_to_card`; добавить себя в список при создании карточки / самоссылка mutate — уведомления «себе» нет; повторно добавить того же assignee (без удаления) — второго уведомления нет.
+- **2026-04-07 — NT5.2**
+  - Миграция `supabase/migrations/20260407220000_nt52_made_responsible_enqueue.sql`: в `set_card_responsible_user` после фактического `UPDATE` и записи `card_activity` вызывается `enqueue_notification_event` для **нового** ответственного, тип `made_responsible`, автор — `auth.uid()`; тело и ссылка в том же формате, что у NT5.1 (`/boards/{board}?card={card}`); ранний выход при `v_current IS NOT DISTINCT FROM p_responsible_user_id` без изменений; назначение себе — пропуск внутри `enqueue_notification_event` (`skipped`).
+  - Авто-назначение ответственным при DnD в «В работе» (`reorder_board_cards`) по-прежнему выставляет `responsible_user_id = auth.uid()` — получатель = автор, отдельный enqueue не добавлялся (соответствует §4.2 «не уведомлять, если сам сделал себя ответственным»).
+  - Применено: `supabase db push`.
+  - **Проверка:** под пользователем A на карточке с участником B — «Сделать ответственным» для B → у B во внутреннем центре событие `made_responsible`, заголовок «Сделали ответственным»; повторный клик по уже ответственном B — без нового уведомления; A назначает себя ответственным — у A записи нет; смена B → C — уведомление только у C.
+- **2026-04-07 — NT5.3**
+  - Миграция `supabase/migrations/20260407230000_nt53_create_card_comment_rpc.sql`: RPC `create_card_comment(p_card_id, p_body, p_reply_to_comment_id)` (`SECURITY DEFINER`) — проверка `comments.create` на доске карточки, длина тела 1–5000, вставка в `card_comments` с `author_user_id = auth.uid()`; ответ тому же триггеру `check_comment_reply_same_card`, что и при прямом INSERT.
+  - После вставки: для каждого `card_assignees.user_id` вызывается `enqueue_notification_event(..., 'card_comment_new', ...)`; автор исключается правилом в `enqueue_notification_event`.
+  - Клиент: `web/src/app/boards/[boardId]/card-comments-sidebar.tsx` — отправка формы через `supabase.rpc('create_card_comment', ...)` вместо прямого `insert`.
+  - Применено: `supabase db push`. Сборка: `npm run build` в `web/` — успешно.
+  - **Замечание к NT5.4:** событие `card_comment_new` создаётся только из этого RPC после новой строки; правка/soft-delete комментария по-прежнему через server actions без `enqueue` — отдельную задачу можно закрыть как верификацию.
+  - **Следующий шаг по плану:** NT5.4 (при необходимости явно зафиксировать отсутствие уведомлений на update/soft-delete) или NT5.5.
+  - **Проверка:** карточка с участниками A и B; A пишет комментарий — у B запись `card_comment_new`, у A нет; ответ с `reply` — то же; пользователь без `comments.create` — RPC с ошибкой прав.
