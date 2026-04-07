@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BoardCanvas } from "./board-canvas";
 import type {
   BoardLabelOption,
+  BoardCardListItem,
   BoardCardPreviewItem,
   CardActivityEntry,
   CardFieldValueSnapshot
@@ -274,20 +275,7 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
     activityByCard.set(a.card_id, cur);
   }
 
-  const cardsByColumnId = new Map<
-    string,
-    Array<{
-      id: string;
-      title: string;
-      description: string;
-      position: number;
-      createdByUserId: string;
-      responsibleUserId: string | null;
-      assigneeUserIds: string[];
-      labelIds: string[];
-      fieldValues: Record<string, CardFieldValueSnapshot>;
-    }>
-  >();
+  const cardsByColumnId = new Map<string, BoardCardListItem[]>();
 
   for (const col of columns) {
     cardsByColumnId.set(col.id, []);

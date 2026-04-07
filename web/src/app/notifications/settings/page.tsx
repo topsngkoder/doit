@@ -1,0 +1,99 @@
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { Toast } from "@/components/ui/toast";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  NOTIFICATION_CHANNELS,
+  NOTIFICATION_EVENT_TYPES,
+  type NotificationChannel,
+  type NotificationEventType
+} from "@/lib/notifications/constants";
+import { NotificationSettingsClient } from "./notification-settings-client";
+import { setNotificationPreferenceEnabledAction, updateNotificationTimezoneAction } from "./actions";
+
+type PreferenceKey = `${NotificationEventType}:${NotificationChannel}`;
+
+function prefKey(eventType: NotificationEventType, channel: NotificationChannel): PreferenceKey {
+  return `${eventType}:${channel}`;
+}
+
+export default async function NotificationSettingsPage() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  const isSessionMissing = userError?.message === "Auth session missing!";
+  const isAuthenticated = !!user && !(userError && !isSessionMissing);
+  if (!isAuthenticated) {
+    redirect("/login");
+  }
+
+  const { data: settingsRow, error: settingsError } = await supabase
+    .from("notification_user_settings")
+    .select("timezone")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const { data: prefRows, error: prefsError } = await supabase
+    .from("notification_preferences")
+    .select("channel, event_type, enabled")
+    .eq("user_id", user.id)
+    .in("channel", [...NOTIFICATION_CHANNELS])
+    .in("event_type", [...NOTIFICATION_EVENT_TYPES]);
+
+  const initialTimezone = settingsRow?.timezone ?? "Europe/Moscow";
+
+  const initialPreferences: Record<PreferenceKey, boolean> = Object.fromEntries(
+    NOTIFICATION_EVENT_TYPES.flatMap((eventType) =>
+      NOTIFICATION_CHANNELS.map((channel) => [prefKey(eventType, channel), true] as const)
+    )
+  ) as Record<PreferenceKey, boolean>;
+
+  for (const r of prefRows ?? []) {
+    const channel = r.channel as NotificationChannel;
+    const eventType = r.event_type as NotificationEventType;
+    if (!NOTIFICATION_CHANNELS.includes(channel) || !NOTIFICATION_EVENT_TYPES.includes(eventType)) continue;
+    initialPreferences[prefKey(eventType, channel)] = !!r.enabled;
+  }
+
+  return (
+    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-50">Настройки уведомлений</h1>
+          </div>
+          <p className="text-sm text-slate-400">
+            Канал × событие (4 типа) · автосохранение без отдельной кнопки.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <Link
+            href="/notifications"
+            className="rounded-md px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-slate-50"
+          >
+            ← Уведомления
+          </Link>
+        </div>
+      </header>
+
+      {settingsError ? (
+        <Toast title="Ошибка загрузки настроек" message={settingsError.message} variant="error" />
+      ) : null}
+      {prefsError ? (
+        <Toast title="Ошибка загрузки предпочтений" message={prefsError.message} variant="error" />
+      ) : null}
+
+      <NotificationSettingsClient
+        initialTimezone={initialTimezone}
+        initialPreferences={initialPreferences}
+        updateTimezoneAction={updateNotificationTimezoneAction}
+        setPreferenceEnabledAction={setNotificationPreferenceEnabledAction}
+      />
+    </main>
+  );
+}
+

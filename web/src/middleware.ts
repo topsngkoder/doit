@@ -30,7 +30,11 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
   const isAuthLanding = pathname === "/" || pathname === "/login";
-  const isProtected = pathname === "/boards" || pathname.startsWith("/boards/");
+  const isProtected =
+    pathname === "/boards" ||
+    pathname.startsWith("/boards/") ||
+    pathname === "/notifications" ||
+    pathname.startsWith("/notifications/");
 
   let response: NextResponse;
   if (user && isAuthLanding) {

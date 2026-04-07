@@ -1703,7 +1703,6 @@ export function BoardColumnsDnD({
           cardContentPermissions={cardContentPermissions}
           boardLabels={boardLabels}
           previewItems={previewItems}
-          fieldDefinitions={fieldDefinitions}
           memberNamesById={memberNamesById}
           memberAvatarsById={memberAvatarsById}
           columnRows={columns}
@@ -1727,6 +1726,10 @@ export function BoardColumnsDnD({
           fieldDefinitions={fieldDefinitions}
           columnPermissions={columnPermissions}
           cardContentPermissions={cardContentPermissions}
+          boardLabels={boardLabels}
+          previewItems={previewItems}
+          memberNamesById={memberNamesById}
+          memberAvatarsById={memberAvatarsById}
           columnRows={local.columnItems}
           cardOrderByColumn={local.cardOrderByColumn}
           cardsById={local.cardsById}

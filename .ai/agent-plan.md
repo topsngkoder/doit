@@ -312,9 +312,25 @@
     - **Hotfix (2026-04-07):** поправлены зависимости realtime-effect в `board-columns-dnd.tsx` (добавлен `currentUserId`), чтобы сравнение `actorUserId === currentUserId` работало корректно даже при смене сессии/пользователя без полного перезапуска страницы.
 
 ### EPIC K — Внутренние уведомления + настройки (10.5–10.6)
-- [ ] **K1 (todo)** Таблицы `internal_notifications`, `notification_preferences`, `notification_user_settings` + RLS. DoD: пользователь видит только своё.
-- [ ] **K2 (todo)** UI “Центр уведомлений”: список, отметка прочитанным, deeplink на доску. DoD: read_at ставится.
-- [ ] **K3 (todo)** UI “Настройки уведомлений”: timezone + тумблеры 4 типов × 2 канала, auto-save. DoD: как 10.6.3.
+- [x] **K1 (done)** Таблицы `internal_notifications`, `notification_preferences`, `notification_user_settings` + RLS. DoD: пользователь видит только своё.
+    - **Схема:** таблицы и constraints определены в `supabase/migrations/20250316100000_initial_schema.sql`.
+    - **RLS/policies:** включены и настроены в `supabase/migrations/20260317146000_rls_activity_notifications_preview.sql`:
+      - `notification_preferences` и `notification_user_settings`: CRUD только своих строк (`user_id = auth.uid()`), sysadmin bypass.
+      - `internal_notifications`: `SELECT/UPDATE` только своих; `INSERT` предполагается через `service_role`/`SECURITY DEFINER` (клиент не вставляет).
+- [x] **K2 (done)** UI “Центр уведомлений”: список, отметка прочитанным, deeplink на доску. DoD: read_at ставится.
+    - **Роут:** `web/src/app/notifications/page.tsx` (SSR, guard как у `/boards`).
+    - **Действия:** `web/src/app/notifications/actions.ts`:
+      - `markInternalNotificationReadAction` → выставляет `read_at` для одного уведомления (только если оно своё и ещё не прочитано).
+      - `markAllInternalNotificationsReadAction` → выставляет `read_at` всем непрочитанным уведомлениям пользователя.
+    - **Навигация/guard:** добавлена ссылка “Уведомления” в `web/src/app/layout.tsx`, а `web/src/middleware.ts` считает `/notifications` защищённым роутом.
+- [x] **K3 (done)** UI “Настройки уведомлений”: timezone + тумблеры 4 типов × 2 канала, auto-save. DoD: как 10.6.3.
+    - **Роут:** добавлен экран `web/src/app/notifications/settings/page.tsx`.
+    - **UI:** `NotificationSettingsClient` — выбор IANA‑timezone, инфо‑плашка про правило “не уведомлять автора”, таблица 4 типов × 2 канала (Telegram/Внутренние) с автосохранением.
+    - **Запись в БД:** server actions `updateNotificationTimezoneAction` и `setNotificationPreferenceEnabledAction` (upsert в `notification_user_settings` и `notification_preferences` под RLS).
+    - **Навигация:** на `/notifications` добавлена ссылка “Настройки” → `/notifications/settings`.
+    - **Проверка:** залогиниться → открыть `/notifications/settings` → сменить timezone и тумблеры; в Supabase Table Editor убедиться, что:
+      - в `notification_user_settings` есть строка с `user_id` текущего пользователя и обновлённым `timezone`;
+      - в `notification_preferences` появляются/обновляются строки `(user_id, channel, event_type, enabled)` для переключённых тумблеров.
 - [ ] **K4 (todo)** Применение правила “не уведомлять автора” (10.6.2) и фильтрация по preferences. DoD: автор не получает ни internal, ни tg.
 
 ### EPIC L — Telegram привязка + бот + outbox (10.1–10.4)

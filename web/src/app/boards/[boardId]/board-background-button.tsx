@@ -99,7 +99,7 @@ export function BoardBackgroundButton({
               <Button
                 type="button"
                 size="sm"
-                variant={currentType === "color" ? "secondary" : "default"}
+                variant={currentType === "color" ? "secondary" : "primary"}
                 disabled={pendingMode !== null}
                 onClick={() => void handleSaveColor()}
               >
@@ -121,7 +121,7 @@ export function BoardBackgroundButton({
               <Button
                 type="button"
                 size="sm"
-                variant={currentType === "image" ? "secondary" : "default"}
+                variant={currentType === "image" ? "secondary" : "primary"}
                 disabled={pendingMode !== null}
                 onClick={() => void handleUploadImage()}
               >
