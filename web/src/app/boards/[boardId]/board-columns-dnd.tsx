@@ -11,7 +11,9 @@ import {
   useDroppable,
   useSensor,
   useSensors,
+  type DragCancelEvent,
   type DragEndEvent,
+  type DragStartEvent,
   type UniqueIdentifier
 } from "@dnd-kit/core";
 import {
@@ -81,6 +83,11 @@ function buildCardOrderRecord(map: Map<string, BoardCardListItem[]>): Record<str
     o[colId] = cards.map((c) => c.id);
   }
   return o;
+}
+
+function cardOrderRecordSignature(order: Record<string, string[]>): string {
+  const keys = Object.keys(order).sort((a, b) => a.localeCompare(b));
+  return keys.map((k) => `${k}=${(order[k] ?? []).join(",")}`).join("|");
 }
 
 function findColumnForCard(cardOrder: Record<string, string[]>, cardId: string): string | null {
@@ -756,6 +763,11 @@ export function BoardColumnsDnD({
   const [persistError, setPersistError] = React.useState<string | null>(null);
   const [editingCardId, setEditingCardId] = React.useState<string | null>(null);
   const [dndMounted, setDndMounted] = React.useState(false);
+  const pendingColumnSignatureRef = React.useRef<string | null>(null);
+  const pendingCardSignatureRef = React.useRef<string | null>(null);
+  const refreshTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dragInProgressRef = React.useRef(false);
+  const refreshQueuedDuringDragRef = React.useRef(false);
 
   React.useEffect(() => {
     setDndMounted(true);
@@ -763,11 +775,27 @@ export function BoardColumnsDnD({
 
   const colSig = columnsSignature(columns);
   React.useEffect(() => {
+    const pendingColumnSig = pendingColumnSignatureRef.current;
+    if (pendingColumnSig) {
+      if (colSig === pendingColumnSig) {
+        pendingColumnSignatureRef.current = null;
+      } else {
+        return;
+      }
+    }
     setColumnItems(columns);
   }, [boardId, colSig]);
 
   const cardSig = cardOrderSignature(cardsByColumnId);
   React.useEffect(() => {
+    const pendingCardSig = pendingCardSignatureRef.current;
+    if (pendingCardSig) {
+      if (cardSig === pendingCardSig) {
+        pendingCardSignatureRef.current = null;
+      } else {
+        return;
+      }
+    }
     setCardOrderByColumn(buildCardOrderRecord(cardsByColumnId));
   }, [boardId, cardSig]);
 
@@ -800,6 +828,20 @@ export function BoardColumnsDnD({
 
   React.useEffect(() => {
     let cancelled = false;
+    const scheduleRefresh = () => {
+      if (cancelled) return;
+      if (dragInProgressRef.current) {
+        refreshQueuedDuringDragRef.current = true;
+        return;
+      }
+      if (refreshTimerRef.current) return;
+      refreshTimerRef.current = setTimeout(() => {
+        refreshTimerRef.current = null;
+        if (!cancelled) {
+          router.refresh();
+        }
+      }, 120);
+    };
     try {
       const supabase = createSupabaseBrowserClient();
       const channel = supabase
@@ -812,9 +854,7 @@ export function BoardColumnsDnD({
             table: "cards",
             filter: `board_id=eq.${boardId}`
           },
-          () => {
-            if (!cancelled) router.refresh();
-          }
+          scheduleRefresh
         )
         .on(
           "postgres_changes",
@@ -824,9 +864,7 @@ export function BoardColumnsDnD({
             table: "board_columns",
             filter: `board_id=eq.${boardId}`
           },
-          () => {
-            if (!cancelled) router.refresh();
-          }
+          scheduleRefresh
         )
         .on(
           "postgres_changes",
@@ -836,9 +874,7 @@ export function BoardColumnsDnD({
             table: "board_members",
             filter: `board_id=eq.${boardId}`
           },
-          () => {
-            if (!cancelled) router.refresh();
-          }
+          scheduleRefresh
         )
         .on(
           "postgres_changes",
@@ -848,9 +884,7 @@ export function BoardColumnsDnD({
             table: "labels",
             filter: `board_id=eq.${boardId}`
           },
-          () => {
-            if (!cancelled) router.refresh();
-          }
+          scheduleRefresh
         )
         .on(
           "postgres_changes",
@@ -860,9 +894,7 @@ export function BoardColumnsDnD({
             table: "board_field_definitions",
             filter: `board_id=eq.${boardId}`
           },
-          () => {
-            if (!cancelled) router.refresh();
-          }
+          scheduleRefresh
         )
         .on(
           "postgres_changes",
@@ -871,9 +903,7 @@ export function BoardColumnsDnD({
             schema: "public",
             table: "board_field_select_options"
           },
-          () => {
-            if (!cancelled) router.refresh();
-          }
+          scheduleRefresh
         )
         .on(
           "postgres_changes",
@@ -883,9 +913,7 @@ export function BoardColumnsDnD({
             table: "board_card_preview_items",
             filter: `board_id=eq.${boardId}`
           },
-          () => {
-            if (!cancelled) router.refresh();
-          }
+          scheduleRefresh
         )
         .on(
           "postgres_changes",
@@ -894,9 +922,7 @@ export function BoardColumnsDnD({
             schema: "public",
             table: "card_assignees"
           },
-          () => {
-            if (!cancelled) router.refresh();
-          }
+          scheduleRefresh
         )
         .on(
           "postgres_changes",
@@ -905,9 +931,7 @@ export function BoardColumnsDnD({
             schema: "public",
             table: "card_labels"
           },
-          () => {
-            if (!cancelled) router.refresh();
-          }
+          scheduleRefresh
         )
         .on(
           "postgres_changes",
@@ -916,9 +940,7 @@ export function BoardColumnsDnD({
             schema: "public",
             table: "card_comments"
           },
-          () => {
-            if (!cancelled) router.refresh();
-          }
+          scheduleRefresh
         )
         .on(
           "postgres_changes",
@@ -927,9 +949,7 @@ export function BoardColumnsDnD({
             schema: "public",
             table: "card_field_values"
           },
-          () => {
-            if (!cancelled) router.refresh();
-          }
+          scheduleRefresh
         )
         .on(
           "postgres_changes",
@@ -938,14 +958,16 @@ export function BoardColumnsDnD({
             schema: "public",
             table: "card_activity"
           },
-          () => {
-            if (!cancelled) router.refresh();
-          }
+          scheduleRefresh
         )
         .subscribe();
 
       return () => {
         cancelled = true;
+        if (refreshTimerRef.current) {
+          clearTimeout(refreshTimerRef.current);
+          refreshTimerRef.current = null;
+        }
         void supabase.removeChannel(channel);
       };
     } catch {
@@ -963,10 +985,29 @@ export function BoardColumnsDnD({
   const showColumnDnd = columnPermissions.canReorder;
   const showAnyDnd = showColumnDnd || canMoveCards;
 
+  const handleDragStart = (_event: DragStartEvent) => {
+    dragInProgressRef.current = true;
+  };
+
+  const handleDragCancel = (_event: DragCancelEvent) => {
+    dragInProgressRef.current = false;
+    if (refreshQueuedDuringDragRef.current) {
+      refreshQueuedDuringDragRef.current = false;
+      router.refresh();
+    }
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
+    dragInProgressRef.current = false;
     setPersistError(null);
     const { active, over } = event;
-    if (!over) return;
+    if (!over) {
+      if (refreshQueuedDuringDragRef.current) {
+        refreshQueuedDuringDragRef.current = false;
+        router.refresh();
+      }
+      return;
+    }
 
     if (isColumnDndId(active.id)) {
       if (!showColumnDnd) return;
@@ -983,6 +1024,7 @@ export function BoardColumnsDnD({
       const previousCols = columnItems;
       const nextCols = arrayMove(columnItems, oldIndex, newIndex);
       setColumnItems(nextCols);
+      pendingColumnSignatureRef.current = columnsSignature(nextCols);
 
       const res = await reorderBoardColumnsAction(
         boardId,
@@ -990,12 +1032,17 @@ export function BoardColumnsDnD({
       );
 
       if (!res.ok) {
+        pendingColumnSignatureRef.current = null;
         setColumnItems(previousCols);
         setPersistError(res.message);
         return;
       }
 
       router.refresh();
+      if (refreshQueuedDuringDragRef.current) {
+        refreshQueuedDuringDragRef.current = false;
+        router.refresh();
+      }
       return;
     }
 
@@ -1017,6 +1064,7 @@ export function BoardColumnsDnD({
     const previousOrder = cardOrderByColumn;
     const nextOrder = applyCardReorder(cardOrderByColumn, activeCardId, fromCol, target);
     setCardOrderByColumn(nextOrder);
+    pendingCardSignatureRef.current = cardOrderRecordSignature(nextOrder);
 
     const layout = columnItems.map((c) => ({
       column_id: c.id,
@@ -1025,12 +1073,17 @@ export function BoardColumnsDnD({
 
     const res = await reorderBoardCardsAction(boardId, layout);
     if (!res.ok) {
+      pendingCardSignatureRef.current = null;
       setCardOrderByColumn(previousOrder);
       setPersistError(res.message);
       return;
     }
 
     router.refresh();
+    if (refreshQueuedDuringDragRef.current) {
+      refreshQueuedDuringDragRef.current = false;
+      router.refresh();
+    }
   };
 
   const editModal = (
@@ -1200,7 +1253,13 @@ export function BoardColumnsDnD({
           {persistError}
         </p>
       : null}
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragCancel={handleDragCancel}
+        onDragEnd={handleDragEnd}
+      >
         {columnRow}
       </DndContext>
     </div>
