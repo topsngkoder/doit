@@ -253,10 +253,16 @@
     - **Приложение:** `web/src/app/boards/[boardId]/card-comments-sidebar.tsx` — inline-редактирование комментария, кнопка удаления (soft-delete) с подтверждением; кнопки показываются по правам (`comments.edit_own`, `comments.delete_own`, `comments.moderate`) и авторству. Добавлены server actions `updateCardCommentAction` и `softDeleteCardCommentAction` в `actions.ts`, включая запись `card_activity` (`comment_updated` / `comment_deleted`).
     - **Права в UI:** `page.tsx` теперь считывает `comments.edit_own`, `comments.delete_own`, `comments.moderate` и прокидывает флаги до модалки карточки.
     - **comments_count:** счётчик комментариев на карточке уже считает только `deleted_at IS NULL` (без изменений логики), что соответствует DoD.
-- [ ] **I3 (todo)** Ограничение reply_to: только в рамках той же карточки. DoD: constraint/trigger/RPC не позволяет нарушить 11.12.
+- [x] **I3 (done)** Ограничение reply_to: только в рамках той же карточки. DoD: constraint/trigger/RPC не позволяет нарушить 11.12.
+    - **БД:** ограничение уже зафиксировано триггером `card_comments_reply_same_card` в `supabase/migrations/20250316100000_initial_schema.sql` (функция `check_comment_reply_same_card()`): на `BEFORE INSERT OR UPDATE` проверяется, что `reply_to_comment_id` указывает на комментарий с тем же `card_id`, иначе выбрасывается ошибка `reply_to_comment_id must reference a comment on the same card`.
+    - **Миграции:** новых не потребовалось (логика соответствует DoD).
+    - **Проверка:** в SQL Editor попробовать создать/обновить комментарий с `reply_to_comment_id` от другой карточки — операция должна падать с ошибкой триггера; с `reply_to_comment_id` в пределах той же карточки — проходить.
 
 ### EPIC J — Realtime синхронизация (13.1)
-- [ ] **J1 (todo)** Каналы подписки по board_id и маппинг событий на локальный state (columns/cards/comments/labels/members/settings/activity/fields/values/preview). DoD: второй клиент видит изменения без reload.
+- [x] **J1 (done)** Каналы подписки по board_id и маппинг событий на локальный state (columns/cards/comments/labels/members/settings/activity/fields/values/preview). DoD: второй клиент видит изменения без reload.
+    - **Приложение:** `web/src/app/boards/[boardId]/board-columns-dnd.tsx` — realtime-канал расширен с точечной подписки только на `cards` до набора сущностей доски: `board_columns`, `cards`, `board_members`, `labels`, `board_field_definitions`, `board_field_select_options`, `board_card_preview_items`, `card_assignees`, `card_labels`, `card_comments`, `card_field_values`, `card_activity`. На любое событие выполняется `router.refresh()`, за счёт чего второй клиент получает обновления без ручного F5.
+    - **Миграции:** не требовались.
+    - **Проверка:** открыть одну доску в двух вкладках/браузерах под участниками. В первой вкладке поочерёдно изменить колонку/карточку/метку/комментарий/участника карточки/пользовательское поле. Ожидание: во второй вкладке соответствующие блоки доски обновляются автоматически (список колонок, карточки, превью, комментарии, история, участники) без ручной перезагрузки страницы.
 - [ ] **J2 (todo)** Стратегия “last write wins” в UI (13.2). DoD: конфликт не ломает состояние; показываются последние данные.
 - [ ] **J3 (todo)** Оптимизация: минимальные re-fetch и корректная сортировка после realtime (position). DoD: нет “прыжков” UI.
 

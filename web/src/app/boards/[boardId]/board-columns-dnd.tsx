@@ -803,7 +803,7 @@ export function BoardColumnsDnD({
     try {
       const supabase = createSupabaseBrowserClient();
       const channel = supabase
-        .channel(`realtime:cards:${boardId}`)
+        .channel(`realtime:board:${boardId}`)
         .on(
           "postgres_changes",
           {
@@ -811,6 +811,132 @@ export function BoardColumnsDnD({
             schema: "public",
             table: "cards",
             filter: `board_id=eq.${boardId}`
+          },
+          () => {
+            if (!cancelled) router.refresh();
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "board_columns",
+            filter: `board_id=eq.${boardId}`
+          },
+          () => {
+            if (!cancelled) router.refresh();
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "board_members",
+            filter: `board_id=eq.${boardId}`
+          },
+          () => {
+            if (!cancelled) router.refresh();
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "labels",
+            filter: `board_id=eq.${boardId}`
+          },
+          () => {
+            if (!cancelled) router.refresh();
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "board_field_definitions",
+            filter: `board_id=eq.${boardId}`
+          },
+          () => {
+            if (!cancelled) router.refresh();
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "board_field_select_options"
+          },
+          () => {
+            if (!cancelled) router.refresh();
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "board_card_preview_items",
+            filter: `board_id=eq.${boardId}`
+          },
+          () => {
+            if (!cancelled) router.refresh();
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "card_assignees"
+          },
+          () => {
+            if (!cancelled) router.refresh();
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "card_labels"
+          },
+          () => {
+            if (!cancelled) router.refresh();
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "card_comments"
+          },
+          () => {
+            if (!cancelled) router.refresh();
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "card_field_values"
+          },
+          () => {
+            if (!cancelled) router.refresh();
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "card_activity"
           },
           () => {
             if (!cancelled) router.refresh();
