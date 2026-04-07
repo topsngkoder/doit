@@ -44,6 +44,7 @@
     - A3.1 (done): на `/boards` добавлен серверный guard, который редиректит неавторизованных пользователей на `/login` через `redirect("/login")`.
     - A3.2 (done): в `RootLayout` добавлен общий header с навигацией (`/`, `/login`, `/boards`) и footer; основные страницы рендерятся внутри `<main>`.
     - A3.3 (done): на `/login` и `/` добавлен серверный guard: авторизованные пользователи автоматически редиректятся на `/boards`.
+    - A3.4 (done): редиректы продублированы в `web/src/middleware.ts` (edge), чтобы уходить на нужную страницу **до** рендера server component и не видеть в dev-overlay “Server Error: NEXT_REDIRECT” от механизма `redirect()`.
 - [x] **A4 (done)** Общие компоненты UI на Tailwind (Button/Input/Modal/Popover/Dropdown/Toast). DoD: используются в 2+ местах.
 
 ### EPIC B — Supabase: схема данных + ограничения + индексы
