@@ -140,6 +140,140 @@ export async function createBoardLabelAction(
   return { ok: true };
 }
 
+export async function updateBoardLabelAction(
+  boardId: string,
+  labelId: string,
+  payload: { name: string; color: string }
+): Promise<BoardLabelCatalogResult> {
+  const name = normalizeBoardLabelName(payload.name);
+  if (name.length < 1 || name.length > 30) {
+    return { ok: false, message: "Название метки: от 1 до 30 символов." };
+  }
+  const color = normalizeBoardLabelHexColor(payload.color);
+  if (!color) {
+    return { ok: false, message: "Некорректный цвет: нужен формат #RRGGBB." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: row, error: readError } = await supabase
+    .from("labels")
+    .select("id, board_id")
+    .eq("id", labelId)
+    .maybeSingle();
+
+  if (readError) {
+    return { ok: false, message: readError.message };
+  }
+  if (!row || row.board_id !== boardId) {
+    return { ok: false, message: "Метка не найдена на этой доске." };
+  }
+
+  const { error } = await supabase
+    .from("labels")
+    .update({ name, color })
+    .eq("id", labelId)
+    .eq("board_id", boardId);
+
+  if (error) {
+    if (error.code === "23505") {
+      return {
+        ok: false,
+        message: "Метка с таким названием уже есть на этой доске."
+      };
+    }
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права управлять метками доски." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function moveBoardLabelAction(
+  boardId: string,
+  labelId: string,
+  direction: "up" | "down"
+): Promise<BoardLabelCatalogResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: rows, error: listError } = await supabase
+    .from("labels")
+    .select("id, position")
+    .eq("board_id", boardId)
+    .order("position", { ascending: true });
+
+  if (listError) {
+    return { ok: false, message: listError.message };
+  }
+
+  const labels = rows ?? [];
+  const idx = labels.findIndex((l) => l.id === labelId);
+  if (idx === -1) {
+    return { ok: false, message: "Метка не найдена на этой доске." };
+  }
+
+  const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= labels.length) {
+    return { ok: true };
+  }
+
+  const current = labels[idx];
+  const target = labels[swapIdx];
+  const posCurrent = Number(current.position);
+  const posTarget = Number(target.position);
+
+  const { error: firstError } = await supabase
+    .from("labels")
+    .update({ position: posTarget })
+    .eq("id", current.id)
+    .eq("board_id", boardId);
+  if (firstError) {
+    if (firstError.code === "42501") {
+      return { ok: false, message: "Нет права менять порядок меток." };
+    }
+    return { ok: false, message: firstError.message };
+  }
+
+  const { error: secondError } = await supabase
+    .from("labels")
+    .update({ position: posCurrent })
+    .eq("id", target.id)
+    .eq("board_id", boardId);
+  if (secondError) {
+    await supabase
+      .from("labels")
+      .update({ position: posCurrent })
+      .eq("id", current.id)
+      .eq("board_id", boardId);
+    if (secondError.code === "42501") {
+      return { ok: false, message: "Нет права менять порядок меток." };
+    }
+    return { ok: false, message: secondError.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
 export async function deleteBoardLabelAction(
   boardId: string,
   labelId: string
@@ -167,11 +301,245 @@ export async function deleteBoardLabelAction(
     return { ok: false, message: "Метка не найдена на этой доске." };
   }
 
-  const { error } = await supabase.from("labels").delete().eq("id", labelId);
+  const { error } = await supabase.rpc("delete_board_label_with_activity", {
+    p_board_id: boardId,
+    p_label_id: labelId
+  });
 
   if (error) {
     if (error.code === "42501") {
       return { ok: false, message: "Нет права управлять метками доски." };
+    }
+    if (error.message.includes("not permitted to manage labels")) {
+      return { ok: false, message: "Нет права управлять метками доски." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export type BoardCardPreviewResult =
+  | { ok: true }
+  | { ok: false; message: string };
+
+export async function toggleBoardCardPreviewItemAction(
+  boardId: string,
+  itemId: string,
+  enabled: boolean
+): Promise<BoardCardPreviewResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: row, error: readError } = await supabase
+    .from("board_card_preview_items")
+    .select("id, board_id, item_type")
+    .eq("id", itemId)
+    .maybeSingle();
+
+  if (readError) {
+    return { ok: false, message: readError.message };
+  }
+  if (!row || row.board_id !== boardId) {
+    return { ok: false, message: "Элемент превью не найден на этой доске." };
+  }
+  if (row.item_type === "title" && !enabled) {
+    return { ok: false, message: "Название карточки нельзя выключить." };
+  }
+
+  const { error } = await supabase
+    .from("board_card_preview_items")
+    .update({ enabled })
+    .eq("id", itemId)
+    .eq("board_id", boardId);
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права менять отображение карточек." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function moveBoardCardPreviewItemAction(
+  boardId: string,
+  itemId: string,
+  direction: "up" | "down"
+): Promise<BoardCardPreviewResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: rows, error: listError } = await supabase
+    .from("board_card_preview_items")
+    .select("id, position")
+    .eq("board_id", boardId)
+    .order("position", { ascending: true });
+
+  if (listError) {
+    return { ok: false, message: listError.message };
+  }
+
+  const items = rows ?? [];
+  const idx = items.findIndex((i) => i.id === itemId);
+  if (idx === -1) {
+    return { ok: false, message: "Элемент превью не найден на этой доске." };
+  }
+
+  const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= items.length) {
+    return { ok: true };
+  }
+
+  const current = items[idx];
+  const target = items[swapIdx];
+  const posCurrent = Number(current.position);
+  const posTarget = Number(target.position);
+
+  const { error: firstError } = await supabase
+    .from("board_card_preview_items")
+    .update({ position: posTarget })
+    .eq("id", current.id)
+    .eq("board_id", boardId);
+  if (firstError) {
+    if (firstError.code === "42501") {
+      return { ok: false, message: "Нет права менять отображение карточек." };
+    }
+    return { ok: false, message: firstError.message };
+  }
+
+  const { error: secondError } = await supabase
+    .from("board_card_preview_items")
+    .update({ position: posCurrent })
+    .eq("id", target.id)
+    .eq("board_id", boardId);
+  if (secondError) {
+    await supabase
+      .from("board_card_preview_items")
+      .update({ position: posCurrent })
+      .eq("id", current.id)
+      .eq("board_id", boardId);
+    if (secondError.code === "42501") {
+      return { ok: false, message: "Нет права менять отображение карточек." };
+    }
+    return { ok: false, message: secondError.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function createBoardCardPreviewCustomFieldItemAction(
+  boardId: string,
+  fieldDefinitionId: string
+): Promise<BoardCardPreviewResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: fieldRow, error: fieldError } = await supabase
+    .from("board_field_definitions")
+    .select("id, board_id")
+    .eq("id", fieldDefinitionId)
+    .maybeSingle();
+
+  if (fieldError) {
+    return { ok: false, message: fieldError.message };
+  }
+  if (!fieldRow || fieldRow.board_id !== boardId) {
+    return { ok: false, message: "Поле не найдено на этой доске." };
+  }
+
+  const { data: maxRow, error: maxError } = await supabase
+    .from("board_card_preview_items")
+    .select("position")
+    .eq("board_id", boardId)
+    .order("position", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (maxError) {
+    return { ok: false, message: maxError.message };
+  }
+  const nextPosition = maxRow?.position != null ? Number(maxRow.position) + 1 : 0;
+
+  const { error } = await supabase.from("board_card_preview_items").insert({
+    board_id: boardId,
+    item_type: "custom_field",
+    field_definition_id: fieldDefinitionId,
+    enabled: true,
+    position: nextPosition
+  });
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права менять отображение карточек." };
+    }
+    if (error.code === "23505") {
+      return { ok: false, message: "Это поле уже добавлено в превью карточки." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
+export async function deleteBoardCardPreviewItemAction(
+  boardId: string,
+  itemId: string
+): Promise<BoardCardPreviewResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const { data: row, error: readError } = await supabase
+    .from("board_card_preview_items")
+    .select("id, board_id, item_type")
+    .eq("id", itemId)
+    .maybeSingle();
+  if (readError) {
+    return { ok: false, message: readError.message };
+  }
+  if (!row || row.board_id !== boardId) {
+    return { ok: false, message: "Элемент превью не найден на этой доске." };
+  }
+  if (row.item_type !== "custom_field") {
+    return { ok: false, message: "Можно удалять только элементы custom_field." };
+  }
+
+  const { error } = await supabase
+    .from("board_card_preview_items")
+    .delete()
+    .eq("id", itemId)
+    .eq("board_id", boardId);
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права менять отображение карточек." };
     }
     return { ok: false, message: error.message };
   }

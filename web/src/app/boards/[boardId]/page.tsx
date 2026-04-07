@@ -4,6 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BoardCanvas } from "./board-canvas";
 import type {
   BoardLabelOption,
+  BoardCardPreviewItem,
   CardActivityEntry,
   CardFieldValueSnapshot
 } from "./column-types";
@@ -11,6 +12,7 @@ import type { NewCardFieldDefinition } from "./card-field-drafts";
 import { BoardMembersPanel, type BoardMemberPublic, type BoardRoleOption } from "./board-members";
 import { BoardLabelsButton } from "./board-labels-button";
 import { BoardFieldsButton } from "./board-fields-button";
+import { BoardCardPreviewButton } from "./board-card-preview-button";
 import { InviteMemberButton } from "./invite-member-button";
 
 type BoardPageProps = {
@@ -65,6 +67,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
   let canCreateComment = false;
   let canManageBoardLabels = false;
   let canManageCardFields = false;
+  let canManageCardPreview = false;
   if (memberRow?.board_role_id) {
     const { data: perms } = await supabase
       .from("board_role_permissions")
@@ -85,7 +88,8 @@ export default async function BoardPage({ params }: BoardPageProps) {
         "columns.delete",
         "cards.move",
         "comments.create",
-        "card_fields.manage"
+        "card_fields.manage",
+        "card_preview.manage"
       ]);
 
     for (const p of perms ?? []) {
@@ -105,6 +109,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
       if (p.permission === "cards.move") canMoveCards = true;
       if (p.permission === "comments.create") canCreateComment = true;
       if (p.permission === "card_fields.manage") canManageCardFields = true;
+      if (p.permission === "card_preview.manage") canManageCardPreview = true;
     }
   }
 
@@ -180,6 +185,12 @@ export default async function BoardPage({ params }: BoardPageProps) {
     .eq("board_id", boardId)
     .order("position", { ascending: true });
 
+  const { data: previewRows } = await supabase
+    .from("board_card_preview_items")
+    .select("id, item_type, field_definition_id, enabled, position")
+    .eq("board_id", boardId)
+    .order("position", { ascending: true });
+
   type OptRow = { id: string; name: string; color: string; position: number };
   type DefRow = {
     id: string;
@@ -217,9 +228,18 @@ export default async function BoardPage({ params }: BoardPageProps) {
       position: c.position
     })) ?? [];
 
+  const previewItems: BoardCardPreviewItem[] = (previewRows ?? []).map((row) => ({
+    id: row.id,
+    itemType: row.item_type as BoardCardPreviewItem["itemType"],
+    fieldDefinitionId: row.field_definition_id,
+    enabled: row.enabled,
+    position: Number(row.position)
+  }));
+
   const cardIds = (cardRows ?? []).map((r) => r.id);
   const assigneesByCard = new Map<string, string[]>();
   const labelIdsByCard = new Map<string, string[]>();
+  const commentsCountByCard = new Map<string, number>();
   const fieldValuesByCard = new Map<string, Record<string, CardFieldValueSnapshot>>();
   const activityByCard = new Map<string, CardActivityEntry[]>();
   if (cardIds.length > 0) {
@@ -260,6 +280,15 @@ export default async function BoardPage({ params }: BoardPageProps) {
         selectOptionId: fv.select_option_id
       };
       fieldValuesByCard.set(fv.card_id, cur);
+    }
+
+    const { data: commentRows } = await supabase
+      .from("card_comments")
+      .select("card_id")
+      .in("card_id", cardIds)
+      .is("deleted_at", null);
+    for (const c of commentRows ?? []) {
+      commentsCountByCard.set(c.card_id, (commentsCountByCard.get(c.card_id) ?? 0) + 1);
     }
 
     const { data: activityRows } = await supabase
@@ -318,6 +347,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
         responsibleUserId: row.responsible_user_id ?? null,
         assigneeUserIds: assigneesByCard.get(row.id) ?? [],
         labelIds: labelIdsByCard.get(row.id) ?? [],
+        commentsCount: commentsCountByCard.get(row.id) ?? 0,
         fieldValues: fieldValuesByCard.get(row.id) ?? {},
         activityEntries: activityByCard.get(row.id) ?? []
       });
@@ -382,6 +412,12 @@ export default async function BoardPage({ params }: BoardPageProps) {
             canManage={canManageCardFields}
             fieldDefinitions={fieldDefinitions}
           />
+          <BoardCardPreviewButton
+            boardId={board.id}
+            canManage={canManageCardPreview}
+            previewItems={previewItems}
+            fieldDefinitions={fieldDefinitions}
+          />
           <InviteMemberButton boardId={board.id} canInvite={canInvite} />
         </div>
       </div>
@@ -397,6 +433,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
         canCreateCard={canCreateCard}
         membersForNewCard={membersForNewCard}
         boardLabels={boardLabels}
+        previewItems={previewItems}
         fieldDefinitions={fieldDefinitions}
         cardContentPermissions={{
           canEditAny: canEditCardAny,

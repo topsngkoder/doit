@@ -26,6 +26,14 @@ export type BoardLabelOption = {
   position: number;
 };
 
+export type BoardCardPreviewItem = {
+  id: string;
+  itemType: "title" | "assignees" | "comments_count" | "labels" | "responsible" | "custom_field";
+  fieldDefinitionId: string | null;
+  enabled: boolean;
+  position: number;
+};
+
 /** Снимок строки card_field_values для UI (по id определения поля). */
 export type CardFieldValueSnapshot = {
   textValue: string | null;
@@ -56,6 +64,8 @@ export type BoardCardListItem = {
   assigneeUserIds: string[];
   /** id меток, назначенных на карточку. */
   labelIds: string[];
+  /** Количество не удалённых комментариев карточки. */
+  commentsCount: number;
   /** Пользовательские поля доски: ключ — field_definition_id. */
   fieldValues: Record<string, CardFieldValueSnapshot>;
   /** История карточки (новые сверху). */

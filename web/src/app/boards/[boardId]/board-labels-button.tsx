@@ -8,6 +8,8 @@ import type { BoardLabelOption } from "./column-types";
 import {
   createBoardLabelAction,
   deleteBoardLabelAction,
+  moveBoardLabelAction,
+  updateBoardLabelAction,
   type BoardLabelCatalogResult
 } from "./actions";
 
@@ -27,7 +29,12 @@ export function BoardLabelsButton({ boardId, canManage, labels }: BoardLabelsBut
   const [color, setColor] = React.useState("#64748B");
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
+  const [editPendingId, setEditPendingId] = React.useState<string | null>(null);
+  const [movePendingId, setMovePendingId] = React.useState<string | null>(null);
   const [deletePendingId, setDeletePendingId] = React.useState<string | null>(null);
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [editingName, setEditingName] = React.useState("");
+  const [editingColor, setEditingColor] = React.useState("#64748B");
 
   const sorted = React.useMemo(
     () => [...labels].sort((a, b) => a.position - b.position),
@@ -50,7 +57,7 @@ export function BoardLabelsButton({ boardId, canManage, labels }: BoardLabelsBut
   };
 
   const handleDelete = async (labelId: string) => {
-    if (deletePendingId || pending) return;
+    if (deletePendingId || pending || editPendingId || movePendingId) return;
     setError(null);
     setDeletePendingId(labelId);
     const res = await deleteBoardLabelAction(boardId, labelId);
@@ -62,10 +69,48 @@ export function BoardLabelsButton({ boardId, canManage, labels }: BoardLabelsBut
     router.refresh();
   };
 
+  const handleMove = async (labelId: string, direction: "up" | "down") => {
+    if (deletePendingId || pending || editPendingId || movePendingId) return;
+    setError(null);
+    setMovePendingId(labelId);
+    const res = await moveBoardLabelAction(boardId, labelId, direction);
+    setMovePendingId(null);
+    if (!res.ok) {
+      setError(res.message);
+      return;
+    }
+    router.refresh();
+  };
+
+  const startEdit = (label: BoardLabelOption) => {
+    setError(null);
+    setEditingId(label.id);
+    setEditingName(label.name);
+    setEditingColor(label.color);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingId || deletePendingId || pending || editPendingId || movePendingId) return;
+    setError(null);
+    setEditPendingId(editingId);
+    const res = await updateBoardLabelAction(boardId, editingId, {
+      name: editingName,
+      color: editingColor
+    });
+    setEditPendingId(null);
+    if (!res.ok) {
+      setError(res.message);
+      return;
+    }
+    setEditingId(null);
+    router.refresh();
+  };
+
   React.useEffect(() => {
     if (!open) {
       setError(null);
       setName("");
+      setEditingId(null);
     }
   }, [open]);
 
@@ -120,29 +165,105 @@ export function BoardLabelsButton({ boardId, canManage, labels }: BoardLabelsBut
             {sorted.length === 0 ?
               <p className="text-xs text-slate-500">Пока ни одной — добавьте выше.</p>
             : <ul className="space-y-1.5">
-                {sorted.map((l) => (
+                {sorted.map((l, idx) => (
                   <li
                     key={l.id}
-                    className="flex items-center justify-between gap-2 rounded-md border border-slate-800 bg-slate-900/50 px-2 py-1.5"
+                    className="rounded-md border border-slate-800 bg-slate-900/50 px-2 py-1.5"
                   >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span
-                        className="h-3 w-3 shrink-0 rounded-full"
-                        style={{ backgroundColor: l.color }}
-                        aria-hidden
-                      />
-                      <span className="truncate text-sm text-slate-100">{l.name}</span>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      className="shrink-0 text-rose-200 hover:bg-rose-950/40"
-                      disabled={deletePendingId !== null || pending}
-                      onClick={() => void handleDelete(l.id)}
-                    >
-                      {deletePendingId === l.id ? "…" : "Удалить"}
-                    </Button>
+                    {editingId === l.id ?
+                      <div className="space-y-2">
+                        <label className="flex flex-col gap-1">
+                          <span className="text-xs text-slate-400">Название</span>
+                          <input
+                            className={inputClass}
+                            value={editingName}
+                            onChange={(e) => setEditingName(e.target.value)}
+                            maxLength={30}
+                            disabled={editPendingId !== null}
+                          />
+                        </label>
+                        <label className="flex items-center gap-3">
+                          <span className="text-xs text-slate-400">Цвет</span>
+                          <input
+                            type="color"
+                            value={editingColor}
+                            onChange={(e) => setEditingColor(e.target.value)}
+                            disabled={editPendingId !== null}
+                            className="h-8 w-12 cursor-pointer rounded border border-slate-600 bg-slate-900"
+                          />
+                          <span className="font-mono text-xs text-slate-500">{editingColor.toUpperCase()}</span>
+                        </label>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setEditingId(null)}
+                            disabled={editPendingId !== null}
+                          >
+                            Отмена
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => void handleEditSave()}
+                            disabled={editPendingId !== null}
+                          >
+                            {editPendingId === l.id ? "Сохранение…" : "Сохранить"}
+                          </Button>
+                        </div>
+                      </div>
+                    : <div className="flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span
+                            className="h-3 w-3 shrink-0 rounded-full"
+                            style={{ backgroundColor: l.color }}
+                            aria-hidden
+                          />
+                          <span className="truncate text-sm text-slate-100">{l.name}</span>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            disabled={movePendingId !== null || pending || idx === 0}
+                            onClick={() => void handleMove(l.id, "up")}
+                            title="Переместить выше"
+                          >
+                            ↑
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            disabled={movePendingId !== null || pending || idx === sorted.length - 1}
+                            onClick={() => void handleMove(l.id, "down")}
+                            title="Переместить ниже"
+                          >
+                            ↓
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => startEdit(l)}
+                            disabled={deletePendingId !== null || pending || movePendingId !== null}
+                          >
+                            Изменить
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="text-rose-200 hover:bg-rose-950/40"
+                            disabled={deletePendingId !== null || pending || movePendingId !== null}
+                            onClick={() => void handleDelete(l.id)}
+                          >
+                            {deletePendingId === l.id ? "…" : "Удалить"}
+                          </Button>
+                        </div>
+                      </div>}
                   </li>
                 ))}
               </ul>}

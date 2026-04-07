@@ -36,6 +36,7 @@ import {
   type BoardCardListItem,
   type BoardColumnPermissions,
   type BoardLabelOption,
+  type BoardCardPreviewItem,
   type CardContentPermissions,
   canDeleteCard,
   canEditCardBodyAsAssignee,
@@ -164,12 +165,22 @@ function BoardCardRow({
   card,
   currentUserId,
   cardContentPermissions,
+  boardLabels = [],
+  previewItems = [],
+  fieldDefinitions = [],
+  memberNamesById = new Map<string, string>(),
+  memberAvatarsById = new Map<string, string | null>(),
   onOpen,
   dragHandleProps
 }: {
   card: BoardCardListItem;
   currentUserId: string;
   cardContentPermissions: CardContentPermissions;
+  boardLabels?: BoardLabelOption[];
+  previewItems?: BoardCardPreviewItem[];
+  fieldDefinitions?: NewCardFieldDefinition[];
+  memberNamesById?: Map<string, string>;
+  memberAvatarsById?: Map<string, string | null>;
   onOpen: (card: BoardCardListItem) => void;
   dragHandleProps?: Pick<
     ReturnType<typeof useSortable>,
@@ -177,6 +188,25 @@ function BoardCardRow({
   >;
 }) {
   const canOpen = canOpenCardModal(cardContentPermissions, card, currentUserId);
+  const enabledPreviewItems = previewItems
+    .filter((i) => i.enabled)
+    .sort((a, b) => a.position - b.position);
+  const labelsById = new Map(boardLabels.map((l) => [l.id, l]));
+  const fieldDefsById = new Map(fieldDefinitions.map((f) => [f.id, f]));
+  const labelsPreviewEnabled = enabledPreviewItems.some((item) => item.itemType === "labels");
+  const cardLabels = card.labelIds
+    .map((id) => labelsById.get(id))
+    .filter(Boolean) as BoardLabelOption[];
+  const primaryLabel = labelsPreviewEnabled ? (cardLabels[0] ?? null) : null;
+
+  function initials(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "?";
+    return parts
+      .slice(0, 2)
+      .map((p) => p[0]!.toUpperCase())
+      .join("");
+  }
 
   return (
     <div
@@ -185,6 +215,14 @@ function BoardCardRow({
         canOpen ?
           "flex cursor-pointer gap-2 rounded-md border border-slate-800 bg-slate-900/90 px-3 py-2 text-sm text-slate-200 shadow-sm transition-colors hover:border-slate-600 hover:bg-slate-900"
         : "flex gap-2 rounded-md border border-slate-800 bg-slate-900/90 px-3 py-2 text-sm text-slate-200 shadow-sm"
+      }
+      style={
+        primaryLabel ?
+          {
+            borderLeftWidth: 4,
+            borderLeftColor: primaryLabel.color
+          }
+        : undefined
       }
       onClick={canOpen ? () => onOpen(card) : undefined}
       onKeyDown={
@@ -211,7 +249,89 @@ function BoardCardRow({
           ⋮⋮
         </button>
       : null}
-      <span className="line-clamp-2 min-w-0 flex-1">{card.title}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-2">
+          <span className="line-clamp-2 min-w-0">{card.title}</span>
+          {primaryLabel ?
+            <span className="shrink-0 truncate text-[11px] text-slate-400">{primaryLabel.name}</span>
+          : null}
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-1">
+          {enabledPreviewItems
+            .filter((item) => item.itemType !== "title")
+            .map((item) => {
+              if (item.itemType === "assignees") {
+                if (card.assigneeUserIds.length === 0) return null;
+                return (
+                  <div key={item.id} className="flex items-center -space-x-1">
+                    {card.assigneeUserIds.slice(0, 4).map((userId) => {
+                      const avatarUrl = memberAvatarsById.get(userId);
+                      const displayName = memberNamesById.get(userId) ?? "Участник";
+                      return (
+                        <span
+                          key={userId}
+                          className="inline-flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border border-slate-800 bg-slate-700 text-[10px] font-medium text-slate-100"
+                          title={displayName}
+                        >
+                          {avatarUrl ?
+                            <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+                          : initials(displayName)}
+                        </span>
+                      );
+                    })}
+                    {card.assigneeUserIds.length > 4 ?
+                      <span className="ml-1 text-[11px] text-slate-400">{`+${card.assigneeUserIds.length - 4}`}</span>
+                    : null}
+                  </div>
+                );
+              }
+              if (item.itemType === "comments_count") {
+                return (
+                  <span key={item.id} className="rounded bg-slate-800/80 px-1.5 py-0.5 text-[11px] text-slate-300">
+                    {`Комментарии: ${card.commentsCount}`}
+                  </span>
+                );
+              }
+              if (item.itemType === "labels") {
+                return null;
+              }
+              if (item.itemType === "responsible") {
+                if (!card.responsibleUserId) return null;
+                const name = memberNamesById.get(card.responsibleUserId) ?? "Участник";
+                return (
+                  <span key={item.id} className="rounded bg-slate-800/80 px-1.5 py-0.5 text-[11px] text-slate-300">
+                    {`Отв.: ${name}`}
+                  </span>
+                );
+              }
+              if (item.itemType === "custom_field") {
+                if (!item.fieldDefinitionId) return null;
+                const fieldDef = fieldDefsById.get(item.fieldDefinitionId);
+                if (!fieldDef) return null;
+                const snapshot = card.fieldValues[item.fieldDefinitionId];
+                if (!snapshot) return null;
+                let value = "";
+                if (fieldDef.fieldType === "text") {
+                  value = snapshot.textValue ?? "";
+                } else if (fieldDef.fieldType === "date") {
+                  value = snapshot.dateValue ?? "";
+                } else if (fieldDef.fieldType === "link") {
+                  value = snapshot.linkText || snapshot.linkUrl || "";
+                } else if (fieldDef.fieldType === "select") {
+                  const option = fieldDef.selectOptions.find((o) => o.id === snapshot.selectOptionId);
+                  value = option?.name ?? "";
+                }
+                if (!value) return null;
+                return (
+                  <span key={item.id} className="rounded bg-slate-800/80 px-1.5 py-0.5 text-[11px] text-slate-300">
+                    {`${fieldDef.name}: ${value}`}
+                  </span>
+                );
+              }
+              return null;
+            })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -220,12 +340,22 @@ function SortableBoardCard({
   card,
   currentUserId,
   cardContentPermissions,
+  boardLabels,
+  previewItems,
+  fieldDefinitions,
+  memberNamesById,
+  memberAvatarsById,
   onOpen,
   enableDrag
 }: {
   card: BoardCardListItem;
   currentUserId: string;
   cardContentPermissions: CardContentPermissions;
+  boardLabels: BoardLabelOption[];
+  previewItems: BoardCardPreviewItem[];
+  fieldDefinitions: NewCardFieldDefinition[];
+  memberNamesById: Map<string, string>;
+  memberAvatarsById: Map<string, string | null>;
   onOpen: (card: BoardCardListItem) => void;
   enableDrag: boolean;
 }) {
@@ -247,6 +377,11 @@ function SortableBoardCard({
         card={card}
         currentUserId={currentUserId}
         cardContentPermissions={cardContentPermissions}
+        boardLabels={boardLabels}
+        previewItems={previewItems}
+        fieldDefinitions={fieldDefinitions}
+        memberNamesById={memberNamesById}
+        memberAvatarsById={memberAvatarsById}
         onOpen={onOpen}
         dragHandleProps={enableDrag ? { attributes, listeners } : undefined}
       />
@@ -262,6 +397,7 @@ type BoardColumnsDnDProps = {
   canCreateComment: boolean;
   membersForNewCard: NewCardMemberOption[];
   boardLabels: BoardLabelOption[];
+  previewItems: BoardCardPreviewItem[];
   fieldDefinitions: NewCardFieldDefinition[];
   columnPermissions: BoardColumnPermissions;
   cardContentPermissions: CardContentPermissions;
@@ -283,6 +419,10 @@ function SortableColumnShell({
   cardContentPermissions,
   cardIds,
   cardsById,
+  boardLabels,
+  previewItems,
+  memberNamesById,
+  memberAvatarsById,
   columnSortableEnabled,
   onOpenCard
 }: {
@@ -299,6 +439,10 @@ function SortableColumnShell({
   cardContentPermissions: CardContentPermissions;
   cardIds: string[];
   cardsById: Map<string, BoardCardListItem>;
+  boardLabels: BoardLabelOption[];
+  previewItems: BoardCardPreviewItem[];
+  memberNamesById: Map<string, string>;
+  memberAvatarsById: Map<string, string | null>;
   columnSortableEnabled: boolean;
   onOpenCard: (card: BoardCardListItem) => void;
 }) {
@@ -357,6 +501,11 @@ function SortableColumnShell({
               card={card}
               currentUserId={currentUserId}
               cardContentPermissions={cardContentPermissions}
+              boardLabels={boardLabels}
+              previewItems={previewItems}
+              fieldDefinitions={fieldDefinitions}
+              memberNamesById={memberNamesById}
+              memberAvatarsById={memberAvatarsById}
               onOpen={onOpenCard}
               enableDrag={canMoveCards}
             />
@@ -397,6 +546,10 @@ function StaticColumnShell({
   cardContentPermissions,
   cardIds,
   cardsById,
+  boardLabels,
+  previewItems,
+  memberNamesById,
+  memberAvatarsById,
   onOpenCard
 }: {
   boardId: string;
@@ -412,6 +565,10 @@ function StaticColumnShell({
   cardContentPermissions: CardContentPermissions;
   cardIds: string[];
   cardsById: Map<string, BoardCardListItem>;
+  boardLabels: BoardLabelOption[];
+  previewItems: BoardCardPreviewItem[];
+  memberNamesById: Map<string, string>;
+  memberAvatarsById: Map<string, string | null>;
   onOpenCard: (card: BoardCardListItem) => void;
 }) {
   const cards = cardIds.map((id) => cardsById.get(id)).filter(Boolean) as BoardCardListItem[];
@@ -439,6 +596,11 @@ function StaticColumnShell({
               card={card}
               currentUserId={currentUserId}
               cardContentPermissions={cardContentPermissions}
+              boardLabels={boardLabels}
+              previewItems={previewItems}
+              fieldDefinitions={fieldDefinitions}
+              memberNamesById={memberNamesById}
+              memberAvatarsById={memberAvatarsById}
               onOpen={onOpenCard}
               enableDrag={canMoveCards}
             />
@@ -480,6 +642,10 @@ function BoardGridStatic({
   fieldDefinitions,
   columnPermissions,
   cardContentPermissions,
+  boardLabels,
+  previewItems,
+  memberNamesById,
+  memberAvatarsById,
   columnRows,
   cardOrderByColumn,
   cardsById,
@@ -492,6 +658,10 @@ function BoardGridStatic({
   fieldDefinitions: NewCardFieldDefinition[];
   columnPermissions: BoardColumnPermissions;
   cardContentPermissions: CardContentPermissions;
+  boardLabels: BoardLabelOption[];
+  previewItems: BoardCardPreviewItem[];
+  memberNamesById: Map<string, string>;
+  memberAvatarsById: Map<string, string | null>;
   columnRows: ColumnRow[];
   cardOrderByColumn: Record<string, string[]>;
   cardsById: Map<string, BoardCardListItem>;
@@ -528,6 +698,11 @@ function BoardGridStatic({
                     card={card!}
                     currentUserId={currentUserId}
                     cardContentPermissions={cardContentPermissions}
+                    boardLabels={boardLabels}
+                    previewItems={previewItems}
+                    fieldDefinitions={fieldDefinitions}
+                    memberNamesById={memberNamesById}
+                    memberAvatarsById={memberAvatarsById}
                     onOpen={onOpenCard}
                   />
                 </div>
@@ -560,6 +735,7 @@ export function BoardColumnsDnD({
   canCreateComment,
   membersForNewCard,
   boardLabels,
+  previewItems,
   fieldDefinitions,
   columnPermissions,
   cardContentPermissions,
@@ -601,6 +777,20 @@ export function BoardColumnsDnD({
 
   const editingCard =
     editingCardId != null ? (cardsById.get(editingCardId) ?? null) : null;
+  const memberNamesById = React.useMemo(() => {
+    const m = new Map<string, string>();
+    for (const member of membersForNewCard) {
+      m.set(member.userId, member.displayName || member.email || "Участник");
+    }
+    return m;
+  }, [membersForNewCard]);
+  const memberAvatarsById = React.useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const member of membersForNewCard) {
+      m.set(member.userId, member.avatarUrl ?? null);
+    }
+    return m;
+  }, [membersForNewCard]);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -772,6 +962,11 @@ export function BoardColumnsDnD({
           fieldDefinitions={fieldDefinitions}
           columnPermissions={columnPermissions}
           cardContentPermissions={cardContentPermissions}
+          boardLabels={boardLabels}
+          previewItems={previewItems}
+          fieldDefinitions={fieldDefinitions}
+          memberNamesById={memberNamesById}
+          memberAvatarsById={memberAvatarsById}
           columnRows={columns}
           cardOrderByColumn={cardOrderByColumn}
           cardsById={cardsById}
@@ -825,6 +1020,10 @@ export function BoardColumnsDnD({
               cardContentPermissions={cardContentPermissions}
               cardIds={cardOrderByColumn[col.id] ?? []}
               cardsById={cardsById}
+              boardLabels={boardLabels}
+              previewItems={previewItems}
+              memberNamesById={memberNamesById}
+              memberAvatarsById={memberAvatarsById}
               columnSortableEnabled
               onOpenCard={(c) => setEditingCardId(c.id)}
             />
@@ -848,6 +1047,10 @@ export function BoardColumnsDnD({
             cardContentPermissions={cardContentPermissions}
             cardIds={cardOrderByColumn[col.id] ?? []}
             cardsById={cardsById}
+            boardLabels={boardLabels}
+            previewItems={previewItems}
+            memberNamesById={memberNamesById}
+            memberAvatarsById={memberAvatarsById}
             onOpenCard={(c) => setEditingCardId(c.id)}
           />
         ))}

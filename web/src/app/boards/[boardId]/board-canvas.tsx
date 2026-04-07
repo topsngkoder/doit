@@ -6,6 +6,7 @@ import type {
   BoardCardListItem,
   BoardColumnPermissions,
   BoardLabelOption,
+  BoardCardPreviewItem,
   CardContentPermissions
 } from "./column-types";
 
@@ -17,6 +18,7 @@ type BoardCanvasProps = {
   canCreateCard: boolean;
   membersForNewCard: NewCardMemberOption[];
   boardLabels: BoardLabelOption[];
+  previewItems: BoardCardPreviewItem[];
   fieldDefinitions: NewCardFieldDefinition[];
   columnPermissions: BoardColumnPermissions;
   canMoveCards: boolean;
@@ -42,6 +44,7 @@ export function BoardCanvas({
   canCreateCard,
   membersForNewCard,
   boardLabels,
+  previewItems,
   fieldDefinitions,
   columnPermissions,
   canMoveCards,
@@ -81,6 +84,7 @@ export function BoardCanvas({
         canCreateCard={canCreateCard}
         membersForNewCard={membersForNewCard}
         boardLabels={boardLabels}
+        previewItems={previewItems}
         fieldDefinitions={fieldDefinitions}
         columnPermissions={columnPermissions}
         canMoveCards={canMoveCards}
