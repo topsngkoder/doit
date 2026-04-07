@@ -755,6 +755,7 @@ export function BoardColumnsDnD({
       }
       canCreateComment={canCreateComment}
       boardMembers={membersForNewCard}
+      fieldDefinitions={fieldDefinitions}
       onClose={() => setEditingCardId(null)}
     />
   );

@@ -2,8 +2,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BoardCanvas } from "./board-canvas";
-import type { NewCardFieldDefinition } from "./create-card-modal";
-import type { BoardLabelOption } from "./column-types";
+import type {
+  BoardLabelOption,
+  CardActivityEntry,
+  CardFieldValueSnapshot
+} from "./column-types";
+import type { NewCardFieldDefinition } from "./card-field-drafts";
 import { BoardMembersPanel, type BoardMemberPublic, type BoardRoleOption } from "./board-members";
 import { BoardLabelsButton } from "./board-labels-button";
 import { InviteMemberButton } from "./invite-member-button";
@@ -212,6 +216,8 @@ export default async function BoardPage({ params }: BoardPageProps) {
   const cardIds = (cardRows ?? []).map((r) => r.id);
   const assigneesByCard = new Map<string, string[]>();
   const labelIdsByCard = new Map<string, string[]>();
+  const fieldValuesByCard = new Map<string, Record<string, CardFieldValueSnapshot>>();
+  const activityByCard = new Map<string, CardActivityEntry[]>();
   if (cardIds.length > 0) {
     const { data: assigneeRows } = await supabase
       .from("card_assignees")
@@ -232,6 +238,49 @@ export default async function BoardPage({ params }: BoardPageProps) {
       cur.push(cl.label_id);
       labelIdsByCard.set(cl.card_id, cur);
     }
+
+    const { data: cardFieldValueRows } = await supabase
+      .from("card_field_values")
+      .select(
+        "card_id, field_definition_id, text_value, date_value, link_url, link_text, select_option_id"
+      )
+      .in("card_id", cardIds);
+    for (const fv of cardFieldValueRows ?? []) {
+      const cur = fieldValuesByCard.get(fv.card_id) ?? {};
+      const dv = fv.date_value as string | null;
+      cur[fv.field_definition_id] = {
+        textValue: fv.text_value,
+        dateValue: dv,
+        linkUrl: fv.link_url,
+        linkText: fv.link_text,
+        selectOptionId: fv.select_option_id
+      };
+      fieldValuesByCard.set(fv.card_id, cur);
+    }
+
+    const { data: activityRows } = await supabase
+      .from("card_activity")
+      .select("id, card_id, actor_user_id, activity_type, message, created_at")
+      .in("card_id", cardIds)
+      .order("created_at", { ascending: false });
+
+    const actorNamesById = new Map<string, string>();
+    for (const row of memberRowsRaw ?? []) {
+      const profile = unwrapOne(row.profiles as ProfileEmbed | ProfileEmbed[] | null);
+      actorNamesById.set(row.user_id, profile?.display_name?.trim() || "Участник");
+    }
+    for (const a of activityRows ?? []) {
+      const cur = activityByCard.get(a.card_id) ?? [];
+      cur.push({
+        id: a.id,
+        activityType: a.activity_type,
+        message: a.message ?? "",
+        createdAt: a.created_at,
+        actorUserId: a.actor_user_id,
+        actorDisplayName: actorNamesById.get(a.actor_user_id) ?? "Участник"
+      });
+      activityByCard.set(a.card_id, cur);
+    }
   }
 
   const cardsByColumnId = new Map<
@@ -245,6 +294,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
       responsibleUserId: string | null;
       assigneeUserIds: string[];
       labelIds: string[];
+      fieldValues: Record<string, CardFieldValueSnapshot>;
     }>
   >();
 
@@ -263,7 +313,9 @@ export default async function BoardPage({ params }: BoardPageProps) {
         createdByUserId: row.created_by_user_id,
         responsibleUserId: row.responsible_user_id ?? null,
         assigneeUserIds: assigneesByCard.get(row.id) ?? [],
-        labelIds: labelIdsByCard.get(row.id) ?? []
+        labelIds: labelIdsByCard.get(row.id) ?? [],
+        fieldValues: fieldValuesByCard.get(row.id) ?? {},
+        activityEntries: activityByCard.get(row.id) ?? []
       });
     }
   }

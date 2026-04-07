@@ -878,6 +878,69 @@ export async function updateCardAction(
   return { ok: true };
 }
 
+export async function updateCardBodyAndCustomFieldsAction(
+  boardId: string,
+  cardId: string,
+  payload: {
+    title: string;
+    description: string;
+    fieldValues: CreateCardFieldValuePayload[];
+  }
+): Promise<CardMutationResult> {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    return { ok: false, message: "Нужна авторизация." };
+  }
+
+  const title = payload.title.trim();
+  if (title.length < 1 || title.length > 200) {
+    return { ok: false, message: "Название: от 1 до 200 символов." };
+  }
+
+  const description = payload.description ?? "";
+  if (description.length > MAX_CARD_DESCRIPTION_LENGTH) {
+    return {
+      ok: false,
+      message: `Описание не длиннее ${MAX_CARD_DESCRIPTION_LENGTH} символов.`
+    };
+  }
+
+  const { data: row, error: fetchError } = await supabase
+    .from("cards")
+    .select("id, board_id")
+    .eq("id", cardId)
+    .maybeSingle();
+
+  if (fetchError) {
+    return { ok: false, message: fetchError.message };
+  }
+  if (!row || row.board_id !== boardId) {
+    return { ok: false, message: "Карточка не найдена на этой доске." };
+  }
+
+  const { error } = await supabase.rpc("update_card_body_and_custom_fields", {
+    p_card_id: cardId,
+    p_title: title,
+    p_description: description,
+    p_field_values: payload.fieldValues
+  });
+
+  if (error) {
+    if (error.code === "42501") {
+      return { ok: false, message: "Нет права редактировать эту карточку." };
+    }
+    return { ok: false, message: error.message };
+  }
+
+  revalidatePath(`/boards/${boardId}`);
+  return { ok: true };
+}
+
 export async function deleteCardAction(
   boardId: string,
   cardId: string

@@ -26,6 +26,24 @@ export type BoardLabelOption = {
   position: number;
 };
 
+/** Снимок строки card_field_values для UI (по id определения поля). */
+export type CardFieldValueSnapshot = {
+  textValue: string | null;
+  dateValue: string | null;
+  linkUrl: string | null;
+  linkText: string | null;
+  selectOptionId: string | null;
+};
+
+export type CardActivityEntry = {
+  id: string;
+  activityType: string;
+  message: string;
+  createdAt: string;
+  actorUserId: string;
+  actorDisplayName: string;
+};
+
 export type BoardCardListItem = {
   id: string;
   title: string;
@@ -38,6 +56,10 @@ export type BoardCardListItem = {
   assigneeUserIds: string[];
   /** id меток, назначенных на карточку. */
   labelIds: string[];
+  /** Пользовательские поля доски: ключ — field_definition_id. */
+  fieldValues: Record<string, CardFieldValueSnapshot>;
+  /** История карточки (новые сверху). */
+  activityEntries: CardActivityEntry[];
 };
 
 export function canEditCardContent(

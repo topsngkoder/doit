@@ -11,9 +11,17 @@ import {
   mutateCardAssigneeAction,
   mutateCardLabelAction,
   setCardResponsibleAction,
-  updateCardAction,
+  updateCardBodyAndCustomFieldsAction,
   type CardMutationResult
 } from "./actions";
+import {
+  buildFieldValuesPayload,
+  isValidHttpUrl,
+  snapshotsToFieldDrafts,
+  validateRequiredCustomFields,
+  type FieldDraft,
+  type NewCardFieldDefinition
+} from "./card-field-drafts";
 import { CardCommentsSidebar } from "./card-comments-sidebar";
 import type { NewCardMemberOption } from "./create-card-modal";
 import type { BoardCardListItem, BoardLabelOption } from "./column-types";
@@ -69,6 +77,7 @@ type EditCardModalProps = {
   canDelete: boolean;
   canCreateComment: boolean;
   boardMembers: NewCardMemberOption[];
+  fieldDefinitions: NewCardFieldDefinition[];
   onClose: () => void;
 };
 
@@ -83,9 +92,11 @@ export function EditCardModal({
   canDelete,
   canCreateComment,
   boardMembers,
+  fieldDefinitions,
   onClose
 }: EditCardModalProps) {
   const router = useRouter();
+  const [activeTab, setActiveTab] = React.useState<"details" | "history">("details");
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
@@ -104,17 +115,26 @@ export function EditCardModal({
   const [labelSuggestOpen, setLabelSuggestOpen] = React.useState(false);
   const labelComboRef = React.useRef<HTMLDivElement>(null);
 
+  const [fieldDrafts, setFieldDrafts] = React.useState<Record<string, FieldDraft>>({});
+
   const assigneeSyncKey = card ? [...card.assigneeUserIds].sort().join("\0") : "";
   const labelSyncKey = card ? [...card.labelIds].sort().join("\0") : "";
+  const fieldValuesSyncKey = card ? JSON.stringify(card.fieldValues) : "";
 
   React.useEffect(() => {
     if (!open || !card) return;
+    setActiveTab("details");
     setTitle(card.title);
     setDescription(card.description);
     setError(null);
     setPending(false);
     setConfirmDelete(false);
   }, [open, card?.id, card?.title, card?.description]);
+
+  React.useEffect(() => {
+    if (!open || !card) return;
+    setFieldDrafts(snapshotsToFieldDrafts(fieldDefinitions, card.fieldValues));
+  }, [open, card?.id, fieldValuesSyncKey, fieldDefinitions]);
 
   React.useEffect(() => {
     if (!open || !card) return;
@@ -163,10 +183,31 @@ export function EditCardModal({
 
   const handleSave = async () => {
     setError(null);
+    const t = title.trim();
+    if (!t || t.length > 200) {
+      setError("Название: от 1 до 200 символов.");
+      return;
+    }
+    const reqErr = validateRequiredCustomFields(fieldDefinitions, fieldDrafts);
+    if (reqErr) {
+      setError(reqErr);
+      return;
+    }
+    for (const f of fieldDefinitions) {
+      const d = fieldDrafts[f.id];
+      if (f.fieldType === "link" && d?.fieldType === "link") {
+        const u = d.url.trim();
+        if (u && !isValidHttpUrl(u)) {
+          setError(`Поле «${f.name}»: укажите корректную ссылку (http/https).`);
+          return;
+        }
+      }
+    }
     setPending(true);
-    const res: CardMutationResult = await updateCardAction(boardId, card.id, {
-      title,
-      description
+    const res: CardMutationResult = await updateCardBodyAndCustomFieldsAction(boardId, card.id, {
+      title: t,
+      description,
+      fieldValues: buildFieldValuesPayload(fieldDefinitions, fieldDrafts)
     });
     setPending(false);
     if (!res.ok) {
@@ -278,6 +319,57 @@ export function EditCardModal({
       <div className="flex min-h-[min(520px,calc(90vh-5rem))] flex-1 flex-col overflow-hidden md:min-h-[420px] md:flex-row">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-5 pb-5 pt-1">
           <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+              <button
+                type="button"
+                className={cn(
+                  "rounded-md px-2.5 py-1 text-xs font-medium",
+                  activeTab === "details" ?
+                    "bg-slate-800 text-slate-100"
+                  : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                )}
+                onClick={() => setActiveTab("details")}
+              >
+                Детали
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  "rounded-md px-2.5 py-1 text-xs font-medium",
+                  activeTab === "history" ?
+                    "bg-slate-800 text-slate-100"
+                  : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                )}
+                onClick={() => setActiveTab("history")}
+              >
+                История
+              </button>
+            </div>
+
+            {activeTab === "history" ?
+              <div className="space-y-2">
+                {card.activityEntries.length === 0 ?
+                  <p className="rounded-md border border-slate-800 bg-slate-900/50 px-3 py-2 text-sm text-slate-400">
+                    История пока пуста.
+                  </p>
+                : <ul className="space-y-2">
+                    {card.activityEntries.map((entry) => (
+                      <li
+                        key={entry.id}
+                        className="rounded-md border border-slate-800 bg-slate-900/70 px-3 py-2"
+                      >
+                        <p className="text-sm text-slate-100">
+                          {entry.message || entry.activityType}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {entry.actorDisplayName} ·{" "}
+                          {new Date(entry.createdAt).toLocaleString("ru-RU")}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>}
+              </div>
+            : <>
             <div>
               <label
                 htmlFor={`card-title-${card.id}`}
@@ -311,6 +403,153 @@ export function EditCardModal({
                 rows={5}
               />
             </div>
+
+            {(() => {
+              const sortedFields = [...fieldDefinitions].sort((a, b) => a.position - b.position);
+              if (sortedFields.length === 0) return null;
+              return (
+                <div className="space-y-4 border-t border-slate-800 pt-4">
+                  <p className="text-xs font-medium text-slate-400">Поля доски</p>
+                  {sortedFields.map((f) => {
+                    const d = fieldDrafts[f.id];
+                    const reqLabel = f.isRequired ? " *" : "";
+                    if (!d) return null;
+                    const ro = readOnly || pending;
+
+                    if (f.fieldType === "text" && d.fieldType === "text") {
+                      return (
+                        <label key={f.id} className="flex flex-col gap-1">
+                          <span className="text-xs text-slate-400">
+                            {f.name}
+                            {reqLabel}
+                          </span>
+                          <textarea
+                            value={d.value}
+                            onChange={(e) =>
+                              setFieldDrafts((prev) => ({
+                                ...prev,
+                                [f.id]: { fieldType: "text", value: e.target.value }
+                              }))
+                            }
+                            rows={3}
+                            disabled={ro}
+                            className={inputClass}
+                          />
+                        </label>
+                      );
+                    }
+
+                    if (f.fieldType === "date" && d.fieldType === "date") {
+                      return (
+                        <label key={f.id} className="flex flex-col gap-1">
+                          <span className="text-xs text-slate-400">
+                            {f.name}
+                            {reqLabel}
+                          </span>
+                          <input
+                            type="date"
+                            value={d.value}
+                            onChange={(e) =>
+                              setFieldDrafts((prev) => ({
+                                ...prev,
+                                [f.id]: { fieldType: "date", value: e.target.value }
+                              }))
+                            }
+                            disabled={ro}
+                            className={inputClass}
+                          />
+                        </label>
+                      );
+                    }
+
+                    if (f.fieldType === "link" && d.fieldType === "link") {
+                      return (
+                        <div key={f.id} className="space-y-2 rounded-md border border-slate-800/80 p-3">
+                          <p className="text-xs font-medium text-slate-400">
+                            {f.name}
+                            {reqLabel}
+                          </p>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-xs text-slate-500">URL</span>
+                            <input
+                              type="url"
+                              value={d.url}
+                              onChange={(e) =>
+                                setFieldDrafts((prev) => ({
+                                  ...prev,
+                                  [f.id]: {
+                                    fieldType: "link",
+                                    url: e.target.value,
+                                    text: d.text
+                                  }
+                                }))
+                              }
+                              placeholder="https://…"
+                              disabled={ro}
+                              className={inputClass}
+                            />
+                          </label>
+                          <label className="flex flex-col gap-1">
+                            <span className="text-xs text-slate-500">Текст ссылки (необязательно)</span>
+                            <input
+                              value={d.text}
+                              onChange={(e) =>
+                                setFieldDrafts((prev) => ({
+                                  ...prev,
+                                  [f.id]: {
+                                    fieldType: "link",
+                                    url: d.url,
+                                    text: e.target.value
+                                  }
+                                }))
+                              }
+                              disabled={ro}
+                              className={inputClass}
+                            />
+                          </label>
+                        </div>
+                      );
+                    }
+
+                    if (f.fieldType === "select" && d.fieldType === "select") {
+                      const opts = [...f.selectOptions].sort((a, b) => a.position - b.position);
+                      return (
+                        <label key={f.id} className="flex flex-col gap-1">
+                          <span className="text-xs text-slate-400">
+                            {f.name}
+                            {reqLabel}
+                          </span>
+                          <select
+                            value={d.optionId}
+                            onChange={(e) =>
+                              setFieldDrafts((prev) => ({
+                                ...prev,
+                                [f.id]: { fieldType: "select", optionId: e.target.value }
+                              }))
+                            }
+                            disabled={ro}
+                            className={inputClass}
+                          >
+                            {!f.isRequired ?
+                              <option value="">— не выбрано —</option>
+                            : <option value="" disabled>
+                                Выберите…
+                              </option>}
+                            {opts.map((o) => (
+                              <option key={o.id} value={o.id}>
+                                {o.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      );
+                    }
+
+                    return null;
+                  })}
+                </div>
+              );
+            })()}
 
             <div>
               <p className="mb-2 text-xs font-medium text-slate-400">Участники карточки</p>
@@ -577,6 +816,7 @@ export function EditCardModal({
                 : null}
               </div>
             </div>
+            </>}
           </div>
         </div>
 

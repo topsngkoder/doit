@@ -6,9 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import {
   createCardAction,
-  type CreateCardFieldValuePayload,
   type CreateCardResult
 } from "./actions";
+import {
+  buildEmptyFieldDrafts,
+  buildFieldValuesPayload,
+  isValidHttpUrl,
+  validateRequiredCustomFields,
+  type FieldDraft,
+  type NewCardFieldDefinition
+} from "./card-field-drafts";
 
 export type NewCardMemberOption = {
   userId: string;
@@ -17,43 +24,10 @@ export type NewCardMemberOption = {
   avatarUrl?: string | null;
 };
 
-export type NewCardFieldDefinition = {
-  id: string;
-  name: string;
-  fieldType: "link" | "text" | "date" | "select";
-  isRequired: boolean;
-  position: number;
-  selectOptions: Array<{ id: string; name: string; color: string; position: number }>;
-};
-
-type FieldDraft =
-  | { fieldType: "text"; value: string }
-  | { fieldType: "date"; value: string }
-  | { fieldType: "link"; url: string; text: string }
-  | { fieldType: "select"; optionId: string };
+export type { NewCardFieldDefinition };
 
 const inputClass =
   "rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600";
-
-function buildInitialDrafts(defs: NewCardFieldDefinition[]): Record<string, FieldDraft> {
-  const out: Record<string, FieldDraft> = {};
-  for (const f of defs) {
-    if (f.fieldType === "text") out[f.id] = { fieldType: "text", value: "" };
-    else if (f.fieldType === "date") out[f.id] = { fieldType: "date", value: "" };
-    else if (f.fieldType === "link") out[f.id] = { fieldType: "link", url: "", text: "" };
-    else out[f.id] = { fieldType: "select", optionId: "" };
-  }
-  return out;
-}
-
-function isValidHttpUrl(raw: string): boolean {
-  try {
-    const u = new URL(raw.trim());
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
 
 type CreateCardModalProps = {
   open: boolean;
@@ -85,7 +59,7 @@ export function CreateCardModal({
     if (!open) return;
     setTitle("");
     setSelectedUserIds(new Set(currentUserId ? [currentUserId] : []));
-    setDrafts(buildInitialDrafts(fieldDefinitions));
+    setDrafts(buildEmptyFieldDrafts(fieldDefinitions));
     setError(null);
     setPending(false);
   }, [open, columnId, currentUserId, fieldDefinitions]);
@@ -103,37 +77,6 @@ export function CreateCardModal({
     });
   };
 
-  const buildPayload = (): CreateCardFieldValuePayload[] => {
-    const fieldValues: CreateCardFieldValuePayload[] = [];
-    for (const f of fieldDefinitions) {
-      const d = drafts[f.id];
-      if (!d) continue;
-      if (f.fieldType === "text" && d.fieldType === "text") {
-        fieldValues.push({
-          field_definition_id: f.id,
-          ...(d.value.trim() ? { text_value: d.value.trim() } : {})
-        });
-      } else if (f.fieldType === "date" && d.fieldType === "date") {
-        fieldValues.push({
-          field_definition_id: f.id,
-          ...(d.value.trim() ? { date_value: d.value.trim() } : {})
-        });
-      } else if (f.fieldType === "link" && d.fieldType === "link") {
-        fieldValues.push({
-          field_definition_id: f.id,
-          ...(d.url.trim() ? { link_url: d.url.trim() } : {}),
-          ...(d.text.trim() ? { link_text: d.text.trim() } : {})
-        });
-      } else if (f.fieldType === "select" && d.fieldType === "select") {
-        fieldValues.push({
-          field_definition_id: f.id,
-          ...(d.optionId.trim() ? { select_option_id: d.optionId.trim() } : {})
-        });
-      }
-    }
-    return fieldValues;
-  };
-
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -144,6 +87,12 @@ export function CreateCardModal({
     }
     if (selectedUserIds.size < 1) {
       setError("Выберите хотя бы одного участника.");
+      return;
+    }
+
+    const reqErr = validateRequiredCustomFields(fieldDefinitions, drafts);
+    if (reqErr) {
+      setError(reqErr);
       return;
     }
 
@@ -163,7 +112,7 @@ export function CreateCardModal({
       columnId,
       title: t,
       assigneeUserIds: [...selectedUserIds],
-      fieldValues: buildPayload()
+      fieldValues: buildFieldValuesPayload(fieldDefinitions, drafts)
     });
     setPending(false);
     if (!res.ok) {
