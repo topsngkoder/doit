@@ -151,8 +151,9 @@
     - при успехе: либо сразу redirect на `/boards` (если сессия появилась), либо показать сообщение “Проверьте почту” (если confirm email включён)
 - [x] **PC7.3 (done)** Ссылка на регистрацию
   - добавить линк “Регистрация” на `/login` и/или в header.
-- [ ] **PC7.4 (todo)** Проверка триггера `handle_new_auth_user`
-  - убедиться, что метаданные попадают и создают `profiles` с `first_name/last_name`.
+- [x] **PC7.4 (done)** Проверка триггера `handle_new_auth_user`
+  - **Ревью цепочки:** `signUpAction` передаёт в `options.data` ключи `first_name`, `last_name`, опционально `position`, `department`. Триггер `public.handle_new_auth_user()` (миграция `supabase/migrations/20260407161000_update_handle_new_auth_user_profile_fields.sql`) читает те же поля из `NEW.raw_user_meta_data`. У Supabase поле `options.data` при регистрации попадает в `auth.users.raw_user_meta_data`, с чего и срабатывает триггер.
+  - **Ручная проверка у себя:** зарегистрировать нового пользователя на `/signup` → в Table Editor или SQL Editor: `select first_name, last_name, display_name, position, department from public.profiles where email = '<email>';` — ожидаются заполненные имя/фамилия и `display_name` как «Имя Фамилия».
 
 ### EPIC PC8 — Приёмка, безопасность, hardening
 - [ ] **PC8.1 (todo)** Ручной тест‑скрипт (минимум)
