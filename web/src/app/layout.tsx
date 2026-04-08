@@ -8,6 +8,7 @@ import "./globals.css";
 
 const AVATARS_BUCKET = "avatars";
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
+export const dynamic = "force-dynamic";
 
 function getProfileAvatarFallback(displayName: string | null, email: string | null): string {
   const nameInitial = displayName?.trim().charAt(0).toUpperCase();
