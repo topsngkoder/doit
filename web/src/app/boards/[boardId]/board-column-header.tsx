@@ -1,13 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
 import type { DraggableAttributes, DraggableSyntheticListeners } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import {
   deleteBoardColumnAction,
-  moveBoardColumnAction,
   updateBoardColumnAction,
   type ColumnMutationResult
 } from "./actions";
@@ -57,7 +56,7 @@ function EditColumnForm({
   onSuccess: () => void;
 }) {
   const bound = updateBoardColumnAction.bind(null, boardId, columnId);
-  const [state, formAction] = useFormState(bound, initialState);
+  const [state, formAction] = React.useActionState(bound, initialState);
 
   React.useEffect(() => {
     if (state.ok) {
@@ -109,10 +108,7 @@ export function BoardColumnHeader({
   name,
   columnType,
   cardCount,
-  columnIndex,
-  columnCount,
   canRename,
-  canReorder,
   canDelete,
   columnDrag = null
 }: BoardColumnHeaderProps) {
@@ -136,14 +132,6 @@ export function BoardColumnHeader({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
 
-  const handleMove = async (direction: "left" | "right") => {
-    setAsyncError(null);
-    const res = await moveBoardColumnAction(boardId, columnId, direction);
-    if (!res.ok) {
-      setAsyncError(res.message);
-    }
-  };
-
   const handleDelete = async () => {
     setAsyncError(null);
     setDeleteBusy(true);
@@ -159,7 +147,6 @@ export function BoardColumnHeader({
     }
   };
 
-  const showReorder = canReorder;
   const showMenu = canRename || canDelete;
   const editFormKey = `${columnId}-${name}-${columnType}`;
 
@@ -193,36 +180,8 @@ export function BoardColumnHeader({
           </div>
           </div>
         </div>
-        {showReorder || showMenu ? (
+        {showMenu ? (
           <div className="flex shrink-0 items-center gap-0.5">
-            {showReorder ? (
-              <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 text-slate-400 hover:text-slate-100"
-                  disabled={columnIndex <= 0}
-                  title="Влево"
-                  aria-label="Переместить колонку влево"
-                  onClick={() => handleMove("left")}
-                >
-                  ‹
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 text-slate-400 hover:text-slate-100"
-                  disabled={columnIndex >= columnCount - 1}
-                  title="Вправо"
-                  aria-label="Переместить колонку вправо"
-                  onClick={() => handleMove("right")}
-                >
-                  ›
-                </Button>
-              </>
-            ) : null}
             {showMenu ? (
               <div className="relative" ref={menuRef}>
                 <Button

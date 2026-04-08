@@ -316,7 +316,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
   }));
 
   return (
-    <main className="relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] grid h-[calc(100dvh-6.5rem)] w-screen grid-rows-[auto_1fr] gap-4 pb-0">
+    <main className="relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] grid min-h-full w-screen grid-rows-[auto_1fr] gap-4 pb-0">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <h1 className="min-w-0 truncate text-2xl font-semibold tracking-tight text-slate-50">

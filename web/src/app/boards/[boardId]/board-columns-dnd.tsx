@@ -1831,13 +1831,15 @@ export function BoardColumnsDnD({
     <div className="flex min-h-0 flex-1 flex-col gap-1">
       {editModal}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] text-slate-500">
-          Realtime:{" "}
-          <span className={realtimeStatus === "SUBSCRIBED" ? "text-emerald-400" : "text-amber-400"}>
-            {realtimeStatus}
-          </span>
-          {realtimeError ? <span className="ml-2 text-rose-400">{realtimeError}</span> : null}
-        </p>
+        {realtimeStatus !== "SUBSCRIBED" || realtimeError ? (
+          <p className="text-[11px] text-slate-500">
+            Realtime:{" "}
+            <span className={realtimeStatus === "SUBSCRIBED" ? "text-emerald-400" : "text-amber-400"}>
+              {realtimeStatus}
+            </span>
+            {realtimeError ? <span className="ml-2 text-rose-400">{realtimeError}</span> : null}
+          </p>
+        ) : null}
       </div>
       {persistError ?
         <p className="text-xs text-rose-400" role="alert">

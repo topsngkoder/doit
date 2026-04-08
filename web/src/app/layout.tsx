@@ -77,13 +77,14 @@ export default async function RootLayout({
         style={{ backgroundColor: "#020617", color: "#f8fafc" }}
       >
         <BrowserNativeNotificationsProvider>
-        <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-4 pt-6">
-          <header className="mb-6 flex items-center justify-between gap-4 border-b border-slate-800 pb-4">
-            <DoitLogoLink />
-            <nav className="flex items-center gap-3 text-sm text-slate-300">
+        <div className="flex min-h-screen flex-col pt-2">
+          <header className="mb-2 border-b border-slate-800">
+            <div className="flex w-full items-center justify-between gap-2 px-3 pb-1.5">
+              <DoitLogoLink />
+            <nav className="flex items-center gap-1.5 text-sm text-slate-300">
               <Link
                 href="/notifications"
-                className="relative rounded-md p-1.5 hover:bg-slate-800 hover:text-slate-50"
+                className="relative rounded-md p-0.5 hover:bg-slate-800 hover:text-slate-50"
                 aria-label="Уведомления"
                 title="Уведомления"
               >
@@ -108,13 +109,13 @@ export default async function RootLayout({
               </Link>
               <Link
                 href="/boards"
-                className="rounded-md px-3 py-1.5 hover:bg-slate-800 hover:text-slate-50"
+                className="rounded-md px-2 py-0.5 hover:bg-slate-800 hover:text-slate-50"
               >
                 Мои доски
               </Link>
               <Link
                 href="/profile"
-                className="rounded-md px-3 py-1.5 hover:bg-slate-800 hover:text-slate-50"
+                className="rounded-md px-2 py-0.5 hover:bg-slate-800 hover:text-slate-50"
               >
                 Личный кабинет
               </Link>
@@ -124,7 +125,7 @@ export default async function RootLayout({
                 aria-label="Перейти в личный кабинет"
                 title="Личный кабинет"
               >
-                <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-slate-700 bg-slate-900 text-xs font-semibold text-slate-200 transition group-hover:border-sky-500/70">
+                <div className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full border border-slate-700 bg-slate-900 text-[11px] font-semibold text-slate-200 transition group-hover:border-sky-500/70">
                   {profileAvatarUrl ? (
                     <img src={profileAvatarUrl} alt="Аватар пользователя" className="h-full w-full object-cover" />
                   ) : (
@@ -132,9 +133,10 @@ export default async function RootLayout({
                   )}
                 </div>
               </Link>
-            </nav>
+              </nav>
+            </div>
           </header>
-          <main className="flex-1">{children}</main>
+          <main className="mx-auto flex w-full max-w-5xl flex-1 px-4">{children}</main>
         </div>
         </BrowserNativeNotificationsProvider>
       </body>
