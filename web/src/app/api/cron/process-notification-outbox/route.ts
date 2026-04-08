@@ -2,6 +2,8 @@ import { getSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 import { processNotificationOutboxEmailBatch } from "@/lib/notifications/process-notification-outbox-email-batch";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const DEFAULT_BATCH = 20;
 
