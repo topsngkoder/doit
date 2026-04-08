@@ -8,6 +8,10 @@ const DEFAULT_BOARD_ACCESS_ERROR =
   "Не удалось установить доску по умолчанию. Нет доступа к этой доске.";
 const DEFAULT_BOARD_SAVE_ERROR =
   "Не удалось сохранить доску по умолчанию. Повторите попытку.";
+const RENAME_BOARD_EMPTY_ERROR = "Укажите название доски.";
+const RENAME_BOARD_TOO_LONG_ERROR = "Название не длиннее 100 символов.";
+const RENAME_BOARD_ACCESS_ERROR = "Нет права переименовывать эту доску.";
+const RENAME_BOARD_SAVE_ERROR = "Не удалось переименовать доску. Повторите попытку.";
 
 export async function createBoardWithDefaultsAction(formData: FormData) {
   const raw = formData.get("name");
@@ -38,6 +42,18 @@ function isUuid(value: string) {
 }
 
 function isDefaultBoardAccessError(error: { code?: string; message?: string }) {
+  if (error.code === "42501") {
+    return true;
+  }
+  const message = (error.message ?? "").toLowerCase();
+  return (
+    message.includes("row-level security") ||
+    message.includes("permission denied") ||
+    message.includes("violates row-level security policy")
+  );
+}
+
+function isPermissionError(error: { code?: string; message?: string }) {
   if (error.code === "42501") {
     return true;
   }
@@ -80,6 +96,48 @@ export async function setDefaultBoardAction(defaultBoardId: string | null) {
       error: isDefaultBoardAccessError(error)
         ? DEFAULT_BOARD_ACCESS_ERROR
         : DEFAULT_BOARD_SAVE_ERROR
+    };
+  }
+
+  await revalidateBoardsData();
+  return { ok: true as const };
+}
+
+export async function renameBoardAction(boardId: string, name: string) {
+  const trimmedName = name.trim();
+  if (!isUuid(boardId)) {
+    return {
+      ok: false as const,
+      error: RENAME_BOARD_SAVE_ERROR
+    };
+  }
+
+  if (!trimmedName) {
+    return {
+      ok: false as const,
+      error: RENAME_BOARD_EMPTY_ERROR
+    };
+  }
+
+  if (trimmedName.length > 100) {
+    return {
+      ok: false as const,
+      error: RENAME_BOARD_TOO_LONG_ERROR
+    };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("boards")
+    .update({ name: trimmedName })
+    .eq("id", boardId);
+
+  if (error) {
+    return {
+      ok: false as const,
+      error: isPermissionError(error)
+        ? RENAME_BOARD_ACCESS_ERROR
+        : RENAME_BOARD_SAVE_ERROR
     };
   }
 
