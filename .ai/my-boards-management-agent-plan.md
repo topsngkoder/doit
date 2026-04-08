@@ -150,43 +150,52 @@
   - **DoD**: есть воспроизводимые сценарии верификации политик.
 
 ### EPIC MB3 - Собрать серверный контракт данных для экрана `/boards`
-- [ ] **MB3.1 (todo)** Пересобрать загрузку данных для списка досок
+- [x] **MB3.1 (done)** Пересобрать загрузку данных для списка досок
   - возвращать `id`, `name`, `created_at`;
   - дополнительно вычислять `can_rename`;
   - дополнительно вычислять `can_delete`;
   - получать `default_board_id` текущего пользователя.
+  - Прогресс: в `web/src/app/boards/page.tsx` обновлена серверная загрузка: `boards` читаются с `owner_user_id`, загружается `profiles.default_board_id`, для каждой доски вычисляется `can_rename` через RPC `has_board_permission(board.rename)`, а `can_delete` — как `is_system_admin() || owner_user_id = auth.uid()`.
+  - Прогресс (фикс после smoke-check): исправлен фильтр профиля с `.eq("id", user.id)` на `.eq("user_id", user.id)` (в проекте PK профиля — `user_id`), устранена ошибка `column profiles.id does not exist` на `/boards`.
   - **DoD**: серверный слой умеет выдать полный контракт из раздела 5.0.1 спецификации.
-- [ ] **MB3.2 (todo)** Выбрать точку вычисления `can_rename` / `can_delete`
+- [x] **MB3.2 (done)** Выбрать точку вычисления `can_rename` / `can_delete`
   - либо SQL/RPC/view;
   - либо server-side composition после чтения досок;
   - решение должно исключать дублирование бизнес-логики по нескольким клиентам.
+  - Прогресс: выбрана единая точка вычисления на server-side composition — добавлен модуль `web/src/app/boards/board-permissions.ts` с функцией `buildBoardsWithPermissions(...)`; `web/src/app/boards/page.tsx` больше не вычисляет `can_rename/can_delete` inline и использует общий helper.
   - **DoD**: логика вычисления прав находится в одном предсказуемом месте.
-- [ ] **MB3.3 (todo)** Обновить типы данных для `/boards`
+- [x] **MB3.3 (done)** Обновить типы данных для `/boards`
   - описать shape элемента списка досок;
   - описать shape общего payload страницы.
+  - Прогресс: добавлен файл `web/src/app/boards/types.ts` с типами `BoardsPageBoardItem` и `BoardsPageData`; типы подключены в `web/src/app/boards/board-permissions.ts` и `web/src/app/boards/page.tsx`, где сформирован явный payload `boardsPageData` вместо ad hoc-полей.
   - **DoD**: фронтенд не использует ad hoc-поля без явного типа.
-- [ ] **MB3.4 (todo)** Обеспечить обновление данных после операций
+- [x] **MB3.4 (done)** Обеспечить обновление данных после операций
   - определить единый механизм `revalidatePath`, `router.refresh`, server action redirect/refresh или эквивалент;
   - не допускать stale UI после rename/delete/set-default.
+  - Прогресс: выбран единый механизм server-side revalidation через helper `web/src/app/boards/revalidation.ts` (`revalidateBoardsData()`), подключён в `web/src/app/boards/actions.ts`; дальнейшие операции `rename/delete/set-default` будут использовать этот же helper для консистентного обновления списка `/boards`.
   - **DoD**: успешные операции сразу отражаются в списке.
 
 ### EPIC MB4 - Реализовать операцию установки/снятия доски по умолчанию
-- [ ] **MB4.1 (todo)** Добавить server action или эквивалент для обновления `profiles.default_board_id`
+- [x] **MB4.1 (done)** Добавить server action или эквивалент для обновления `profiles.default_board_id`
   - вход: `uuid | null`;
   - запись только в профиль текущего пользователя;
   - ошибка маппится на фиксированные сообщения раздела 8.3.
+  - Прогресс: в `web/src/app/boards/actions.ts` добавлен server action `setDefaultBoardAction(defaultBoardId: string | null)`, который обновляет `profiles.default_board_id` только для `auth`-пользователя (`.eq("user_id", user.id)`), валидирует вход `uuid | null`, и маппит ошибки в фиксированные тексты из спецификации: `"Не удалось установить доску по умолчанию. Нет доступа к этой доске."` и `"Не удалось сохранить доску по умолчанию. Повторите попытку."`; после успеха вызывает `revalidateBoardsData()`.
   - **DoD**: операция соответствует разделу 5.0.4.
-- [ ] **MB4.2 (todo)** Нормализовать пользовательские сценарии checkbox
+- [x] **MB4.2 (done)** Нормализовать пользовательские сценарии checkbox
   - checked на доске A -> сохранить `A.id`;
   - uncheck текущей дефолтной доски -> сохранить `NULL`.
+  - Прогресс: добавлен клиентский компонент `web/src/app/boards/default-board-checkbox.tsx`; при `checked=true` вызывает `setDefaultBoardAction(boardId)`, при снятии — `setDefaultBoardAction(null)`. Компонент подключён в `web/src/app/boards/page.tsx` для каждой строки доски.
   - **DoD**: поведение checkbox соответствует разделу 6.1.
-- [ ] **MB4.3 (todo)** Реализовать откат UI при ошибке
+- [x] **MB4.3 (done)** Реализовать откат UI при ошибке
   - если БД отклонила изменение, вернуть прежнее состояние;
   - показать ошибку из спецификации.
+  - Прогресс: в `web/src/app/boards/default-board-checkbox.tsx` добавлен rollback при неуспешном `setDefaultBoardAction(...)` (возврат к `prevChecked`) и вывод ошибки через `Toast` с текстом из server action (фиксированные сообщения раздела 8.3).
   - **DoD**: пользователь не остаётся с ложным checked-state после неуспешного запроса.
-- [ ] **MB4.4 (todo)** Заблокировать повторный запрос во время сохранения
+- [x] **MB4.4 (done)** Заблокировать повторный запрос во время сохранения
   - блокировать checkbox на время операции;
   - не допускать гонок между несколькими быстрыми кликами.
+  - Прогресс: в `web/src/app/boards/boards-default-selector.tsx` реализовано единое состояние сохранения через `useTransition` для всего списка; на время запроса `disabled={isPending}` ставится на все checkbox, что предотвращает параллельные запросы и гонки между быстрыми кликами по разным строкам.
   - **DoD**: нет дублирующих запросов и визуальных скачков состояния.
 
 ### EPIC MB5 - Реализовать переименование доски

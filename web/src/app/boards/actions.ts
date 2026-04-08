@@ -1,8 +1,13 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { revalidateBoardsData } from "./revalidation";
+
+const DEFAULT_BOARD_ACCESS_ERROR =
+  "Не удалось установить доску по умолчанию. Нет доступа к этой доске.";
+const DEFAULT_BOARD_SAVE_ERROR =
+  "Не удалось сохранить доску по умолчанию. Повторите попытку.";
 
 export async function createBoardWithDefaultsAction(formData: FormData) {
   const raw = formData.get("name");
@@ -22,6 +27,62 @@ export async function createBoardWithDefaultsAction(formData: FormData) {
     redirect("/boards?boardError=" + encodeURIComponent(error.message));
   }
 
-  revalidatePath("/boards");
+  await revalidateBoardsData();
   redirect("/boards");
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
+}
+
+function isDefaultBoardAccessError(error: { code?: string; message?: string }) {
+  if (error.code === "42501") {
+    return true;
+  }
+  const message = (error.message ?? "").toLowerCase();
+  return (
+    message.includes("row-level security") ||
+    message.includes("permission denied") ||
+    message.includes("violates row-level security policy")
+  );
+}
+
+export async function setDefaultBoardAction(defaultBoardId: string | null) {
+  if (defaultBoardId !== null && !isUuid(defaultBoardId)) {
+    return {
+      ok: false as const,
+      error: DEFAULT_BOARD_SAVE_ERROR
+    };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      ok: false as const,
+      error: DEFAULT_BOARD_SAVE_ERROR
+    };
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ default_board_id: defaultBoardId })
+    .eq("user_id", user.id);
+
+  if (error) {
+    return {
+      ok: false as const,
+      error: isDefaultBoardAccessError(error)
+        ? DEFAULT_BOARD_ACCESS_ERROR
+        : DEFAULT_BOARD_SAVE_ERROR
+    };
+  }
+
+  await revalidateBoardsData();
+  return { ok: true as const };
 }
