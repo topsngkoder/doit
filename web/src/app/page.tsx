@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function HomePage() {
@@ -7,10 +6,6 @@ export default async function HomePage() {
   const {
     data: { user }
   } = await supabase.auth.getUser();
-
-  if (user) {
-    redirect("/boards");
-  }
 
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-4 text-center">

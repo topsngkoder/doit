@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import {
@@ -33,7 +33,7 @@ function InviteMemberForm({
   onSuccess: () => void;
 }) {
   const boundInvite = inviteBoardMemberAction.bind(null, boardId);
-  const [state, formAction] = useFormState(boundInvite, initialState);
+  const [state, formAction] = React.useActionState(boundInvite, initialState);
 
   React.useEffect(() => {
     if (state.ok) {

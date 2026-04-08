@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { Toast } from "@/components/ui/toast";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { LoginForm } from "./LoginForm";
@@ -10,10 +9,6 @@ export default async function LoginPage() {
   const {
     data: { user }
   } = await supabase.auth.getUser();
-
-  if (user) {
-    redirect("/boards");
-  }
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6">
