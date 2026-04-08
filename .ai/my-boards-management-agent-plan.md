@@ -126,23 +126,27 @@
   - **DoD**: удаление доски не оставляет битых ссылок.
 
 ### EPIC MB2 - Привести RLS и policy-слой к требованиям спецификации
-- [ ] **MB2.1 (todo)** Добавить `DELETE` policy для `boards`
+- [x] **MB2.1 (done)** Добавить `DELETE` policy для `boards`
   - разрешить удаление только если `boards.owner_user_id = auth.uid()`;
   - либо `public.is_system_admin() = true`.
+  - Прогресс: добавлена миграция `supabase/migrations/20260408110000_boards_delete_policy_owner_admin.sql` с policy `boards_delete_owner_or_admin`, применена через `npx supabase db push --yes`.
   - **DoD**: клиентская попытка удалить чужую доску без прав блокируется БД.
-- [ ] **MB2.2 (todo)** Уточнить policy обновления `profiles` для `default_board_id`
+- [x] **MB2.2 (done)** Уточнить policy обновления `profiles` для `default_board_id`
   - пользователь может обновлять свой профиль;
   - `default_board_id IS NULL` разрешён;
   - если `default_board_id` не `NULL`, должна существовать строка в `board_members` для `auth.uid()`.
+  - Прогресс: добавлена миграция `supabase/migrations/20260408111000_profiles_update_policy_default_board_membership.sql`; policy `profiles_update_own` пересоздана с `WITH CHECK`, который разрешает `default_board_id = NULL` или membership в `board_members` (с bypass для `public.is_system_admin()`), миграция применена через `npx supabase db push --yes`.
   - **DoD**: нельзя выставить дефолтной доску, где пользователь не участник.
-- [ ] **MB2.3 (todo)** Проверить, что переименование доски реально опирается на `board.rename`
+- [x] **MB2.3 (done)** Проверить, что переименование доски реально опирается на `board.rename`
   - если текущая `UPDATE` policy разрешает лишние сценарии, сузить проверку именно для имени;
   - если достаточно существующей policy, явно зафиксировать это в плане/реализации.
+  - Прогресс: выявлен риск в `boards_update_by_permission` (разрешение `board.change_background` могло открыть обновление `name`); добавлена миграция `supabase/migrations/20260408112000_boards_update_permission_guard.sql` с trigger-функцией `boards_enforce_update_permissions()`, которая отдельно валидирует `board.rename` при изменении `name` и `board.change_background` при изменении полей фона. Миграция применена через `npx supabase db push --yes`.
   - **DoD**: изменение `boards.name` недоступно без `board.rename`.
-- [ ] **MB2.4 (todo)** Подготовить негативные кейсы для проверки RLS
+- [x] **MB2.4 (done)** Подготовить негативные кейсы для проверки RLS
   - rename без `board.rename`;
   - delete не-owner и не-admin;
   - set `default_board_id` на чужую доску.
+  - Прогресс: добавлен воспроизводимый SQL-чеклист `/.ai/mb2-rls-negative-cases.sql` с 3 негативными сценариями (rename/delete/set-default), явными предусловиями, шагами и ожидаемым результатом для ручной верификации RLS.
   - **DoD**: есть воспроизводимые сценарии верификации политик.
 
 ### EPIC MB3 - Собрать серверный контракт данных для экрана `/boards`
