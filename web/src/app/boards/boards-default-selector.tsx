@@ -6,7 +6,11 @@ import { useEffect, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { Toast } from "@/components/ui/toast";
-import { renameBoardAction, setDefaultBoardAction } from "./actions";
+import {
+  deleteBoardAction,
+  renameBoardAction,
+  setDefaultBoardAction
+} from "./actions";
 import type { BoardsPageBoardItem } from "./types";
 
 type BoardsDefaultSelectorProps = {
@@ -27,6 +31,10 @@ export function BoardsDefaultSelector({
   const [renameName, setRenameName] = useState("");
   const [renameError, setRenameError] = useState<string | null>(null);
   const [isRenamePending, setIsRenamePending] = useState(false);
+  const [deleteBoard, setDeleteBoard] = useState<BoardsPageBoardItem | null>(null);
+  const [deleteConfirmationName, setDeleteConfirmationName] = useState("");
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isDeletePending, setIsDeletePending] = useState(false);
 
   useEffect(() => {
     setVisibleBoards(boards);
@@ -92,6 +100,47 @@ export function BoardsDefaultSelector({
   }
 
   const isRenameSubmitDisabled = renameName.trim().length === 0 || isRenamePending;
+  const expectedDeleteName = deleteBoard?.name.trim().toLocaleLowerCase() ?? "";
+  const actualDeleteName = deleteConfirmationName.trim().toLocaleLowerCase();
+  const isDeleteSubmitDisabled =
+    isDeletePending || !expectedDeleteName || expectedDeleteName !== actualDeleteName;
+
+  function openDeleteModal(board: BoardsPageBoardItem) {
+    setDeleteBoard(board);
+    setDeleteConfirmationName("");
+    setDeleteError(null);
+  }
+
+  function closeDeleteModal() {
+    if (isDeletePending) {
+      return;
+    }
+    setDeleteBoard(null);
+    setDeleteConfirmationName("");
+    setDeleteError(null);
+  }
+
+  async function onDeleteSubmit() {
+    if (!deleteBoard || isDeleteSubmitDisabled) {
+      return;
+    }
+    setDeleteError(null);
+    setIsDeletePending(true);
+    const result = await deleteBoardAction(deleteBoard.id);
+    setIsDeletePending(false);
+
+    if (!result.ok) {
+      setDeleteError(result.error);
+      return;
+    }
+
+    setVisibleBoards((prev) => prev.filter((board) => board.id !== deleteBoard.id));
+    if (defaultBoardId === deleteBoard.id) {
+      setDefaultBoardId(null);
+    }
+    closeDeleteModal();
+    router.refresh();
+  }
 
   return (
     <div className="space-y-2">
@@ -116,6 +165,17 @@ export function BoardsDefaultSelector({
                   disabled={isPending}
                 >
                   Переименовать
+                </Button>
+              ) : null}
+              {board.can_delete ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => openDeleteModal(board)}
+                  disabled={isPending}
+                >
+                  Удалить
                 </Button>
               ) : null}
               <label className="inline-flex items-center gap-2 text-xs text-slate-300">
@@ -164,6 +224,45 @@ export function BoardsDefaultSelector({
               onClick={() => void onRenameSubmit()}
             >
               Сохранить
+            </Button>
+          </div>
+        </div>
+      </Modal>
+      <Modal open={!!deleteBoard} title="Удалить доску?" onClose={closeDeleteModal}>
+        <div className="space-y-4">
+          <p className="text-sm text-slate-300">
+            Доска будет удалена для всех участников. Данные восстановить нельзя.
+          </p>
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-slate-400">
+              Введите название доски для подтверждения
+            </span>
+            <input
+              type="text"
+              value={deleteConfirmationName}
+              disabled={isDeletePending}
+              onChange={(event) => setDeleteConfirmationName(event.currentTarget.value)}
+              className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+            />
+          </label>
+          {deleteError ? <Toast title="Ошибка" message={deleteError} variant="error" /> : null}
+          <div className="flex items-center justify-end gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={isDeletePending}
+              onClick={closeDeleteModal}
+            >
+              Отмена
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={isDeleteSubmitDisabled}
+              onClick={() => void onDeleteSubmit()}
+            >
+              Удалить
             </Button>
           </div>
         </div>

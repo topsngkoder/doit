@@ -12,6 +12,8 @@ const RENAME_BOARD_EMPTY_ERROR = "Укажите название доски.";
 const RENAME_BOARD_TOO_LONG_ERROR = "Название не длиннее 100 символов.";
 const RENAME_BOARD_ACCESS_ERROR = "Нет права переименовывать эту доску.";
 const RENAME_BOARD_SAVE_ERROR = "Не удалось переименовать доску. Повторите попытку.";
+const DELETE_BOARD_ACCESS_ERROR = "Нет права удалять эту доску.";
+const DELETE_BOARD_SAVE_ERROR = "Не удалось удалить доску. Повторите попытку.";
 
 export async function createBoardWithDefaultsAction(formData: FormData) {
   const raw = formData.get("name");
@@ -138,6 +140,30 @@ export async function renameBoardAction(boardId: string, name: string) {
       error: isPermissionError(error)
         ? RENAME_BOARD_ACCESS_ERROR
         : RENAME_BOARD_SAVE_ERROR
+    };
+  }
+
+  await revalidateBoardsData();
+  return { ok: true as const };
+}
+
+export async function deleteBoardAction(boardId: string) {
+  if (!isUuid(boardId)) {
+    return {
+      ok: false as const,
+      error: DELETE_BOARD_SAVE_ERROR
+    };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.from("boards").delete().eq("id", boardId);
+
+  if (error) {
+    return {
+      ok: false as const,
+      error: isPermissionError(error)
+        ? DELETE_BOARD_ACCESS_ERROR
+        : DELETE_BOARD_SAVE_ERROR
     };
   }
 
