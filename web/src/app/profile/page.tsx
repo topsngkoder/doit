@@ -1,7 +1,12 @@
 import { redirect } from "next/navigation";
 import { Toast } from "@/components/ui/toast";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { deleteAvatarAction, updateProfileAction, uploadAvatarAction } from "./actions";
+import {
+  deleteAvatarAction,
+  signOutAction,
+  updateProfileAction,
+  uploadAvatarAction
+} from "./actions";
 import { ProfileAvatar } from "./profile-avatar";
 import { ProfileForm } from "./profile-form";
 
@@ -25,13 +30,23 @@ export default async function ProfilePage() {
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-8">
-      <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-50">
-          Личный кабинет
-        </h1>
-        <p className="text-sm text-slate-400">
-          Настройки профиля и аватара.
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-50">
+            Личный кабинет
+          </h1>
+          <p className="text-sm text-slate-400">
+            Настройки профиля и аватара.
+          </p>
+        </div>
+        <form action={signOutAction} className="shrink-0">
+          <button
+            type="submit"
+            className="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 transition hover:border-rose-500/70 hover:text-rose-300"
+          >
+            Выйти из приложения
+          </button>
+        </form>
       </header>
 
       {profileError ? (

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type UpdateProfileInput = {
@@ -161,5 +162,11 @@ export async function deleteAvatarAction(): Promise<AvatarMutationResult> {
 
   revalidatePath("/profile");
   return { ok: true };
+}
+
+export async function signOutAction() {
+  const supabase = await createSupabaseServerClient();
+  await supabase.auth.signOut();
+  redirect("/login");
 }
 

@@ -6,6 +6,17 @@ import { DoitLogoLink } from "@/components/doit-logo-link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import "./globals.css";
 
+const AVATARS_BUCKET = "avatars";
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+
+function getProfileAvatarFallback(displayName: string | null, email: string | null): string {
+  const nameInitial = displayName?.trim().charAt(0).toUpperCase();
+  if (nameInitial) return nameInitial;
+  const emailInitial = email?.trim().charAt(0).toUpperCase();
+  if (emailInitial) return emailInitial;
+  return "?";
+}
+
 const manrope = Manrope({
   subsets: ["latin", "cyrillic"],
   variable: "--font-manrope",
@@ -29,6 +40,26 @@ export default async function RootLayout({
   } = await supabase.auth.getUser();
   const isSessionMissing = userError?.message === "Auth session missing!";
   const isAuthenticated = !!user && !(userError && !isSessionMissing);
+  let avatarFallback = getProfileAvatarFallback(user?.user_metadata?.display_name ?? null, user?.email ?? null);
+
+  let profileAvatarUrl: string | null = null;
+  if (isAuthenticated && user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("avatar_url,display_name")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    avatarFallback = getProfileAvatarFallback(profile?.display_name ?? null, user.email ?? null);
+    const avatarPath = profile?.avatar_url?.trim() || null;
+    if (avatarPath) {
+      const { data: avatarData, error: avatarError } = await supabase.storage
+        .from(AVATARS_BUCKET)
+        .createSignedUrl(avatarPath, SIGNED_URL_TTL_SECONDS);
+      if (!avatarError && avatarData?.signedUrl) {
+        profileAvatarUrl = avatarData.signedUrl;
+      }
+    }
+  }
 
   let unreadCount = 0;
   if (isAuthenticated) {
@@ -86,6 +117,20 @@ export default async function RootLayout({
                 className="rounded-md px-3 py-1.5 hover:bg-slate-800 hover:text-slate-50"
               >
                 Личный кабинет
+              </Link>
+              <Link
+                href="/profile"
+                className="group rounded-full p-0.5 hover:bg-slate-800"
+                aria-label="Перейти в личный кабинет"
+                title="Личный кабинет"
+              >
+                <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-slate-700 bg-slate-900 text-xs font-semibold text-slate-200 transition group-hover:border-sky-500/70">
+                  {profileAvatarUrl ? (
+                    <img src={profileAvatarUrl} alt="Аватар пользователя" className="h-full w-full object-cover" />
+                  ) : (
+                    <span>{avatarFallback}</span>
+                  )}
+                </div>
               </Link>
             </nav>
           </header>

@@ -349,7 +349,7 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
   }));
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 pb-10">
+    <main className="relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] flex min-h-[calc(100vh-9rem)] w-screen flex-1 flex-col gap-4 px-4 pb-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Link

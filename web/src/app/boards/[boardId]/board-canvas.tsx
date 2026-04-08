@@ -65,7 +65,7 @@ export function BoardCanvas({
       backgroundType={board.backgroundType}
       backgroundColor={board.backgroundColor}
       backgroundImagePath={board.backgroundImagePath}
-      className="flex min-h-[320px] flex-col gap-4 rounded-xl border border-slate-800/80 p-4"
+      className="flex min-h-[320px] flex-1 flex-col gap-4 rounded-xl border border-slate-800/80 p-4"
     >
       <div className="flex flex-wrap items-center gap-2">
         <AddBoardColumnButton boardId={boardId} canCreate={columnPermissions.canCreate} />
