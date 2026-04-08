@@ -314,17 +314,17 @@
   - учитывать `next_attempt_at`, если поле уже используется в проекте.
   - **Реализация:** `GET|POST /api/cron/process-notification-outbox`, пакетная логика в `process-notification-outbox-email-batch.ts`, отправка через Resend HTTP (`send-outbox-email-resend.ts`).
   - **DoD**: асинхронная email-доставка соответствует разделу 9.2.
-- [ ] **NT8.4 (todo)** Подготовить шаблоны/formatter email-содержимого
+- [x] **NT8.4 (done)** Подготовить шаблоны/formatter email-содержимого
   - заголовки строго из раздела 10.1;
   - тело должно включать доску, карточку, автора, описание, ссылку.
   - **DoD**: email соответствует обязательным данным из раздела 10.2.
 
 ### EPIC NT9 — Привести экран внутреннего центра уведомлений в консистентное состояние
-- [ ] **NT9.1 (todo)** Проверить `web/src/app/notifications/page.tsx`
+- [x] **NT9.1 (done)** Проверить `web/src/app/notifications/page.tsx`
   - при необходимости обновить copy: вместо “внутренние” ориентироваться на термин “центр уведомлений”;
   - не менять базовое поведение read/unread, если оно уже соответствует требованиям.
   - **DoD**: UI центра уведомлений консистентен с каналом `browser`.
-- [ ] **NT9.2 (todo)** Проверить `web/src/app/notifications/actions.ts`
+- [x] **NT9.2 (done)** Проверить `web/src/app/notifications/actions.ts`
   - убедиться, что mark-as-read логика не зависит от legacy event type/channel semantics.
   - **DoD**: прочтение уведомлений продолжает работать без регрессии.
 
@@ -622,3 +622,16 @@
   - **Миграции:** не требовались. `supabase db push` — без изменений схемы.
   - **Проверка:** заполнить env на проде/локально; создать тестовую строку outbox или воспроизвести событие с `email=true`; `curl -H "Authorization: Bearer $NOTIFICATION_OUTBOX_CRON_SECRET" "http://localhost:3000/api/cron/process-notification-outbox"` — ответ JSON `{ examined, sent, failedPermanent, scheduledRetry }`; письмо в Resend dashboard / почте.
   - **Следующий шаг по плану:** NT8.4 (шаблоны/formatter §10 при необходимости сверх `title`/`body`/`link`).
+- **2026-04-08 — NT8.4**
+  - Добавлен форматтер `web/src/lib/notifications/format-outbox-email.ts`: единый plaintext-шаблон для email (`title`, строка «Тип события», нормализованное `body`, строка `Ссылка: ...`, служебный footer).
+  - `web/src/lib/notifications/process-notification-outbox-email-batch.ts`: выборка outbox теперь читает `event_type`; перед отправкой через Resend формирует текст письма через `formatOutboxEmailText(...)` (для валидных 6 типов), fallback на прежний текст оставлен только как защитная ветка для некорректных legacy-значений.
+  - Миграции не требовались.
+  - **Как проверить:** создать событие с `email=true`, запустить cron-роут и проверить raw text письма — должен содержать блоки `Тип события: ...`, описание (`body`) и `Ссылка: ...` в одном стандартизованном формате.
+- **2026-04-08 — NT9.1**
+  - Проверен `web/src/app/notifications/page.tsx`: поведение read/unread, сортировка и действия не менялись.
+  - Обновлён copy для консистентности с новой терминологией канала `browser`: заголовок страницы `Центр уведомлений`, описание заменено на нейтральное `Ваши уведомления в приложении...` (без legacy-формулировки «внутренний центр»).
+  - Миграции не требовались.
+  - **Как проверить:** открыть `/notifications` — в шапке должен быть заголовок `Центр уведомлений`; список, отметка прочитанного и кнопка «Отметить все» работают как раньше.
+- **2026-04-08 — NT9.2**
+  - Проверен `web/src/app/notifications/actions.ts`: `markInternalNotificationReadAction` и `markAllInternalNotificationsReadAction` обновляют только `internal_notifications.read_at` с фильтрами по `id`/`user_id`, без чтения `event_type`/`channel` и без legacy-семантик.
+  - Изменений в код не требовалось.

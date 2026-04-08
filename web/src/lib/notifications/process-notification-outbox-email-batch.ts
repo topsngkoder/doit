@@ -1,7 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { formatOutboxEmailText } from "@/lib/notifications/format-outbox-email";
 import { NOTIFICATION_OUTBOX_EMAIL_CHANNEL, resolveAppLinkForEmail } from "@/lib/notifications/notification-outbox";
 import { sendOutboxEmailViaResend } from "@/lib/notifications/send-outbox-email-resend";
+import { isNotificationEventType } from "@/lib/notifications/constants";
 
 const MAX_ERROR_LEN = 4000;
 
@@ -15,6 +17,7 @@ type OutboxRow = {
   id: string;
   user_id: string;
   status: string;
+  event_type: string;
   title: string;
   body: string;
   link_url: string | null;
@@ -41,7 +44,7 @@ export async function processNotificationOutboxEmailBatch(
 
   const { data: rows, error: selectError } = await supabase
     .from("notification_outbox")
-    .select("id, user_id, status, title, body, link_url, attempts")
+    .select("id, user_id, status, event_type, title, body, link_url, attempts")
     .eq("channel", NOTIFICATION_OUTBOX_EMAIL_CHANNEL)
     .eq("status", "pending")
     .lte("next_attempt_at", now)
@@ -96,7 +99,15 @@ export async function processNotificationOutboxEmailBatch(
     }
 
     const absLink = row.link_url ? resolveAppLinkForEmail(row.link_url, appOrigin) : "";
-    const text = absLink ? `${row.body}\n\n${absLink}` : row.body;
+    const fallbackText = absLink ? `${row.body}\n\nСсылка: ${absLink}` : row.body;
+    const text = isNotificationEventType(row.event_type)
+      ? formatOutboxEmailText({
+          eventType: row.event_type,
+          title: row.title,
+          body: row.body,
+          linkUrl: absLink
+        })
+      : fallbackText;
 
     const send = await sendOutboxEmailViaResend({
       to: email,

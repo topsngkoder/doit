@@ -50,10 +50,10 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight text-slate-50">
-            Уведомления
+            Центр уведомлений
           </h1>
           <p className="text-sm text-slate-400">
-            Внутренний центр уведомлений. Непрочитанных:{" "}
+            Ваши уведомления в приложении. Непрочитанных:{" "}
             <span className="font-medium text-slate-200">{unreadCount}</span>.
           </p>
         </div>
