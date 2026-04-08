@@ -7,8 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:patch-opennext": "node scripts/patch-opennext-windows-paths.mjs",
+    "preview": "opennextjs-cloudflare build && npm run cf:patch-opennext && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && npm run cf:patch-opennext && opennextjs-cloudflare deploy",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "db:migrate": "node scripts/run-migrations.js",
     "create-dev-users": "node --env-file=.env.local scripts/create-dev-users.mjs"

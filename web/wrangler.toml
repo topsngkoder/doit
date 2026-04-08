@@ -14,5 +14,5 @@ crons = ["*/5 * * * *"]
 [vars]
 NEXT_PUBLIC_SUPABASE_URL = "https://wimpnybtdqgsszgibxvh.supabase.co"
 NEXT_PUBLIC_SUPABASE_ANON_KEY = "sb_publishable__zkroZ9WBRL0wHTV4JFY0w_GDm0Ng0q"
-NEXT_PUBLIC_APP_URL = "https://doit-web.mir24.workers.dev"
+NEXT_PUBLIC_APP_URL = "https://doit-web.mir24zvuk.workers.dev"
 NOTIFICATION_EMAIL_FROM = "Doit <onboarding@resend.dev>"
