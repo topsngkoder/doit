@@ -329,19 +329,19 @@
   - **DoD**: прочтение уведомлений продолжает работать без регрессии.
 
 ### EPIC NT10 — Очистка legacy UI и copy
-- [ ] **NT10.1 (todo)** Удалить все упоминания Telegram из notification UI
+- [x] **NT10.1 (done)** Удалить все упоминания Telegram из notification UI
   - тексты;
   - labels;
   - описания;
   - табличные заголовки.
   - **DoD**: на экране настроек и связанных экранах Telegram не упоминается.
-- [ ] **NT10.2 (todo)** Удалить все упоминания timezone/quiet hours из notification UI
+- [x] **NT10.2 (done)** Удалить все упоминания timezone/quiet hours из notification UI
   - тексты;
   - select;
   - server loading;
   - actions.
   - **DoD**: пользовательский сценарий больше не содержит timezone и quiet hours.
-- [ ] **NT10.3 (todo)** Проверить `.ai/done/agent-plan.md` и соседние документы только на предмет внутренних ссылок/ожиданий
+- [x] **NT10.3 (done)** Проверить `.ai/done/agent-plan.md` и соседние документы только на предмет внутренних ссылок/ожиданий
   - не править исторические планы без необходимости;
   - убедиться, что текущая реализация не ориентируется на устаревшие пункты про Telegram.
   - **DoD**: активный код не зависит от старой документации.
@@ -635,3 +635,18 @@
 - **2026-04-08 — NT9.2**
   - Проверен `web/src/app/notifications/actions.ts`: `markInternalNotificationReadAction` и `markAllInternalNotificationsReadAction` обновляют только `internal_notifications.read_at` с фильтрами по `id`/`user_id`, без чтения `event_type`/`channel` и без legacy-семантик.
   - Изменений в код не требовалось.
+- **2026-04-08 — NT10.1**
+  - Выполнен поиск по notification UI в `web/` на `telegram|Telegram`: совпадений не найдено.
+  - Текущие экраны уведомлений (`/notifications`, `/notifications/settings`) не содержат Telegram в текстах, labels, описаниях и заголовках.
+  - Изменений в runtime-код не потребовалось.
+  - **Как проверить:** в `web/` выполнить поиск `telegram`/`Telegram` по каталогу и открыть `/notifications/settings` — в интерфейсе есть только каналы «В браузере» и «По email».
+- **2026-04-08 — NT10.2**
+  - Выполнен поиск по `web/` и отдельно по `web/src/app/notifications` на `timezone`, `quiet hours`, `quietHours`, а также русские фрагменты про «тихие часы» — совпадений не найдено.
+  - Подтверждено, что в notification UI и связанном серверном слое для уведомлений отсутствуют тексты/селекты/загрузка/экшены для timezone и quiet hours.
+  - Изменений в runtime-код не потребовалось.
+  - **Как проверить:** в `web/` выполнить поиск `timezone|quiet[\\s_-]?hours|quietHours` и открыть `/notifications/settings` — элементов timezone/quiet hours нет.
+- **2026-04-08 — NT10.3**
+  - Проверены `.ai/done/agent-plan.md` и `.ai/done/specification.md`: это исторические документы, содержащие legacy-упоминания (в т.ч. старые пункты про Telegram/timezone/quiet hours), правки в них не вносились.
+  - Проверены ссылки/зависимости в коде: активный runtime-код не использует `.ai/done/*` как источник логики; найдена только документационная ссылка в комментарии (`web/src/lib/notifications/notification-outbox.ts`) на актуальную `.ai/notifications-specification.md`.
+  - Дополнительно подтверждено по поиску, что в notification UI нет активных упоминаний Telegram/timezone/quiet hours; остатки встречаются только в миграционной/исторической документации и прошлых SQL-артефактах.
+  - **Как проверить:** глобальный поиск по репозиторию на `.ai/done/agent-plan.md|.ai/done/specification.md` и на `telegram|notification_user_settings|quiet_hours` — в активном `web/src/app/notifications` совпадений быть не должно.
