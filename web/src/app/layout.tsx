@@ -28,6 +28,11 @@ export const metadata: Metadata = {
   description: "Task boards app"
 };
 
+type HeaderBoardLink = {
+  id: string;
+  name: string;
+};
+
 export default async function RootLayout({
   children
 }: {
@@ -41,15 +46,17 @@ export default async function RootLayout({
   const isSessionMissing = userError?.message === "Auth session missing!";
   const isAuthenticated = !!user && !(userError && !isSessionMissing);
   let avatarFallback = getProfileAvatarFallback(user?.user_metadata?.display_name ?? null, user?.email ?? null);
+  let defaultBoardId: string | null = null;
 
   let profileAvatarUrl: string | null = null;
   if (isAuthenticated && user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("avatar_url,display_name")
+      .select("avatar_url,display_name,default_board_id")
       .eq("user_id", user.id)
       .maybeSingle();
     avatarFallback = getProfileAvatarFallback(profile?.display_name ?? null, user.email ?? null);
+    defaultBoardId = profile?.default_board_id ?? null;
     const avatarPath = profile?.avatar_url?.trim() || null;
     if (avatarPath) {
       const { data: avatarData, error: avatarError } = await supabase.storage
@@ -68,6 +75,26 @@ export default async function RootLayout({
       .select("id", { count: "exact", head: true })
       .is("read_at", null);
     unreadCount = count ?? 0;
+  }
+
+  let headerBoards: HeaderBoardLink[] = [];
+  if (isAuthenticated) {
+    const { data: boards } = await supabase
+      .from("boards")
+      .select("id, name")
+      .order("created_at", { ascending: false });
+
+    headerBoards =
+      boards?.map((board) => ({
+        id: board.id,
+        name: board.name?.trim() || "Без названия"
+      })) ?? [];
+
+    headerBoards.sort((a, b) => {
+      if (a.id === defaultBoardId && b.id !== defaultBoardId) return -1;
+      if (b.id === defaultBoardId && a.id !== defaultBoardId) return 1;
+      return a.name.localeCompare(b.name, "ru", { sensitivity: "base" });
+    });
   }
 
   return (
@@ -107,12 +134,47 @@ export default async function RootLayout({
                   </span>
                 ) : null}
               </Link>
-              <Link
-                href="/boards"
-                className="rounded-md px-2 py-0.5 hover:bg-slate-800 hover:text-slate-50"
-              >
-                Мои доски
-              </Link>
+              <div className="relative group/boards">
+                <Link
+                  href="/boards"
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 hover:bg-slate-800 hover:text-slate-50 group-focus-within/boards:bg-slate-800 group-focus-within/boards:text-slate-50"
+                  aria-haspopup={headerBoards.length > 0 ? "menu" : undefined}
+                >
+                  <span>Мои доски</span>
+                  {headerBoards.length > 0 ? (
+                    <svg
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className="h-3.5 w-3.5 text-slate-500 transition group-hover/boards:text-slate-300 group-focus-within/boards:text-slate-300"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M5.23 7.21a.75.75 0 0 1 1.06.02L10 11.168l3.71-3.938a.75.75 0 1 1 1.08 1.04l-4.25 4.5a.75.75 0 0 1-1.08 0l-4.25-4.5a.75.75 0 0 1 .02-1.06Z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  ) : null}
+                </Link>
+                {headerBoards.length > 0 ? (
+                  <div className="invisible absolute left-0 top-full z-30 pt-2 opacity-0 transition duration-150 group-hover/boards:visible group-hover/boards:opacity-100 group-focus-within/boards:visible group-focus-within/boards:opacity-100">
+                    <div className="w-72 overflow-hidden rounded-xl border border-slate-800 bg-slate-950/95 shadow-2xl shadow-black/30 backdrop-blur">
+                      <div className="max-h-80 overflow-y-auto py-1">
+                        {headerBoards.map((board) => (
+                          <Link
+                            key={board.id}
+                            href={`/boards/${board.id}`}
+                            className="block truncate px-3 py-2 text-sm text-slate-300 transition hover:bg-slate-800/90 hover:text-slate-50 focus:bg-slate-800/90 focus:text-slate-50 focus:outline-none"
+                            title={board.name}
+                          >
+                            {board.name}
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
               <Link
                 href="/profile"
                 className="rounded-md px-2 py-0.5 hover:bg-slate-800 hover:text-slate-50"
