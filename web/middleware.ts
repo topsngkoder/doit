@@ -29,7 +29,8 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isAuthLanding = pathname === "/" || pathname === "/login";
+  const isRoot = pathname === "/";
+  const isAuthLanding = pathname === "/login";
   const isProtected =
     pathname === "/boards" ||
     pathname.startsWith("/boards/") ||
@@ -39,7 +40,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/notifications/");
 
   let response: NextResponse;
-  if (user && isAuthLanding) {
+  if (user && isRoot) {
+    response = NextResponse.redirect(new URL("/go", request.url));
+  } else if (user && isAuthLanding) {
     response = NextResponse.redirect(new URL("/boards", request.url));
   } else if (!user && isProtected) {
     response = NextResponse.redirect(new URL("/login", request.url));

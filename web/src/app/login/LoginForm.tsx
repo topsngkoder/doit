@@ -36,7 +36,7 @@ export function LoginForm() {
       }
 
       router.refresh();
-      router.push("/boards");
+      router.push("/go");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Неизвестная ошибка");
       setLoading(false);

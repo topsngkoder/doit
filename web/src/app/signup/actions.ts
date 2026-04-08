@@ -87,7 +87,7 @@ export async function signUpAction(input: SignUpInput): Promise<SignUpResult> {
   }
 
   if (data.session) {
-    redirect("/boards");
+    redirect("/go");
   }
 
   return { ok: true, needsEmailConfirmation: true };
