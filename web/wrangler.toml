@@ -10,3 +10,9 @@ binding = "ASSETS"
 
 [triggers]
 crons = ["*/5 * * * *"]
+
+[vars]
+NEXT_PUBLIC_SUPABASE_URL = "https://wimpnybtdqgsszgibxvh.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY = "REPLACE_WITH_PUBLIC_ANON_KEY"
+NEXT_PUBLIC_APP_URL = "https://doit-web.mir24.workers.dev"
+NOTIFICATION_EMAIL_FROM = "Doit <onboarding@resend.dev>"
