@@ -288,14 +288,15 @@ function BoardCardRow({
       role={canOpen ? "button" : undefined}
       className={
         canOpen ?
-          "flex cursor-pointer gap-2 rounded-md border border-slate-800 bg-slate-900/90 px-3 py-2 text-sm text-slate-200 shadow-sm transition-colors hover:border-slate-600 hover:bg-slate-900"
+          "flex cursor-pointer gap-2 rounded-md border border-slate-800 bg-slate-900/90 px-3 py-2 text-sm text-slate-200 shadow-sm transition-colors hover:border-slate-600"
         : "flex gap-2 rounded-md border border-slate-800 bg-slate-900/90 px-3 py-2 text-sm text-slate-200 shadow-sm"
       }
       style={
         primaryLabel ?
           {
             borderLeftWidth: 4,
-            borderLeftColor: primaryLabel.color
+            borderLeftColor: primaryLabel.color,
+            backgroundColor: `color-mix(in srgb, ${primaryLabel.color} 12%, rgb(15 23 42 / 90%))`
           }
         : undefined
       }

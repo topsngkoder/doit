@@ -98,16 +98,7 @@ export function InviteMemberButton({ boardId, canInvite, triggerClassName }: Inv
         +
       </Button>
       <Modal open={open} title="Пригласить на доску" onClose={() => setOpen(false)}>
-        <p className="mb-4 text-slate-400">
-          Отправится приглашение на указанный email. Повторный pending для того же адреса на этой
-          доске невозможен.
-        </p>
         <InviteMemberForm key={formInstance} boardId={boardId} onSuccess={handleSuccess} />
-        <div className="mt-3 flex justify-end border-t border-slate-800 pt-3">
-          <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
-            Отмена
-          </Button>
-        </div>
       </Modal>
     </>
   );
