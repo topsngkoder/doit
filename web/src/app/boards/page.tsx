@@ -49,7 +49,13 @@ export default async function BoardsPage({ searchParams }: BoardsPageProps) {
     boards,
     currentUserId: user.id,
     isSystemAdmin: !!isSystemAdmin,
-    hasBoardPermissionRpc: (args) => supabase.rpc("has_board_permission", args)
+    hasBoardPermissionRpc: async (args) => {
+      const { data, error } = await supabase.rpc("has_board_permission", args);
+      return {
+        data,
+        error: error ? { message: error.message } : null
+      };
+    }
   });
 
   const boardsPageData: BoardsPageData = {
