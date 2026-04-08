@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BoardCanvas } from "./board-canvas";
@@ -22,43 +21,11 @@ const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 type BoardPageProps = {
   params: Promise<{ boardId: string }>;
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function BoardPage({ params, searchParams }: BoardPageProps) {
+export default async function BoardPage({ params }: BoardPageProps) {
   const { boardId } = await params;
-
-  const perfParams = (await searchParams) ?? {};
-  const perfEnabledRaw = perfParams["perf"] ?? perfParams["__perf"];
-  const perfEnabled =
-    typeof perfEnabledRaw === "string" ? perfEnabledRaw === "1" : Array.isArray(perfEnabledRaw)
-      ? perfEnabledRaw.includes("1")
-      : false;
-
-  const perf =
-    perfEnabled && process.env.NODE_ENV !== "production"
-      ? {
-          total: 0,
-          db: 0,
-          auth: 0,
-          storage: 0,
-          other: 0
-        }
-      : null;
-
-  const supabase = await createSupabaseServerClient({
-    instrumentation: perf
-      ? {
-          onFetch(url) {
-            perf.total += 1;
-            if (url.includes("/rest/v1/")) perf.db += 1;
-            else if (url.includes("/auth/v1/")) perf.auth += 1;
-            else if (url.includes("/storage/v1/")) perf.storage += 1;
-            else perf.other += 1;
-          }
-        }
-      : undefined
-  });
+  const supabase = await createSupabaseServerClient();
 
   const { data: snapshotRaw, error: snapshotError } = await supabase.rpc("get_board_snapshot", {
     p_board_id: boardId
@@ -349,15 +316,9 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
   }));
 
   return (
-    <main className="relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] flex min-h-[calc(100vh-9rem)] w-screen flex-1 flex-col gap-4 px-4 pb-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <main className="relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] grid h-[calc(100dvh-6.5rem)] w-screen grid-rows-[auto_1fr] gap-4 pb-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4">
         <div className="flex min-w-0 flex-1 items-center gap-3">
-          <Link
-            href="/boards"
-            className="shrink-0 text-sm text-slate-400 hover:text-slate-200"
-          >
-            ← Мои доски
-          </Link>
           <h1 className="min-w-0 truncate text-2xl font-semibold tracking-tight text-slate-50">
             {board.name}
           </h1>
@@ -395,72 +356,41 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
           <InviteMemberButton boardId={board.id} canInvite={canInvite} />
         </div>
       </div>
-      <BoardCanvas
-        boardId={board.id}
-        currentUserId={snapshot.current_user_id}
-        canCreateCard={canCreateCard}
-        membersForNewCard={membersForNewCard}
-        boardLabels={boardLabels}
-        previewItems={previewItems}
-        fieldDefinitions={fieldDefinitions}
-        cardContentPermissions={{
-          canEditAny: canEditCardAny,
-          canEditOwn: canEditCardOwn,
-          canDeleteAny: canDeleteCardAny,
-          canDeleteOwn: canDeleteCardOwn
-        }}
-        columnPermissions={{
-          canCreate: canCreateColumn,
-          canRename: canRenameColumn,
-          canReorder: canReorderColumn,
-          canDelete: canDeleteColumn
-        }}
-        canMoveCards={canMoveCards}
-        canCreateComment={canCreateComment}
-        canEditOwnComment={canEditOwnComment}
-        canDeleteOwnComment={canDeleteOwnComment}
-        canModerateComments={canModerateComments}
-        board={{
-          backgroundType: board.background_type as "color" | "image",
-          backgroundColor: board.background_color,
-          backgroundImagePath: board.background_image_path
-        }}
-        columns={columns}
-        cardsByColumnId={cardsByColumnId}
-      />
-
-      {perf && (
-        <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-200">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="font-medium text-slate-100">Perf: SSR запросы Supabase</div>
-            <div className="text-slate-400">
-              Включено через <code className="text-slate-200">?perf=1</code>
-            </div>
-          </div>
-          <div className="mt-2 grid grid-cols-2 gap-2 md:grid-cols-5">
-            <div className="rounded-md bg-slate-900/60 px-2 py-1">
-              <div className="text-slate-400">Всего</div>
-              <div className="text-slate-50">{perf.total}</div>
-            </div>
-            <div className="rounded-md bg-slate-900/60 px-2 py-1">
-              <div className="text-slate-400">DB</div>
-              <div className="text-slate-50">{perf.db}</div>
-            </div>
-            <div className="rounded-md bg-slate-900/60 px-2 py-1">
-              <div className="text-slate-400">Auth</div>
-              <div className="text-slate-50">{perf.auth}</div>
-            </div>
-            <div className="rounded-md bg-slate-900/60 px-2 py-1">
-              <div className="text-slate-400">Storage</div>
-              <div className="text-slate-50">{perf.storage}</div>
-            </div>
-            <div className="rounded-md bg-slate-900/60 px-2 py-1">
-              <div className="text-slate-400">Other</div>
-              <div className="text-slate-50">{perf.other}</div>
-            </div>
-          </div>
-        </div>
-      )}
+      <div className="min-h-0">
+        <BoardCanvas
+          boardId={board.id}
+          currentUserId={snapshot.current_user_id}
+          canCreateCard={canCreateCard}
+          membersForNewCard={membersForNewCard}
+          boardLabels={boardLabels}
+          previewItems={previewItems}
+          fieldDefinitions={fieldDefinitions}
+          cardContentPermissions={{
+            canEditAny: canEditCardAny,
+            canEditOwn: canEditCardOwn,
+            canDeleteAny: canDeleteCardAny,
+            canDeleteOwn: canDeleteCardOwn
+          }}
+          columnPermissions={{
+            canCreate: canCreateColumn,
+            canRename: canRenameColumn,
+            canReorder: canReorderColumn,
+            canDelete: canDeleteColumn
+          }}
+          canMoveCards={canMoveCards}
+          canCreateComment={canCreateComment}
+          canEditOwnComment={canEditOwnComment}
+          canDeleteOwnComment={canDeleteOwnComment}
+          canModerateComments={canModerateComments}
+          board={{
+            backgroundType: board.background_type as "color" | "image",
+            backgroundColor: board.background_color,
+            backgroundImagePath: board.background_image_path
+          }}
+          columns={columns}
+          cardsByColumnId={cardsByColumnId}
+        />
+      </div>
     </main>
   );
 }

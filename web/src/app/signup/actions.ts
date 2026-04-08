@@ -34,8 +34,8 @@ export async function signUpAction(input: SignUpInput): Promise<SignUpResult> {
   if (!email) {
     return { ok: false, message: "Заполните email" };
   }
-  if (password.length < 4) {
-    return { ok: false, message: "Пароль должен быть не короче 4 символов" };
+  if (password.length < 1) {
+    return { ok: false, message: "Заполните пароль" };
   }
   if (!firstName) {
     return { ok: false, message: "Заполните имя" };

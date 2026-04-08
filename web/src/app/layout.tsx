@@ -77,7 +77,7 @@ export default async function RootLayout({
         style={{ backgroundColor: "#020617", color: "#f8fafc" }}
       >
         <BrowserNativeNotificationsProvider>
-        <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-4 py-6">
+        <div className="mx-auto flex min-h-screen max-w-5xl flex-col px-4 pt-6">
           <header className="mb-6 flex items-center justify-between gap-4 border-b border-slate-800 pb-4">
             <DoitLogoLink />
             <nav className="flex items-center gap-3 text-sm text-slate-300">
@@ -135,9 +135,6 @@ export default async function RootLayout({
             </nav>
           </header>
           <main className="flex-1">{children}</main>
-          <footer className="mt-6 border-t border-slate-800 pt-3 text-xs text-slate-500">
-            MVP Doit · Supabase + Next.js
-          </footer>
         </div>
         </BrowserNativeNotificationsProvider>
       </body>

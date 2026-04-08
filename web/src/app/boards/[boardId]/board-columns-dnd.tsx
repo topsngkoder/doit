@@ -1828,7 +1828,7 @@ export function BoardColumnsDnD({
       </div>;
 
   return (
-    <div className="space-y-1">
+    <div className="flex min-h-0 flex-1 flex-col gap-1">
       {editModal}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[11px] text-slate-500">
@@ -1844,15 +1844,17 @@ export function BoardColumnsDnD({
           {persistError}
         </p>
       : null}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragCancel={handleDragCancel}
-        onDragEnd={handleDragEnd}
-      >
-        {columnRow}
-      </DndContext>
+      <div className="min-h-0 flex-1">
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCorners}
+          onDragStart={handleDragStart}
+          onDragCancel={handleDragCancel}
+          onDragEnd={handleDragEnd}
+        >
+          {columnRow}
+        </DndContext>
+      </div>
     </div>
   );
 }

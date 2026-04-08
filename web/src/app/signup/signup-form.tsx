@@ -44,7 +44,7 @@ export function SignupForm() {
   const errors = useMemo<FieldErrors>(() => {
     return {
       email: email.trim() ? null : "Заполните email",
-      password: password.length >= 4 ? null : "Пароль должен быть не короче 4 символов",
+      password: password.length >= 1 ? null : "Заполните пароль",
       firstName: validateLength(firstName, 1, 50, true, "Заполните имя"),
       lastName: validateLength(lastName, 1, 50, true, "Заполните фамилию"),
       position: validateLength(position, 1, 100, false, ""),
@@ -105,7 +105,6 @@ export function SignupForm() {
             name="password"
             type="password"
             required
-            minLength={4}
             autoComplete="new-password"
             placeholder="••••••••"
             value={password}
