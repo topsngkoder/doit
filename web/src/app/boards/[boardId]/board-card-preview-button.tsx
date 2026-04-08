@@ -120,7 +120,7 @@ export function BoardCardPreviewButton({
         className="max-w-3xl"
       >
         <div className="flex max-h-[min(80vh,700px)] flex-col gap-4 overflow-hidden">
-          <p className="text-xs text-slate-400">
+          <p className="text-sm text-slate-400">
             Выберите, какие элементы показывать в карточках, и их порядок. Поле
             «Название» всегда включено и должно быть первым.
           </p>
@@ -138,13 +138,13 @@ export function BoardCardPreviewButton({
                   <li key={item.id} className="rounded-lg border border-slate-800 bg-slate-900/40 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-slate-100">
+                        <p className="truncate text-base font-medium text-slate-100">
                           {previewLabel(item.itemType)}
                           {fieldName ? `: ${fieldName}` : ""}
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-1">
-                        <label className="mr-1 flex items-center gap-2 text-xs text-slate-300">
+                        <label className="mr-1 flex items-center gap-2 text-sm text-slate-300">
                           <input
                             type="checkbox"
                             className="h-4 w-4 accent-sky-500"
@@ -209,12 +209,12 @@ export function BoardCardPreviewButton({
           </div>
 
           <div className="shrink-0 rounded-lg border border-slate-800/90 bg-slate-900/40 p-3">
-            <p className="mb-2 text-xs font-medium text-slate-300">
+            <p className="mb-2 text-sm font-medium text-slate-300">
               Добавить пользовательское поле в превью
             </p>
             <div className="grid gap-2 md:grid-cols-[1fr_auto]">
               <select
-                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
                 value={newFieldId}
                 onChange={(e) => setNewFieldId(e.target.value)}
                 disabled={pending || availableCustomFields.length === 0}

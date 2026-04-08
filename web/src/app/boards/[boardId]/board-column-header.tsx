@@ -170,7 +170,7 @@ export function BoardColumnHeader({
             </button>
           : null}
           <div className="min-w-0 flex-1">
-          <h2 className="truncate text-sm font-medium text-slate-100">{name}</h2>
+          <h2 className="truncate text-[18px] font-medium text-slate-100">{name}</h2>
           <div className="mt-0.5 flex flex-wrap items-center gap-2">
             <span className="text-[10px] uppercase tracking-wide text-slate-500">
               {columnTypeLabel(columnType)}

@@ -326,7 +326,7 @@ function BoardCardRow({
       : null}
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <span className="line-clamp-2 min-w-0">{card.title}</span>
+          <span className="line-clamp-2 min-w-0 text-[16px]">{card.title}</span>
           {primaryLabel ?
             <span className="shrink-0 truncate text-[11px] text-slate-400">{primaryLabel.name}</span>
           : null}
@@ -578,7 +578,7 @@ function SortableColumnShell({
     <div
       ref={setNodeRef}
       style={columnStyle}
-      className="flex w-64 shrink-0 flex-col gap-3 rounded-lg bg-slate-950/70 p-3 ring-1 ring-slate-800"
+      className="flex w-72 shrink-0 flex-col gap-3 rounded-lg bg-slate-950/70 p-3 ring-1 ring-slate-800"
     >
       <BoardColumnHeader
         boardId={boardId}
@@ -674,7 +674,7 @@ function StaticColumnShell({
   const cards = cardIds.map((id) => cardsById.get(id)).filter(Boolean) as BoardCardListItem[];
 
   return (
-    <div className="flex w-64 shrink-0 flex-col gap-3 rounded-lg bg-slate-950/70 p-3 ring-1 ring-slate-800">
+    <div className="flex w-72 shrink-0 flex-col gap-3 rounded-lg bg-slate-950/70 p-3 ring-1 ring-slate-800">
       <BoardColumnHeader
         boardId={boardId}
         columnId={col.id}
@@ -773,7 +773,7 @@ function BoardGridStatic({
       {columnRows.map((col, index) => (
         <div
           key={col.id}
-          className="flex w-64 shrink-0 flex-col gap-3 rounded-lg bg-slate-950/70 p-3 ring-1 ring-slate-800"
+          className="flex w-72 shrink-0 flex-col gap-3 rounded-lg bg-slate-950/70 p-3 ring-1 ring-slate-800"
         >
           <BoardColumnHeader
             boardId={boardId}
