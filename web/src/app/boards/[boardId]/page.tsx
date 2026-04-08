@@ -16,7 +16,6 @@ import { BoardFieldsButton } from "./board-fields-button";
 import { BoardCardPreviewButton } from "./board-card-preview-button";
 import { BoardBackgroundButton } from "./board-background-button";
 import { InviteMemberButton } from "./invite-member-button";
-import { LastOpenedBoardTracker } from "@/components/last-opened-board-tracker";
 
 const AVATARS_BUCKET = "avatars";
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
@@ -351,7 +350,6 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
 
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 pb-10">
-      <LastOpenedBoardTracker boardId={board.id} />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <Link

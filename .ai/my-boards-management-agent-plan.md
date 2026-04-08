@@ -47,10 +47,11 @@
   - авторизованного пользователя на `/` или `/login` ведёт на `/boards`;
   - логики `default_board_id` не содержит.
 - `web/src/components/doit-logo-link.tsx`
-  - использует `localStorage` ключ `doit:last-opened-board-id`;
-  - ведёт либо на `/boards/{id}`, либо на `/boards`.
+  - ведёт на `/go`;
+  - не использует `localStorage`.
 - `web/src/components/last-opened-board-tracker.tsx`
-  - записывает последнюю открытую доску в `localStorage`.
+  - legacy-компонент удалён;
+  - механизм `last opened board` больше не используется для навигации.
 - `web/src/app/layout.tsx`
   - выводит `DoitLogoLink`;
   - ссылка "Мои доски" ведёт на `/boards`.
@@ -327,16 +328,19 @@
   - **DoD**: выполнен раздел 7.4.
 
 ### EPIC MB9 - Убрать влияние legacy `last opened board` на поведение приложения
-- [ ] **MB9.1 (todo)** Найти все чтения `doit:last-opened-board-id`
+- [x] **MB9.1 (done)** Найти все чтения `doit:last-opened-board-id`
   - убрать из логики выбора маршрута "в приложение";
   - не использовать для `DOIT`, `/`, `/go`.
+  - Прогресс: выполнен поиск по репозиторию по ключу `doit:last-opened-board-id`; чтений (`localStorage.getItem`) не осталось. Входная маршрутизация (`/`, `/go`, `DOIT`) не использует `localStorage`, ключ присутствует только в `web/src/components/last-opened-board-tracker.tsx` для записи (`setItem`) и не влияет на entry redirect.
   - **DoD**: localStorage больше не влияет на entry redirect.
-- [ ] **MB9.2 (todo)** Решить судьбу `LastOpenedBoardTracker`
+- [x] **MB9.2 (done)** Решить судьбу `LastOpenedBoardTracker`
   - либо удалить полностью;
   - либо оставить только как нейтральный telemetry/helper без влияния на навигацию.
+  - Прогресс: выбран вариант полного удаления legacy-механизма: удалён компонент `web/src/components/last-opened-board-tracker.tsx`, а также его использование в `web/src/app/boards/[boardId]/page.tsx` (import и рендер). После этого в кодовой базе больше нет `LastOpenedBoardTracker` и записи `doit:last-opened-board-id`.
   - **DoD**: legacy-механизм не конфликтует со спецификацией.
-- [ ] **MB9.3 (todo)** Убедиться, что документация/комментарии не вводят в заблуждение
+- [x] **MB9.3 (done)** Убедиться, что документация/комментарии не вводят в заблуждение
   - убрать ссылки на "последнюю открытую доску" как основной сценарий входа.
+  - Прогресс: актуализирован раздел "Что уже есть в коде" в `@.ai/my-boards-management-agent-plan.md`: удалены устаревшие формулировки про использование `doit:last-opened-board-id` в `DoitLogoLink` и существование `LastOpenedBoardTracker` как активного механизма. Зафиксировано текущее состояние: `DOIT` ведёт на `/go`, legacy-трекер удалён, `last opened board` не является сценарием входа.
   - **DoD**: кодовая база отражает новую модель маршрутизации.
 
 ### EPIC MB10 - Проверка, приёмка и доводка
