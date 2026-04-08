@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 import { updateBoardMemberRoleAction } from "./actions";
+import { InviteMemberButton } from "./invite-member-button";
 
 export type BoardRoleOption = {
   id: string;
@@ -58,7 +59,8 @@ function AvatarCircle({
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}
-        alt=""
+        alt={label}
+        title={label}
         className={cn(dim, "rounded-full object-cover")}
       />
     );
@@ -69,7 +71,8 @@ function AvatarCircle({
         dim,
         "flex items-center justify-center rounded-full bg-slate-700 font-medium text-slate-200"
       )}
-      aria-hidden
+      title={label}
+      aria-label={label}
     >
       {initials(label)}
     </div>
@@ -130,40 +133,51 @@ export function BoardMembersPanel({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="group flex items-center rounded-full outline-none ring-offset-2 ring-offset-slate-950 focus-visible:ring-2 focus-visible:ring-sky-500"
-        aria-label={`Участники доски, ${sorted.length}`}
-      >
-        <span className="flex items-center pr-1">
-          {preview.map((m, i) => (
-            <span
-              key={m.userId}
-              className={cn(
-                "relative rounded-full ring-2 ring-slate-950",
-                i > 0 && "-ml-2"
-              )}
-              style={{ zIndex: preview.length - i }}
-            >
-              <AvatarCircle label={m.displayName} src={m.avatarUrl} />
-            </span>
-          ))}
-          {overflow > 0 ? (
-            <span
-              className={cn(
-                "relative -ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-slate-100 ring-2 ring-slate-950"
-              )}
-              style={{ zIndex: 0 }}
-            >
-              +{overflow}
-            </span>
-          ) : null}
-        </span>
-        <span className="pl-1.5 text-sm text-slate-400 underline-offset-2 group-hover:text-slate-200 group-hover:underline">
+      <div className="group flex items-center">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex items-center rounded-full outline-none ring-offset-2 ring-offset-slate-950 focus-visible:ring-2 focus-visible:ring-sky-500"
+          aria-label={`Участники доски, ${sorted.length}`}
+        >
+          <span className="flex items-center pr-1">
+            {preview.map((m, i) => (
+              <span
+                key={m.userId}
+                className={cn(
+                  "relative rounded-full ring-2 ring-slate-950",
+                  i > 0 && "-ml-2"
+                )}
+                style={{ zIndex: preview.length - i }}
+              >
+                <AvatarCircle label={m.displayName} src={m.avatarUrl} />
+              </span>
+            ))}
+            {overflow > 0 ? (
+              <span
+                className={cn(
+                  "relative -ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-slate-100 ring-2 ring-slate-950"
+                )}
+                style={{ zIndex: 0 }}
+              >
+                +{overflow}
+              </span>
+            ) : null}
+          </span>
+        </button>
+        <InviteMemberButton
+          boardId={boardId}
+          canInvite={canInvite}
+          triggerClassName="-ml-2 h-8 w-8 shrink-0 rounded-full border-0 bg-slate-700 p-0 text-sm font-semibold leading-none text-slate-100 ring-2 ring-slate-950 hover:bg-slate-600"
+        />
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="pl-1.5 text-sm text-slate-400 underline-offset-2 outline-none ring-offset-2 ring-offset-slate-950 transition-colors hover:text-slate-200 hover:underline focus-visible:ring-2 focus-visible:ring-sky-500"
+        >
           Участники
-        </span>
-      </button>
+        </button>
+      </div>
 
       <Modal open={open} title="Участники доски" onClose={() => setOpen(false)}>
         <p className="mb-3 text-slate-400">

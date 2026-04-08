@@ -10,11 +10,7 @@ import type {
 } from "./column-types";
 import type { NewCardFieldDefinition } from "./card-field-drafts";
 import { BoardMembersPanel, type BoardMemberPublic, type BoardRoleOption } from "./board-members";
-import { BoardLabelsButton } from "./board-labels-button";
-import { BoardFieldsButton } from "./board-fields-button";
-import { BoardCardPreviewButton } from "./board-card-preview-button";
-import { BoardBackgroundButton } from "./board-background-button";
-import { InviteMemberButton } from "./invite-member-button";
+import { BoardSettingsMenu } from "./board-settings-menu";
 
 const AVATARS_BUCKET = "avatars";
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
@@ -331,29 +327,18 @@ export default async function BoardPage({ params }: BoardPageProps) {
             canInvite={canInvite}
             canManageRoles={canManageRoles}
           />
-          <BoardLabelsButton
+          <BoardSettingsMenu
             boardId={board.id}
-            canManage={canManageBoardLabels}
-            labels={boardLabels}
-          />
-          <BoardFieldsButton
-            boardId={board.id}
-            canManage={canManageCardFields}
+            canManageBoardLabels={canManageBoardLabels}
+            canManageCardFields={canManageCardFields}
+            canManageCardPreview={canManageCardPreview}
+            canChangeBoardBackground={canChangeBoardBackground}
+            boardLabels={boardLabels}
             fieldDefinitions={fieldDefinitions}
-          />
-          <BoardCardPreviewButton
-            boardId={board.id}
-            canManage={canManageCardPreview}
             previewItems={previewItems}
-            fieldDefinitions={fieldDefinitions}
+            backgroundType={board.background_type as "color" | "image"}
+            backgroundColor={board.background_color}
           />
-          <BoardBackgroundButton
-            boardId={board.id}
-            canManage={canChangeBoardBackground}
-            currentType={board.background_type as "color" | "image"}
-            currentColor={board.background_color}
-          />
-          <InviteMemberButton boardId={board.id} canInvite={canInvite} />
         </div>
       </div>
       <div className="min-h-0">

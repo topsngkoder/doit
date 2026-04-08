@@ -1,4 +1,8 @@
+/* eslint-disable react-dom/no-unknown-property */
+"use client";
+
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { Button } from "./button";
 
@@ -13,9 +17,17 @@ export type ModalProps = {
 };
 
 export function Modal({ open, title, onClose, children, className, bodyClassName }: ModalProps) {
-  if (!open) return null;
+  const [mounted, setMounted] = React.useState(false);
 
-  return (
+  React.useEffect(() => {
+    setMounted(true);
+    return () => setMounted(false);
+  }, []);
+
+  if (!open) return null;
+  if (!mounted) return null;
+
+  return createPortal(
     <div
       role="presentation"
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 py-8"
@@ -57,7 +69,8 @@ export function Modal({ open, title, onClose, children, className, bodyClassName
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

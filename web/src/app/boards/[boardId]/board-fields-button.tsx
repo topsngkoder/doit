@@ -24,6 +24,9 @@ type BoardFieldsButtonProps = {
   boardId: string;
   canManage: boolean;
   fieldDefinitions: NewCardFieldDefinition[];
+  triggerClassName?: string;
+  triggerVariant?: "primary" | "secondary" | "ghost" | "destructive";
+  onTriggerClick?: () => void;
 };
 
 const FIELD_TYPE_OPTIONS = [
@@ -42,7 +45,10 @@ type FormState = {
 export function BoardFieldsButton({
   boardId,
   canManage,
-  fieldDefinitions
+  fieldDefinitions,
+  triggerClassName,
+  triggerVariant = "secondary",
+  onTriggerClick
 }: BoardFieldsButtonProps) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -127,7 +133,16 @@ export function BoardFieldsButton({
 
   return (
     <>
-      <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant={triggerVariant}
+        size="sm"
+        className={triggerClassName}
+        onClick={() => {
+          onTriggerClick?.();
+          setOpen(true);
+        }}
+      >
         Поля
       </Button>
       <Modal open={open} title="Поля доски" onClose={() => setOpen(false)} className="max-w-3xl">

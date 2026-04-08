@@ -18,13 +18,19 @@ type BoardBackgroundButtonProps = {
   canManage: boolean;
   currentType: "color" | "image";
   currentColor: string | null;
+  triggerClassName?: string;
+  triggerVariant?: "primary" | "secondary" | "ghost" | "destructive";
+  onTriggerClick?: () => void;
 };
 
 export function BoardBackgroundButton({
   boardId,
   canManage,
   currentType,
-  currentColor
+  currentColor,
+  triggerClassName,
+  triggerVariant = "secondary",
+  onTriggerClick
 }: BoardBackgroundButtonProps) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -74,13 +80,22 @@ export function BoardBackgroundButton({
 
   return (
     <>
-      <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant={triggerVariant}
+        size="sm"
+        className={triggerClassName}
+        onClick={() => {
+          onTriggerClick?.();
+          setOpen(true);
+        }}
+      >
         Фон
       </Button>
       <Modal open={open} title="Фон доски" onClose={() => setOpen(false)} className="max-w-md">
         <div className="space-y-4">
           <p className="text-xs text-slate-400">
-            Можно выбрать цвет или загрузить изображение (до 5 МБ).
+            Можно выбрать цвет или загрузить изображение.
           </p>
 
           <div className="space-y-2 rounded-lg border border-slate-800/90 bg-slate-900/40 p-3">

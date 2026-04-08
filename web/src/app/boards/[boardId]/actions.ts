@@ -16,7 +16,6 @@ function normalizeEmail(raw: string): string {
 }
 
 const BOARD_BACKGROUNDS_BUCKET = "board-backgrounds";
-const MAX_BACKGROUND_FILE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_BACKGROUND_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -108,9 +107,6 @@ export async function updateBoardBackgroundImageAction(
   }
   if (file.size <= 0) {
     return { ok: false, message: "Файл пустой." };
-  }
-  if (file.size > MAX_BACKGROUND_FILE_BYTES) {
-    return { ok: false, message: "Файл слишком большой: максимум 5 МБ." };
   }
   if (!ALLOWED_BACKGROUND_MIME_TYPES.has(file.type)) {
     return { ok: false, message: "Допустимы JPEG, PNG, WEBP или GIF." };

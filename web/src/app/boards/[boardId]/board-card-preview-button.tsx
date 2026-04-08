@@ -19,6 +19,9 @@ type BoardCardPreviewButtonProps = {
   canManage: boolean;
   previewItems: BoardCardPreviewItem[];
   fieldDefinitions: NewCardFieldDefinition[];
+  triggerClassName?: string;
+  triggerVariant?: "primary" | "secondary" | "ghost" | "destructive";
+  onTriggerClick?: () => void;
 };
 
 function previewLabel(itemType: BoardCardPreviewItem["itemType"]): string {
@@ -44,7 +47,10 @@ export function BoardCardPreviewButton({
   boardId,
   canManage,
   previewItems,
-  fieldDefinitions
+  fieldDefinitions,
+  triggerClassName,
+  triggerVariant = "secondary",
+  onTriggerClick
 }: BoardCardPreviewButtonProps) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -110,7 +116,16 @@ export function BoardCardPreviewButton({
 
   return (
     <>
-      <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant={triggerVariant}
+        size="sm"
+        className={triggerClassName}
+        onClick={() => {
+          onTriggerClick?.();
+          setOpen(true);
+        }}
+      >
         Отображение карточек
       </Button>
       <Modal

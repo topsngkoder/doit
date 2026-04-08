@@ -12,6 +12,7 @@ import {
 type InviteMemberButtonProps = {
   boardId: string;
   canInvite: boolean;
+  triggerClassName?: string;
 };
 
 const initialState: InviteBoardMemberResult = { ok: false, message: "" };
@@ -67,7 +68,7 @@ function InviteMemberForm({
   );
 }
 
-export function InviteMemberButton({ boardId, canInvite }: InviteMemberButtonProps) {
+export function InviteMemberButton({ boardId, canInvite, triggerClassName }: InviteMemberButtonProps) {
   const [open, setOpen] = React.useState(false);
   const [formInstance, setFormInstance] = React.useState(0);
 
@@ -86,7 +87,10 @@ export function InviteMemberButton({ boardId, canInvite }: InviteMemberButtonPro
         type="button"
         size="sm"
         variant="secondary"
-        className="h-9 w-9 shrink-0 rounded-full p-0 text-lg leading-none"
+        className={
+          triggerClassName ??
+          "h-8 w-8 shrink-0 rounded-full border-0 bg-slate-700 p-0 text-sm font-semibold leading-none text-slate-100 ring-2 ring-slate-950 hover:bg-slate-600"
+        }
         aria-label="Пригласить по email"
         title="Пригласить по email"
         onClick={() => setOpen(true)}

@@ -20,9 +20,19 @@ type BoardLabelsButtonProps = {
   boardId: string;
   canManage: boolean;
   labels: BoardLabelOption[];
+  triggerClassName?: string;
+  triggerVariant?: "primary" | "secondary" | "ghost" | "destructive";
+  onTriggerClick?: () => void;
 };
 
-export function BoardLabelsButton({ boardId, canManage, labels }: BoardLabelsButtonProps) {
+export function BoardLabelsButton({
+  boardId,
+  canManage,
+  labels,
+  triggerClassName,
+  triggerVariant = "secondary",
+  onTriggerClick
+}: BoardLabelsButtonProps) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
@@ -120,7 +130,16 @@ export function BoardLabelsButton({ boardId, canManage, labels }: BoardLabelsBut
 
   return (
     <>
-      <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        variant={triggerVariant}
+        size="sm"
+        className={triggerClassName}
+        onClick={() => {
+          onTriggerClick?.();
+          setOpen(true);
+        }}
+      >
         Метки
       </Button>
       <Modal open={open} title="Метки доски" onClose={() => setOpen(false)} className="max-w-md">
