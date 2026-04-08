@@ -35,13 +35,14 @@ export function BoardsDefaultSelector({
   const [deleteConfirmationName, setDeleteConfirmationName] = useState("");
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isDeletePending, setIsDeletePending] = useState(false);
+  const isAnyOperationPending = isPending || isRenamePending || isDeletePending;
 
   useEffect(() => {
     setVisibleBoards(boards);
   }, [boards]);
 
   function onToggle(boardId: string, nextChecked: boolean) {
-    if (isPending) {
+    if (isAnyOperationPending) {
       return;
     }
 
@@ -162,7 +163,7 @@ export function BoardsDefaultSelector({
                   size="sm"
                   variant="secondary"
                   onClick={() => openRenameModal(board)}
-                  disabled={isPending}
+                  disabled={isAnyOperationPending}
                 >
                   Переименовать
                 </Button>
@@ -173,7 +174,7 @@ export function BoardsDefaultSelector({
                   size="sm"
                   variant="secondary"
                   onClick={() => openDeleteModal(board)}
-                  disabled={isPending}
+                  disabled={isAnyOperationPending}
                 >
                   Удалить
                 </Button>
@@ -183,7 +184,7 @@ export function BoardsDefaultSelector({
                   type="checkbox"
                   checked={defaultBoardId === board.id}
                   onChange={(event) => onToggle(board.id, event.currentTarget.checked)}
-                  disabled={isPending}
+                  disabled={isAnyOperationPending}
                   className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-sky-500 focus:ring-sky-500"
                 />
                 По умолчанию
