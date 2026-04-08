@@ -25,5 +25,6 @@ Required environment variables:
 Notes:
 
 - Example values are documented in `web/.env.local.example`.
-- Vercel cron is configured in `web/vercel.json` and calls `/api/cron/process-notification-outbox` every 5 minutes.
+- Vercel Hobby supports cron jobs only once per day, so `web/vercel.json` schedules `/api/cron/process-notification-outbox` once daily at `09:00 UTC`.
+- If you need notification processing more often than once per day, keep Vercel for hosting and trigger `/api/cron/process-notification-outbox` from an external scheduler instead.
 - Supabase SQL migrations are not applied by Vercel automatically. Run them separately against your Supabase database before production use.

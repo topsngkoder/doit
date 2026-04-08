@@ -1,3 +1,4 @@
+import colors from "tailwindcss/colors";
 import type { Config } from "tailwindcss";
 
 const config: Config = {
@@ -6,6 +7,10 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      colors: {
+        slate: colors.zinc,
+        sky: colors.gray
+      },
       fontFamily: {
         sans: [
           "var(--font-manrope)",

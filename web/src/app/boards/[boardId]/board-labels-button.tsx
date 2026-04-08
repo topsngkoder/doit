@@ -26,7 +26,7 @@ export function BoardLabelsButton({ boardId, canManage, labels }: BoardLabelsBut
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [name, setName] = React.useState("");
-  const [color, setColor] = React.useState("#64748B");
+  const [color, setColor] = React.useState("#71717A");
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
   const [editPendingId, setEditPendingId] = React.useState<string | null>(null);
@@ -34,7 +34,7 @@ export function BoardLabelsButton({ boardId, canManage, labels }: BoardLabelsBut
   const [deletePendingId, setDeletePendingId] = React.useState<string | null>(null);
   const [editingId, setEditingId] = React.useState<string | null>(null);
   const [editingName, setEditingName] = React.useState("");
-  const [editingColor, setEditingColor] = React.useState("#64748B");
+  const [editingColor, setEditingColor] = React.useState("#71717A");
 
   const sorted = React.useMemo(
     () => [...labels].sort((a, b) => a.position - b.position),

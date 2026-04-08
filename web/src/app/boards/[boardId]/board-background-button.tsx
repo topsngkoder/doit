@@ -28,13 +28,13 @@ export function BoardBackgroundButton({
 }: BoardBackgroundButtonProps) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
-  const [color, setColor] = React.useState(currentColor ?? "#0F172A");
+  const [color, setColor] = React.useState(currentColor ?? "#18181B");
   const [file, setFile] = React.useState<File | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [pendingMode, setPendingMode] = React.useState<"color" | "image" | null>(null);
 
   React.useEffect(() => {
-    setColor(currentColor ?? "#0F172A");
+    setColor(currentColor ?? "#18181B");
   }, [currentColor, open]);
 
   if (!canManage) {

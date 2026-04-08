@@ -71,10 +71,10 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="ru" className={manrope.variable} style={{ backgroundColor: "#020617" }}>
+    <html lang="ru" className={manrope.variable} style={{ backgroundColor: "#09090b" }}>
       <body
         className="min-h-screen bg-slate-950 font-sans text-slate-50"
-        style={{ backgroundColor: "#020617", color: "#f8fafc" }}
+        style={{ backgroundColor: "#09090b", color: "#fafafa" }}
       >
         <BrowserNativeNotificationsProvider>
         <div className="flex min-h-screen flex-col pt-2">

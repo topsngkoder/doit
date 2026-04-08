@@ -209,7 +209,7 @@ export function BoardFieldsButton({
                 {sorted.map((field, index) => {
                   const optionDraft = optionDrafts[field.id] ?? {
                     name: "",
-                    color: "#64748B"
+                    color: "#71717A"
                   };
                   const options = [...(field.selectOptions ?? [])].sort(
                     (a, b) => a.position - b.position
@@ -459,7 +459,7 @@ export function BoardFieldsButton({
                                   if (res.ok) {
                                     setOptionDrafts((prev) => ({
                                       ...prev,
-                                      [field.id]: { name: "", color: "#64748B" }
+                                      [field.id]: { name: "", color: "#71717A" }
                                     }));
                                   }
                                   return res;
