@@ -176,10 +176,8 @@ export function EditCardModal({
   );
   const [selectedLabelIds, setSelectedLabelIds] = React.useState<Set<string>>(() => new Set());
   const [labelPending, setLabelPending] = React.useState(false);
-  const [labelQuery, setLabelQuery] = React.useState("");
-  const [labelSuggestOpen, setLabelSuggestOpen] = React.useState(false);
+  const [openLabelMenuId, setOpenLabelMenuId] = React.useState<string | "new" | null>(null);
   const [isEditingTitle, setIsEditingTitle] = React.useState(false);
-  const labelComboRef = React.useRef<HTMLDivElement>(null);
   const titleInputRef = React.useRef<HTMLInputElement>(null);
 
   const [fieldDrafts, setFieldDrafts] = React.useState<Record<string, FieldDraft>>({});
@@ -218,24 +216,24 @@ export function EditCardModal({
   React.useEffect(() => {
     if (!open || !card) return;
     setSelectedLabelIds(new Set(card.labelIds));
-    setLabelQuery("");
-    setLabelSuggestOpen(false);
+    setOpenLabelMenuId(null);
   }, [open, card?.id, labelSyncKey]);
 
   React.useEffect(() => {
-    if (!labelSuggestOpen) return;
+    if (!open) setOpenLabelMenuId(null);
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!openLabelMenuId) return;
     const onMouseDown = (e: MouseEvent) => {
-      const el = e.target as Node;
-      if (labelComboRef.current?.contains(el)) return;
-      setLabelSuggestOpen(false);
+      const el = e.target as HTMLElement;
+      const hit = el.closest("[data-label-menu]");
+      if (hit?.getAttribute("data-label-menu") === String(openLabelMenuId)) return;
+      setOpenLabelMenuId(null);
     };
     document.addEventListener("mousedown", onMouseDown);
     return () => document.removeEventListener("mousedown", onMouseDown);
-  }, [labelSuggestOpen]);
-
-  React.useEffect(() => {
-    if (!open) setLabelSuggestOpen(false);
-  }, [open]);
+  }, [openLabelMenuId]);
 
   React.useEffect(() => {
     if (!openAssigneePanelUserId) return;
@@ -353,13 +351,9 @@ export function EditCardModal({
   const labelsOnCard = boardLabels
     .filter((l) => selectedLabelIds.has(l.id))
     .sort((a, b) => a.position - b.position);
-
-  const labelQueryNorm = labelQuery.trim().toLowerCase();
-  const labelSuggestions = boardLabels.filter(
-    (l) =>
-      !selectedLabelIds.has(l.id) &&
-      (labelQueryNorm === "" || l.name.toLowerCase().includes(labelQueryNorm))
-  );
+  const labelCandidates = boardLabels
+    .filter((l) => !selectedLabelIds.has(l.id))
+    .sort((a, b) => a.position - b.position);
 
   const toggleCardLabel = async (labelId: string, add: boolean) => {
     if (!card || !canManageLabels || labelPending) return;
@@ -377,8 +371,33 @@ export function EditCardModal({
       else next.delete(labelId);
       return next;
     });
-    setLabelQuery("");
-    setLabelSuggestOpen(false);
+    setOpenLabelMenuId(null);
+    router.refresh();
+  };
+
+  const replaceCardLabel = async (currentLabelId: string, nextLabelId: string) => {
+    if (!card || !canManageLabels || labelPending || currentLabelId === nextLabelId) return;
+    setError(null);
+    setLabelPending(true);
+    const removeRes = await mutateCardLabelAction(boardId, card.id, currentLabelId, false);
+    if (!removeRes.ok) {
+      setLabelPending(false);
+      setError(removeRes.message);
+      return;
+    }
+    const addRes = await mutateCardLabelAction(boardId, card.id, nextLabelId, true);
+    setLabelPending(false);
+    if (!addRes.ok) {
+      setError(addRes.message);
+      return;
+    }
+    setSelectedLabelIds((prev) => {
+      const next = new Set(prev);
+      next.delete(currentLabelId);
+      next.add(nextLabelId);
+      return next;
+    });
+    setOpenLabelMenuId(null);
     router.refresh();
   };
 
@@ -457,6 +476,99 @@ export function EditCardModal({
               >
                 История
               </button>
+              <div className="ml-auto flex flex-wrap items-center gap-1.5">
+                {assigneesOnCard.map((m) => {
+                  const isResponsible = card.responsibleUserId === m.userId;
+                  const isCardCreator = card.createdByUserId === m.userId;
+                  const panelOpen = openAssigneePanelUserId === m.userId;
+                  const showActions = canManageAssignees;
+
+                  return (
+                    <div
+                      key={m.userId}
+                      className="relative"
+                      data-assignee-panel={m.userId}
+                    >
+                      <button
+                        type="button"
+                        disabled={pending}
+                        aria-expanded={panelOpen}
+                        aria-haspopup="dialog"
+                        onClick={() =>
+                          setOpenAssigneePanelUserId((cur) => (cur === m.userId ? null : m.userId))
+                        }
+                        className={cn(
+                          "flex items-center justify-center rounded-full border p-1 text-left text-sm transition-colors",
+                          isCardCreator ?
+                            "border-amber-400/90 bg-amber-950/20 text-amber-100"
+                          : "border-slate-700 bg-slate-900/80 text-slate-100 hover:border-slate-600"
+                        )}
+                        title={m.displayName}
+                      >
+                        <span className="relative flex items-center justify-center">
+                          {isResponsible ?
+                            <span
+                              className="pointer-events-none absolute -bottom-2.5 left-1/2 -translate-x-1/2 text-sky-200 drop-shadow-[0_0_4px_rgba(56,189,248,0.7)]"
+                              aria-hidden
+                            >
+                              <span className="text-sm leading-none">🛠️</span>
+                            </span>
+                          : null}
+                          <AssigneeAvatar
+                            label={m.displayName}
+                            src={m.avatarUrl ?? null}
+                            className="h-7 w-7 shrink-0 text-xs"
+                          />
+                        </span>
+                        <span className="sr-only">{m.displayName}</span>
+                      </button>
+                      {panelOpen ?
+                        <div className="absolute right-0 top-[calc(100%+6px)] z-[60] w-max min-w-[240px] max-w-[min(100vw-3rem,280px)]">
+                          <Popover className="space-y-3 p-3 text-xs">
+                            <div className="flex gap-3">
+                              <AssigneeAvatar
+                                label={m.displayName}
+                                src={m.avatarUrl ?? null}
+                                className="h-12 w-12 shrink-0 text-sm"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium text-slate-100">{m.displayName}</p>
+                                <p className="break-all text-slate-400">{m.email}</p>
+                              </div>
+                            </div>
+                            {showActions ?
+                              <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-2">
+                                {!isResponsible ?
+                                  <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    className="w-full justify-center"
+                                    disabled={assigneePending}
+                                    onClick={() => void handleSetResponsible(m.userId)}
+                                  >
+                                    Сделать ответственным
+                                  </Button>
+                                : null}
+                                <Button
+                                  type="button"
+                                  variant="secondary"
+                                  size="sm"
+                                  className="w-full justify-center text-rose-200 hover:bg-rose-950/50"
+                                  disabled={assigneePending || selectedAssigneeIds.size <= 1}
+                                  onClick={() => void toggleAssignee(m.userId)}
+                                >
+                                  Исключить из карточки
+                                </Button>
+                              </div>
+                            : null}
+                          </Popover>
+                        </div>
+                      : null}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             {activeTab === "history" ?
@@ -662,89 +774,6 @@ export function EditCardModal({
             })()}
 
             <div>
-              <p className="mb-2 text-xs font-medium text-slate-400">Участники карточки</p>
-              <div className="flex flex-wrap gap-2">
-                {assigneesOnCard.map((m) => {
-                  const isResponsible = card.responsibleUserId === m.userId;
-                  const panelOpen = openAssigneePanelUserId === m.userId;
-                  const showActions = canManageAssignees;
-
-                  return (
-                    <div
-                      key={m.userId}
-                      className="relative"
-                      data-assignee-panel={m.userId}
-                    >
-                      <button
-                        type="button"
-                        disabled={pending}
-                        aria-expanded={panelOpen}
-                        aria-haspopup="dialog"
-                        onClick={() =>
-                          setOpenAssigneePanelUserId((cur) => (cur === m.userId ? null : m.userId))
-                        }
-                        className={cn(
-                          "flex items-center justify-center rounded-full border p-1 text-left text-sm transition-colors",
-                          isResponsible ?
-                            "border-sky-700/80 bg-sky-950/50 text-sky-100"
-                          : "border-slate-700 bg-slate-900/80 text-slate-100 hover:border-slate-600"
-                        )}
-                        title={m.displayName}
-                      >
-                        <AssigneeAvatar
-                          label={m.displayName}
-                          src={m.avatarUrl ?? null}
-                          className="h-7 w-7 shrink-0 text-xs"
-                        />
-                        <span className="sr-only">{m.displayName}</span>
-                      </button>
-                      {panelOpen ?
-                        <div className="absolute left-0 top-[calc(100%+6px)] z-[60] w-max min-w-[240px] max-w-[min(100vw-3rem,280px)]">
-                          <Popover className="space-y-3 p-3 text-xs">
-                            <div className="flex gap-3">
-                              <AssigneeAvatar
-                                label={m.displayName}
-                                src={m.avatarUrl ?? null}
-                                className="h-12 w-12 shrink-0 text-sm"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <p className="font-medium text-slate-100">{m.displayName}</p>
-                                <p className="break-all text-slate-400">{m.email}</p>
-                              </div>
-                            </div>
-                            {showActions ?
-                              <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-2">
-                                {!isResponsible ?
-                                  <Button
-                                    type="button"
-                                    variant="secondary"
-                                    size="sm"
-                                    className="w-full justify-center"
-                                    disabled={assigneePending}
-                                    onClick={() => void handleSetResponsible(m.userId)}
-                                  >
-                                    Сделать ответственным
-                                  </Button>
-                                : null}
-                                <Button
-                                  type="button"
-                                  variant="secondary"
-                                  size="sm"
-                                  className="w-full justify-center text-rose-200 hover:bg-rose-950/50"
-                                  disabled={assigneePending || selectedAssigneeIds.size <= 1}
-                                  onClick={() => void toggleAssignee(m.userId)}
-                                >
-                                  Исключить из карточки
-                                </Button>
-                              </div>
-                            : null}
-                          </Popover>
-                        </div>
-                      : null}
-                    </div>
-                  );
-                })}
-              </div>
               {canManageAssignees && membersToAdd.length > 0 ?
                 <div className="mt-4 border-t border-slate-800/80 pt-3">
                   <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
@@ -789,14 +818,84 @@ export function EditCardModal({
               : <>
                   <div className="mb-2 flex flex-wrap gap-1.5">
                     {labelsOnCard.length === 0 ?
-                      <span className="text-xs text-slate-500">Меток нет</span>
-                    : labelsOnCard.map((l) => (
-                        <span
-                          key={l.id}
-                          className="inline-flex max-w-full items-center gap-1 rounded-md border border-slate-700 bg-slate-900/80 pl-2 pr-1 text-xs text-slate-100"
-                          style={{ borderLeftWidth: 3, borderLeftColor: l.color }}
+                      <div className="relative" data-label-menu="new">
+                        <button
+                          type="button"
+                          disabled={!canManageLabels || labelPending || pending}
+                          className={cn(
+                            "text-xs",
+                            canManageLabels ?
+                              "text-slate-400 hover:text-slate-200"
+                            : "cursor-default text-slate-500"
+                          )}
+                          onClick={() => setOpenLabelMenuId((cur) => (cur === "new" ? null : "new"))}
                         >
-                          <span className="min-w-0 truncate">{l.name}</span>
+                          Меток нет
+                        </button>
+                        {canManageLabels && openLabelMenuId === "new" ?
+                          <ul className="absolute z-[70] mt-1 max-h-48 w-[18rem] overflow-auto rounded-md border border-slate-700 bg-slate-950 py-1 shadow-lg">
+                            {labelCandidates.length === 0 ?
+                              <li className="px-3 py-2 text-xs text-slate-500">Нет доступных меток</li>
+                            : labelCandidates.map((l) => (
+                                <li key={l.id}>
+                                  <button
+                                    type="button"
+                                    disabled={labelPending || pending}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800"
+                                    onClick={() => void toggleCardLabel(l.id, true)}
+                                  >
+                                    <span
+                                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                      style={{ backgroundColor: l.color }}
+                                      aria-hidden
+                                    />
+                                    <span className="min-w-0 truncate">{l.name}</span>
+                                  </button>
+                                </li>
+                              ))}
+                          </ul>
+                        : null}
+                      </div>
+                    : labelsOnCard.map((l) => (
+                        <div
+                          key={l.id}
+                          className="relative"
+                          data-label-menu={l.id}
+                        >
+                          <button
+                            type="button"
+                            disabled={!canManageLabels || labelPending || pending}
+                            className="inline-flex max-w-full items-center gap-1 rounded-md border border-slate-700 bg-slate-900/80 px-2 py-1 text-xs text-slate-100"
+                            style={{ borderLeftWidth: 3, borderLeftColor: l.color }}
+                            onClick={() =>
+                              setOpenLabelMenuId((cur) => (cur === l.id ? null : l.id))
+                            }
+                          >
+                            <span className="min-w-0 truncate">{l.name}</span>
+                          </button>
+                          {canManageLabels && openLabelMenuId === l.id ?
+                            <ul className="absolute z-[70] mt-1 max-h-48 w-[18rem] overflow-auto rounded-md border border-slate-700 bg-slate-950 py-1 shadow-lg">
+                              {labelCandidates.length === 0 ?
+                                <li className="px-3 py-2 text-xs text-slate-500">Нет доступных меток</li>
+                              : labelCandidates.map((candidate) => (
+                                  <li key={candidate.id}>
+                                    <button
+                                      type="button"
+                                      disabled={labelPending || pending}
+                                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800"
+                                      onClick={() => void replaceCardLabel(l.id, candidate.id)}
+                                    >
+                                      <span
+                                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                        style={{ backgroundColor: candidate.color }}
+                                        aria-hidden
+                                      />
+                                      <span className="min-w-0 truncate">{candidate.name}</span>
+                                    </button>
+                                  </li>
+                                ))}
+                            </ul>
+                          : null}
                           {canManageLabels ?
                             <button
                               type="button"
@@ -808,59 +907,9 @@ export function EditCardModal({
                               ×
                             </button>
                           : null}
-                        </span>
+                        </div>
                       ))}
                   </div>
-                  {canManageLabels ?
-                    <div ref={labelComboRef} className="relative space-y-1">
-                      <label htmlFor={`card-labels-q-${card.id}`} className="sr-only">
-                        Добавить метку по названию
-                      </label>
-                      <input
-                        id={`card-labels-q-${card.id}`}
-                        className={cn(inputClass, "w-[18rem] max-w-[18rem]")}
-                        placeholder="Найти метку по названию…"
-                        value={labelQuery}
-                        disabled={labelPending || pending}
-                        autoComplete="off"
-                        onChange={(e) => {
-                          setLabelQuery(e.target.value);
-                          setLabelSuggestOpen(true);
-                        }}
-                        onFocus={() => setLabelSuggestOpen(true)}
-                      />
-                      {labelSuggestOpen && labelSuggestions.length > 0 ?
-                        <ul
-                          className="absolute z-[70] mt-1 max-h-48 w-full overflow-auto rounded-md border border-slate-700 bg-slate-950 py-1 shadow-lg"
-                          role="listbox"
-                        >
-                          {labelSuggestions.map((l) => (
-                            <li key={l.id} role="option">
-                              <button
-                                type="button"
-                                disabled={labelPending}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800"
-                                onClick={() => void toggleCardLabel(l.id, true)}
-                              >
-                                <span
-                                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                                  style={{ backgroundColor: l.color }}
-                                  aria-hidden
-                                />
-                                <span className="min-w-0 truncate">{l.name}</span>
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      : null}
-                      {labelSuggestOpen &&
-                      labelQuery.trim() !== "" &&
-                      labelSuggestions.length === 0 &&
-                      boardLabels.some((l) => !selectedLabelIds.has(l.id)) ?
-                        <p className="text-xs text-slate-500">Нет совпадений по названию.</p>
-                      : null}
-                    </div>
-                  : null}
                 </>
               }
             </div>
