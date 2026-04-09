@@ -44,6 +44,13 @@
   --btn-secondary-bg: var(--bg-surface-muted);
   --btn-secondary-hover-bg: var(--bg-surface-subtle);
 
+  /* Поля ввода / textarea / select (§7.2; в dark — как прежняя тёмная форма) */
+  --field-bg: var(--bg-surface-muted);
+  --field-border: var(--border-strong);
+  --field-border-hover: var(--button-secondary-border-hover);
+  --field-border-focus: var(--accent-bg);
+  --field-placeholder: var(--text-tertiary);
+
   --focus-ring: #9ca3af;
 
   --overlay: rgba(0, 0, 0, 0.55);
@@ -117,6 +124,12 @@ html[data-theme="light"] {
 
   --btn-secondary-bg: var(--bg-surface);
   --btn-secondary-hover-bg: var(--bg-surface-muted);
+
+  --field-bg: var(--bg-surface);
+  --field-border: var(--button-secondary-border);
+  --field-border-hover: var(--button-secondary-border-hover);
+  --field-border-focus: var(--accent-bg);
+  --field-placeholder: var(--text-disabled);
 
   --focus-ring: #93c5fd;
 
@@ -241,5 +254,73 @@ html[data-theme="light"] {
   .focus-ring-app:focus-visible {
     outline: none;
     box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
+  }
+
+  /* Общий вид input/textarea/select (§7.2 в light через токены выше) */
+  .field-base {
+    width: 100%;
+    border-radius: var(--radius-control);
+    border: 1px solid var(--field-border);
+    background-color: var(--field-bg);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--text-primary);
+    outline: none;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .field-base::placeholder {
+    color: var(--field-placeholder);
+    opacity: 1;
+  }
+
+  .field-base:hover:not(:disabled):not(:focus-visible) {
+    border-color: var(--field-border-hover);
+  }
+
+  .field-base:focus-visible {
+    border-color: var(--field-border-focus);
+    box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
+  }
+
+  .field-base:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  /* Toast: статусные подложки по токенам (dark/light из :root / html[data-theme="light"]) */
+  .toast-variant-info {
+    border: 1px solid var(--info-subtle-border);
+    background-color: var(--info-subtle-bg);
+    color: var(--info-subtle-text);
+    border-radius: var(--radius-surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  .toast-variant-success {
+    border: 1px solid var(--success-subtle-border);
+    background-color: var(--success-subtle-bg);
+    color: var(--success-subtle-text);
+    border-radius: var(--radius-surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  .toast-variant-error {
+    border: 1px solid var(--danger-subtle-border);
+    background-color: var(--danger-subtle-bg);
+    color: var(--danger-subtle-text);
+    border-radius: var(--radius-surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Панели popup (dropdown/popover/modal): surface и скругление; тень задаётся отдельно (--shadow-card / --shadow-modal) */
+  .popup-panel {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-surface);
   }
 }

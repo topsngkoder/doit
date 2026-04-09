@@ -9,6 +9,7 @@ import {
 } from "./actions";
 import { ProfileAvatar } from "./profile-avatar";
 import { ProfileForm } from "./profile-form";
+import { ProfileThemeSection } from "./profile-theme-section";
 
 export default async function ProfilePage() {
   const supabase = await createSupabaseServerClient();
@@ -48,6 +49,8 @@ export default async function ProfilePage() {
           </button>
         </form>
       </header>
+
+      <ProfileThemeSection />
 
       {profileError ? (
         <Toast

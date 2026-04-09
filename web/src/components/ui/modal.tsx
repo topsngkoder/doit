@@ -54,17 +54,18 @@ export function Modal({
     <div
       role="presentation"
       className={cn(
-        "fixed inset-0 z-40 flex justify-center bg-black/60 px-4 py-8",
+        "fixed inset-0 z-40 flex justify-center px-4 py-8",
         verticalAlign === "center" ? "items-center" : "items-start",
         overlayClassName
       )}
+      style={{ backgroundColor: "var(--overlay)" }}
       onClick={() => onClose?.()}
     >
       <div
         role="dialog"
         aria-modal="true"
         className={cn(
-          "flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-slate-800 bg-slate-950/95 shadow-xl",
+          "popup-panel flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden shadow-[var(--shadow-modal)]",
           className,
           panelClassName
         )}
@@ -72,15 +73,15 @@ export function Modal({
       >
         <div
           className={cn(
-            "flex w-full shrink-0 items-start justify-between gap-3 px-5 pb-2 pt-5",
+            "flex w-full shrink-0 items-start justify-between gap-3 px-5 pb-2 pt-5 text-app-primary",
             headerClassName
           )}
         >
           {typeof title === "string" ?
-            <h2 className="text-base font-semibold text-slate-50">{title}</h2>
+            <h2 className="text-base font-semibold">{title}</h2>
           : title ?
             <div className="min-w-0 flex-1">{title}</div>
-          : <span className="text-sm font-medium text-slate-200">Диалог</span>}
+          : <span className="text-sm font-medium text-app-secondary">Диалог</span>}
           {onClose && (
             <Button
               variant="ghost"
@@ -95,7 +96,7 @@ export function Modal({
         </div>
         <div
           className={cn(
-            "min-h-0 flex-1 overflow-y-auto px-5 pb-5 text-sm text-slate-200",
+            "min-h-0 flex-1 overflow-y-auto px-5 pb-5 text-sm text-app-secondary",
             bodyClassName,
             bodyWrapperClassName
           )}

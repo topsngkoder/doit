@@ -117,7 +117,7 @@ export default async function BoardsPage({ searchParams }: BoardsPageProps) {
               maxLength={100}
               required
               placeholder="Например, Продукт"
-              className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+              className="field-base"
             />
           </label>
           <Button type="submit" size="sm">

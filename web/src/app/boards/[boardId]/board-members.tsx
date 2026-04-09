@@ -211,7 +211,7 @@ export function BoardMembersPanel({
                         const v = e.target.value;
                         if (v && v !== m.roleId) void onRoleChange(m.userId, v);
                       }}
-                      className="max-w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-sm text-slate-100 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600 disabled:opacity-50"
+                      className="field-base max-w-full px-2 py-1.5"
                     >
                       {sortedRoles.map((r) => (
                         <option key={r.id} value={r.id}>

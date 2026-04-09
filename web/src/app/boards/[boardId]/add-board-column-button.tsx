@@ -52,7 +52,7 @@ function CreateColumnForm({
           required
           maxLength={50}
           placeholder="Новая колонка"
-          className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+          className="field-base"
         />
       </label>
       <label className="flex flex-col gap-1">
@@ -61,7 +61,7 @@ function CreateColumnForm({
           name="column_type"
           required
           defaultValue="queue"
-          className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+          className="field-base"
         >
           {COLUMN_TYPES.map((t) => (
             <option key={t} value={t}>

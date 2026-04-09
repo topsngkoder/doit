@@ -229,7 +229,7 @@ export function BoardCardPreviewButton({
             </p>
             <div className="grid gap-2 md:grid-cols-[1fr_auto]">
               <select
-                className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+                className="field-base"
                 value={newFieldId}
                 onChange={(e) => setNewFieldId(e.target.value)}
                 disabled={pending || availableCustomFields.length === 0}

@@ -120,7 +120,7 @@ export function ProfileForm({
             onChange={(e) => setFirstName(e.target.value)}
             maxLength={50}
             disabled={isPending}
-            className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+            className="field-base"
           />
           {errors.firstName ? <span className="text-xs text-rose-300">{errors.firstName}</span> : null}
         </label>
@@ -132,7 +132,7 @@ export function ProfileForm({
             onChange={(e) => setLastName(e.target.value)}
             maxLength={50}
             disabled={isPending}
-            className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+            className="field-base"
           />
           {errors.lastName ? <span className="text-xs text-rose-300">{errors.lastName}</span> : null}
         </label>
@@ -144,7 +144,7 @@ export function ProfileForm({
             onChange={(e) => setPosition(e.target.value)}
             maxLength={100}
             disabled={isPending}
-            className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+            className="field-base"
           />
           {errors.position ? <span className="text-xs text-rose-300">{errors.position}</span> : null}
         </label>
@@ -156,7 +156,7 @@ export function ProfileForm({
             onChange={(e) => setDepartment(e.target.value)}
             maxLength={100}
             disabled={isPending}
-            className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+            className="field-base"
           />
           {errors.department ? <span className="text-xs text-rose-300">{errors.department}</span> : null}
         </label>

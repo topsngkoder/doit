@@ -16,7 +16,7 @@ export function Dropdown({ items, onSelect, className }: DropdownProps) {
   return (
     <div
       className={cn(
-        "min-w-[160px] rounded-md border border-slate-800 bg-slate-950/95 py-1 text-sm text-slate-100 shadow-lg",
+        "popup-panel min-w-[160px] py-1 text-sm text-app-primary shadow-[var(--shadow-card)]",
         className
       )}
     >
@@ -24,7 +24,7 @@ export function Dropdown({ items, onSelect, className }: DropdownProps) {
         <button
           key={item.id}
           type="button"
-          className="flex w-full items-center px-3 py-1.5 text-left hover:bg-slate-800/90"
+          className="focus-ring-app flex w-full items-center px-3 py-1.5 text-left hover:bg-app-surface-muted"
           onClick={() => onSelect?.(item.id)}
         >
           {item.label}

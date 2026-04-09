@@ -8,6 +8,10 @@
 - **2026-04-09** — **T04 DONE**: в `web/src/app/globals.css` введены семантические CSS variables для `:root` (dark, близко к текущему zinc/gray UI) и `html[data-theme="light"]` (значения из `.ai/light-theme-specification.md` §5–5.4). Покрыты: surfaces, text, borders, accent, focus, overlay, три тени, success/warning/danger/info, радиусы 8/12/9999px, дополнительно `--border-divider`, `--text-link` / `--text-link-hover`. `html`/`body` переведены на `var(--bg-page)` и `var(--text-primary)`; **inline-стили в `layout.tsx` по-прежнему перебивают фон/цвет body** до **T05**. Добавлен слой `@layer utilities`: `bg-app-*`, `text-app-*`, `border-app-*`, `surface-card`, `surface-muted`, `surface-elevated`, `focus-ring-app`. Миграции БД не требовались.
 - **2026-04-09** — **T05 DONE**: root полностью на токенах — стили `html`/`body` (фон, цвет текста, `min-height`, `antialiased`) перенесены в `@layer base` после `@tailwind`, без жёстких цветов вне переменных. В `layout.tsx` у `body` убраны дублирующие `bg-app-page` / `text-app-primary` (остались `min-h-screen font-sans`). При `html[data-theme="light"]` фон страницы — светлый (`--bg-page` из спецификации). Миграции БД не требовались.
 - **2026-04-09** — **T06 DONE**: `web/src/components/ui/button.tsx` переведён на CSS-переменные (`--accent-*`, `--danger-*`, `--text-*`, `--bg-*`, токены secondary/disabled из `globals.css`). Focus ring: `var(--focus-ring)` + offset `var(--bg-page)`; радиус `var(--radius-control)`. В `globals.css` добавлены `--accent-btn-disabled-bg`, `--button-secondary-border`, `--button-secondary-border-hover`, `--btn-secondary-bg` / `--btn-secondary-hover-bg` (в `light` secondary фон/hover по §7.1 через поверхности). Убраны утилиты `slate`/`sky`/`rose`/`white` с кнопки. Миграции БД не требовались.
+- **2026-04-09** — **T07 DONE**: в `globals.css` добавлены токены полей `--field-bg`, `--field-border`, `--field-border-hover`, `--field-border-focus`, `--field-placeholder` (`:root` + `html[data-theme="light"]` по §7.2). Утилита `.field-base` для нативных `input`/`textarea`/`select` (hover/focus/disabled 60%). `web/src/components/ui/input.tsx` на тех же токенах + `shadow-sm`, радиус `--radius-control`. Все прежние длинные классы `border-slate-700 bg-slate-900…` заменены на `field-base` в board-модалках, `profile-form`, `boards/page`, `boards-default-selector`, `invite-member`, `board-column-header`, `board-members`, `board-card-preview`, `card-comments-sidebar`. Чекбокс в `boards-default-selector` (§7.3) не трогали. Миграции БД не требовались.
+- **2026-04-10** — **T08 DONE**: `modal.tsx` — overlay через `var(--overlay)`, панель `.popup-panel` + `shadow-[var(--shadow-modal)]`, заголовок/тело `text-app-primary` / `text-app-secondary`. `dropdown.tsx` / `popover.tsx` — `.popup-panel` + `shadow-[var(--shadow-card)]`, пункты меню `hover:bg-app-surface-muted`, `focus-ring-app`. `toast.tsx` — классы `toast-variant-info|success|error` в `globals.css` (граница/фон/текст из `--info|success|danger-subtle-*`, радиус `--radius-surface`, тень карточки). Миграции БД не требовались.
+- **2026-04-10** — **T09 DONE**: добавлен `profile-theme-section.tsx` (client): блок «Тема интерфейса» после `<header>`, до аватара/формы; два варианта «Тёмная» / «Светлая» как `role="radio"` кнопки (без toggle/select/checkbox), `useTheme` → `setTheme`. Секция в `surface-card`, токены `text-app-*`, `border-app-*`. Подключено в `profile/page.tsx`. Миграции БД не требовались.
+- **2026-04-10** — **T10 DONE**: мгновенное применение и запись в `localStorage` уже в `ThemeProvider`/`setTheme`; UI профиля вызывает `setTheme` без submit и без reload. Отдельный код не потребовался.
 
 ## Назначение
 Этот документ предназначен для AI-агента, который будет внедрять требования из `.ai/light-theme-specification.md`.
@@ -474,6 +478,34 @@
 | Focus | `ring` от `--focus-ring` / `--focus-ring-width`, offset `--bg-page` |
 | Радиус | `--radius-control` (8px) |
 
+## Результат T07 — поля ввода на токенах
+
+| Что | Где |
+| --- | --- |
+| Токены поля | `--field-bg`, `--field-border`, `--field-border-hover`, `--field-border-focus`, `--field-placeholder` |
+| Общий класс | `.field-base` в `@layer utilities` (`globals.css`) |
+| Компонент | `components/ui/input.tsx` — те же переменные + лёгкая тень |
+| Замена дублей | Константы `inputClass` / `textareaClass` и однотипные `className` → `field-base` (+ модификаторы где нужно) |
+
+## Результат T08 — Modal, Dropdown, Popover, Toast
+
+| Что | Где |
+| --- | --- |
+| Overlay модалки | `style={{ backgroundColor: "var(--overlay)" }}` (§5.4 light/dark из токенов) |
+| Панель модалки | `popup-panel` + `shadow-[var(--shadow-modal)]`, скругление `--radius-surface` |
+| Dropdown / Popover | `popup-panel` + `shadow-[var(--shadow-card)]` |
+| Toast-варианты | `.toast-variant-info` / `-success` / `-error` в `globals.css` |
+| Общая оболочка popup | `.popup-panel` — `--bg-surface`, `--border-default`, `--radius-surface` |
+
+## Результат T09–T10 — тема в личном кабинете
+
+| Что | Где |
+| --- | --- |
+| Блок «Тема интерфейса» | `web/src/app/profile/profile-theme-section.tsx`, вставка в `profile/page.tsx` сразу после `</header>` |
+| Варианты | Две кнопки с `role="radio"` / `aria-checked`, подписи «Тёмная» и «Светлая» |
+| Состояние | `useTheme().theme` и `setTheme` из `@/lib/theme` |
+| Поведение | Смена темы сразу, персистенция через существующий `writeThemeToStorage` + `applyThemeToDocument` |
+
 ---
 
 ## Трекер задач
@@ -486,10 +518,10 @@
 | T04 | DONE | Ввести семантические CSS tokens для `dark` и `light` | `globals.css` | T02 | Токены покрывают root, surfaces, text, borders, focus, overlay, statuses, shadows |
 | T05 | DONE | Перевести root `html/body` на токены и убрать жёсткий dark root | `globals.css`, `layout.tsx` | T03, T04 | Нет hardcoded dark root при `light` |
 | T06 | DONE | Перевести `Button` на семантические варианты `primary/secondary/ghost/destructive` | `components/ui/button.tsx`, `globals.css` | T04 | Кнопки соответствуют обоим режимам и спецификации `light` |
-| T07 | TODO | Перевести `Input` и общий стиль полей ввода | `components/ui/input.tsx`, экранные формы | T04 | Input/select/textarea используют белую базовую surface в `light` |
-| T08 | TODO | Перевести `Modal`, `Dropdown`, `Popover`, `Toast` на тему и статусы | `components/ui/modal.tsx`, `dropdown.tsx`, `popover.tsx`, `toast.tsx` | T04 | Все popup/toast surface и overlay тематизируются без локальных костылей |
-| T09 | TODO | Добавить UI выбора темы на страницу `Личный кабинет` | `profile/page.tsx`, новый client control при необходимости | T02, T04, T05 | Есть блок `Тема интерфейса` с 2 взаимоисключающими вариантами |
-| T10 | TODO | Сделать мгновенное клиентское переключение и сохранение темы | theme util/provider + profile UI | T02, T09 | Переключение работает без reload и без submit |
+| T07 | DONE | Перевести `Input` и общий стиль полей ввода | `components/ui/input.tsx`, `globals.css`, формы/модалки досок, профиль, страница досок | T04 | Input/select/textarea используют белую базовую surface в `light` |
+| T08 | DONE | Перевести `Modal`, `Dropdown`, `Popover`, `Toast` на тему и статусы | `components/ui/modal.tsx`, `dropdown.tsx`, `popover.tsx`, `toast.tsx`, `globals.css` | T04 | Все popup/toast surface и overlay тематизируются без локальных костылей |
+| T09 | DONE | Добавить UI выбора темы на страницу `Личный кабинет` | `profile/page.tsx`, `profile-theme-section.tsx` | T02, T04, T05 | Есть блок `Тема интерфейса` с 2 взаимоисключающими вариантами |
+| T10 | DONE | Сделать мгновенное клиентское переключение и сохранение темы | `ThemeProvider` + `profile-theme-section.tsx` | T02, T09 | Переключение работает без reload и без submit |
 | T11 | TODO | Перекрасить лендинг, вход и регистрацию по правилам `light` | `page.tsx`, `login/*`, `signup/*` | T05, T06, T07, T08 | Публичные/auth страницы корректны в обеих темах |
 | T12 | TODO | Перевести глобальный header и header dropdown | `layout.tsx` | T05, T08 | Header соответствует светлой спецификации и не ломает `dark` |
 | T13 | TODO | Перевести профильные секции, аватар, form cards и destructive states | `profile/page.tsx`, `profile-form.tsx`, `profile-avatar.tsx` | T06, T07, T08, T09 | Профиль полностью читабелен в `light` |

@@ -74,7 +74,7 @@ function EditColumnForm({
           required
           maxLength={50}
           defaultValue={initialName}
-          className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+          className="field-base"
         />
       </label>
       <label className="flex flex-col gap-1">
@@ -83,7 +83,7 @@ function EditColumnForm({
           name="column_type"
           required
           defaultValue={initialType}
-          className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+          className="field-base"
         >
           {COLUMN_TYPES.map((t) => (
             <option key={t} value={t}>

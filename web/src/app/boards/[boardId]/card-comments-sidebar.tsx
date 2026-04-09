@@ -6,8 +6,7 @@ import type { NewCardMemberOption } from "./create-card-modal";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { softDeleteCardCommentAction, updateCardCommentAction } from "./actions";
 
-const textareaClass =
-  "w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600";
+const textareaClass = "field-base";
 
 type CardCommentRow = {
   id: string;

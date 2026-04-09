@@ -17,8 +17,7 @@ import {
   updateBoardFieldSelectOptionAction
 } from "./actions";
 
-const inputClass =
-  "w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600";
+const inputClass = "field-base";
 
 type BoardFieldsButtonProps = {
   boardId: string;

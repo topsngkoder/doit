@@ -26,8 +26,7 @@ import { CardCommentsSidebar } from "./card-comments-sidebar";
 import type { NewCardMemberOption } from "./create-card-modal";
 import type { BoardCardListItem, BoardLabelOption } from "./column-types";
 
-const inputClass =
-  "w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600";
+const inputClass = "field-base";
 
 function AutoSizeTextarea({
   value,
@@ -408,7 +407,7 @@ export function EditCardModal({
         isEditingTitle && canEditContent ?
           <input
             ref={titleInputRef}
-            className="w-full max-w-[min(100%,34rem)] rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-base font-semibold text-slate-100 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+            className="field-base max-w-[min(100%,34rem)] px-2.5 py-1.5 text-base font-semibold"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onBlur={() => setIsEditingTitle(false)}

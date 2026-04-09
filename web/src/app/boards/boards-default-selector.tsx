@@ -204,7 +204,7 @@ export function BoardsDefaultSelector({
               value={renameName}
               disabled={isRenamePending}
               onChange={(event) => setRenameName(event.currentTarget.value)}
-              className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+              className="field-base"
             />
           </label>
           {renameError ? <Toast title="Ошибка" message={renameError} variant="error" /> : null}
@@ -243,7 +243,7 @@ export function BoardsDefaultSelector({
               value={deleteConfirmationName}
               disabled={isDeletePending}
               onChange={(event) => setDeleteConfirmationName(event.currentTarget.value)}
-              className="rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600"
+              className="field-base"
             />
           </label>
           {deleteError ? <Toast title="Ошибка" message={deleteError} variant="error" /> : null}
