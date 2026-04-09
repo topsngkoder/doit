@@ -268,7 +268,8 @@ function BoardCardRow({
   const labelsPreviewEnabled = enabledPreviewItems.some((item) => item.itemType === "labels");
   const cardLabels = card.labelIds
     .map((id) => labelsById.get(id))
-    .filter(Boolean) as BoardLabelOption[];
+    .filter(Boolean)
+    .sort((a, b) => a.position - b.position) as BoardLabelOption[];
   const primaryLabel = labelsPreviewEnabled ? (cardLabels[0] ?? null) : null;
   const orderedAssigneeUserIds = React.useMemo(() => {
     if (!card.assigneeUserIds.length) return [];
@@ -332,9 +333,6 @@ function BoardCardRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <span className="line-clamp-2 min-w-0 text-[16px]">{card.title}</span>
-          {primaryLabel ?
-            <span className="shrink-0 truncate text-[11px] text-slate-400">{primaryLabel.name}</span>
-          : null}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-1">
           {enabledPreviewItems
@@ -395,7 +393,23 @@ function BoardCardRow({
                 );
               }
               if (item.itemType === "labels") {
-                return null;
+                if (cardLabels.length === 0) return null;
+                return (
+                  <div key={item.id} className="flex flex-wrap items-center gap-1">
+                    {cardLabels.map((label) => (
+                      <span
+                        key={label.id}
+                        className="inline-flex max-w-full items-center rounded border px-1.5 py-0.5 text-[11px] text-slate-100"
+                        style={{
+                          borderColor: label.color,
+                          backgroundColor: `color-mix(in srgb, ${label.color} 16%, rgb(15 23 42 / 0.96))`
+                        }}
+                      >
+                        <span className="min-w-0 truncate">{label.name}</span>
+                      </span>
+                    ))}
+                  </div>
+                );
               }
               if (item.itemType === "responsible") {
                 if (!card.responsibleUserId) return null;
@@ -413,6 +427,8 @@ function BoardCardRow({
                 const snapshot = card.fieldValues[item.fieldDefinitionId];
                 if (!snapshot) return null;
                 let value = "";
+                let chipStyle: CSSProperties | undefined;
+                let chipClassName = "rounded bg-slate-800/80 px-1.5 py-0.5 text-[11px] text-slate-300";
                 if (fieldDef.fieldType === "text") {
                   value = snapshot.textValue ?? "";
                 } else if (fieldDef.fieldType === "date") {
@@ -422,10 +438,18 @@ function BoardCardRow({
                 } else if (fieldDef.fieldType === "select") {
                   const option = fieldDef.selectOptions.find((o) => o.id === snapshot.selectOptionId);
                   value = option?.name ?? "";
+                  if (option?.color) {
+                    chipClassName =
+                      "rounded border px-1.5 py-0.5 text-[11px] text-slate-100";
+                    chipStyle = {
+                      borderColor: option.color,
+                      backgroundColor: `color-mix(in srgb, ${option.color} 16%, rgb(15 23 42 / 0.96))`
+                    };
+                  }
                 }
                 if (!value) return null;
                 return (
-                  <span key={item.id} className="rounded bg-slate-800/80 px-1.5 py-0.5 text-[11px] text-slate-300">
+                  <span key={item.id} className={chipClassName} style={chipStyle}>
                     {value}
                   </span>
                 );
