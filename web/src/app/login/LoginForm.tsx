@@ -47,7 +47,7 @@ export function LoginForm() {
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-2">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-300">Email</span>
+          <span className="text-xs font-medium text-app-secondary">Email</span>
           <Input
             name="email"
             type="email"
@@ -57,7 +57,7 @@ export function LoginForm() {
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-300">Пароль</span>
+          <span className="text-xs font-medium text-app-secondary">Пароль</span>
           <Input
             name="password"
             type="password"
@@ -68,7 +68,7 @@ export function LoginForm() {
         </label>
       </div>
       {error ? (
-        <p className="text-sm text-red-400" role="alert">
+        <p className="text-app-validation-error text-sm" role="alert">
           {error}
         </p>
       ) : null}

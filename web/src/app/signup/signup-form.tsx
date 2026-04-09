@@ -85,7 +85,7 @@ export function SignupForm() {
     <form onSubmit={onSubmit} className="space-y-4">
       <div className="grid gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-300">Email</span>
+          <span className="text-xs font-medium text-app-secondary">Email</span>
           <Input
             name="email"
             type="email"
@@ -96,11 +96,13 @@ export function SignupForm() {
             disabled={isPending}
             onChange={(e) => setEmail(e.target.value)}
           />
-          {errors.email ? <span className="text-xs text-rose-300">{errors.email}</span> : null}
+          {errors.email ? (
+            <span className="text-app-validation-error text-xs">{errors.email}</span>
+          ) : null}
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-300">Пароль</span>
+          <span className="text-xs font-medium text-app-secondary">Пароль</span>
           <Input
             name="password"
             type="password"
@@ -111,11 +113,13 @@ export function SignupForm() {
             disabled={isPending}
             onChange={(e) => setPassword(e.target.value)}
           />
-          {errors.password ? <span className="text-xs text-rose-300">{errors.password}</span> : null}
+          {errors.password ? (
+            <span className="text-app-validation-error text-xs">{errors.password}</span>
+          ) : null}
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-300">Имя *</span>
+          <span className="text-xs font-medium text-app-secondary">Имя *</span>
           <Input
             name="first_name"
             required
@@ -124,11 +128,13 @@ export function SignupForm() {
             disabled={isPending}
             onChange={(e) => setFirstName(e.target.value)}
           />
-          {errors.firstName ? <span className="text-xs text-rose-300">{errors.firstName}</span> : null}
+          {errors.firstName ? (
+            <span className="text-app-validation-error text-xs">{errors.firstName}</span>
+          ) : null}
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-300">Фамилия *</span>
+          <span className="text-xs font-medium text-app-secondary">Фамилия *</span>
           <Input
             name="last_name"
             required
@@ -137,11 +143,13 @@ export function SignupForm() {
             disabled={isPending}
             onChange={(e) => setLastName(e.target.value)}
           />
-          {errors.lastName ? <span className="text-xs text-rose-300">{errors.lastName}</span> : null}
+          {errors.lastName ? (
+            <span className="text-app-validation-error text-xs">{errors.lastName}</span>
+          ) : null}
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-300">Должность</span>
+          <span className="text-xs font-medium text-app-secondary">Должность</span>
           <Input
             name="position"
             maxLength={100}
@@ -149,11 +157,13 @@ export function SignupForm() {
             disabled={isPending}
             onChange={(e) => setPosition(e.target.value)}
           />
-          {errors.position ? <span className="text-xs text-rose-300">{errors.position}</span> : null}
+          {errors.position ? (
+            <span className="text-app-validation-error text-xs">{errors.position}</span>
+          ) : null}
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-slate-300">Отдел</span>
+          <span className="text-xs font-medium text-app-secondary">Отдел</span>
           <Input
             name="department"
             maxLength={100}
@@ -161,7 +171,9 @@ export function SignupForm() {
             disabled={isPending}
             onChange={(e) => setDepartment(e.target.value)}
           />
-          {errors.department ? <span className="text-xs text-rose-300">{errors.department}</span> : null}
+          {errors.department ? (
+            <span className="text-app-validation-error text-xs">{errors.department}</span>
+          ) : null}
         </label>
       </div>
 

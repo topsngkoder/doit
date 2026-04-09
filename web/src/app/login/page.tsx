@@ -13,18 +13,21 @@ export default async function LoginPage() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-50">
+        <h1 className="text-2xl font-semibold tracking-tight text-app-primary">
           Вход в Doit
         </h1>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-app-tertiary">
           Вход по email и паролю (учётные записи из Supabase Auth). OAuth — позже.
         </p>
       </header>
-      <section className="space-y-4 rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-5 text-sm text-slate-200">
+      <section className="surface-card space-y-4 px-4 py-5 text-sm text-app-secondary">
         <LoginForm />
-        <p className="text-center text-xs text-slate-400">
+        <p className="text-center text-xs text-app-tertiary">
           Нет аккаунта?{" "}
-          <Link href="/signup" className="font-medium text-sky-400 hover:text-sky-300 hover:underline">
+          <Link
+            href="/signup"
+            className="font-medium text-app-link underline-offset-2 hover:text-[color:var(--text-link-hover)] hover:underline"
+          >
             Регистрация
           </Link>
         </p>

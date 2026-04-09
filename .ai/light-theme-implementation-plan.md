@@ -12,6 +12,7 @@
 - **2026-04-10** — **T08 DONE**: `modal.tsx` — overlay через `var(--overlay)`, панель `.popup-panel` + `shadow-[var(--shadow-modal)]`, заголовок/тело `text-app-primary` / `text-app-secondary`. `dropdown.tsx` / `popover.tsx` — `.popup-panel` + `shadow-[var(--shadow-card)]`, пункты меню `hover:bg-app-surface-muted`, `focus-ring-app`. `toast.tsx` — классы `toast-variant-info|success|error` в `globals.css` (граница/фон/текст из `--info|success|danger-subtle-*`, радиус `--radius-surface`, тень карточки). Миграции БД не требовались.
 - **2026-04-10** — **T09 DONE**: добавлен `profile-theme-section.tsx` (client): блок «Тема интерфейса» после `<header>`, до аватара/формы; два варианта «Тёмная» / «Светлая» как `role="radio"` кнопки (без toggle/select/checkbox), `useTheme` → `setTheme`. Секция в `surface-card`, токены `text-app-*`, `border-app-*`. Подключено в `profile/page.tsx`. Миграции БД не требовались.
 - **2026-04-10** — **T10 DONE**: мгновенное применение и запись в `localStorage` уже в `ThemeProvider`/`setTheme`; UI профиля вызывает `setTheme` без submit и без reload. Отдельный код не потребовался.
+- **2026-04-10** — **T11 DONE**: лендинг `page.tsx` — заголовок/подзаголовок на токенах (`--text-landing-subtitle` §8.1), CTA как primary/secondary кнопки через CSS-переменные акцента и secondary. `login/page.tsx`, `signup/page.tsx` — карточки форм `surface-card`, типографика `text-app-*`, ссылка «Регистрация» через `text-app-link`. `LoginForm.tsx` / `signup-form.tsx` — лейблы `text-app-secondary`, ошибки `.text-app-validation-error` (§8.2). `UserDebugClient.tsx` — muted surface и токены границ/текста. В `globals.css`: `--text-landing-subtitle`, утилиты `text-app-landing-subtitle`, `text-app-validation-error`. Миграции БД не требовались.
 
 ## Назначение
 Этот документ предназначен для AI-агента, который будет внедрять требования из `.ai/light-theme-specification.md`.
@@ -506,6 +507,15 @@
 | Состояние | `useTheme().theme` и `setTheme` из `@/lib/theme` |
 | Поведение | Смена темы сразу, персистенция через существующий `writeThemeToStorage` + `applyThemeToDocument` |
 
+## Результат T11 — лендинг и auth
+
+| Что | Где |
+| --- | --- |
+| Лендинг §8.1 | `app/page.tsx` + `--text-landing-subtitle` / `.text-app-landing-subtitle` |
+| Карточки вход/регистрация §6.3, §8.2 | `surface-card` на `login/page.tsx`, `signup/page.tsx` |
+| Формы | `LoginForm.tsx`, `signup-form.tsx` — лейблы и `.text-app-validation-error` |
+| Dev-блок входа | `UserDebugClient.tsx` на семантических классах |
+
 ---
 
 ## Трекер задач
@@ -522,7 +532,7 @@
 | T08 | DONE | Перевести `Modal`, `Dropdown`, `Popover`, `Toast` на тему и статусы | `components/ui/modal.tsx`, `dropdown.tsx`, `popover.tsx`, `toast.tsx`, `globals.css` | T04 | Все popup/toast surface и overlay тематизируются без локальных костылей |
 | T09 | DONE | Добавить UI выбора темы на страницу `Личный кабинет` | `profile/page.tsx`, `profile-theme-section.tsx` | T02, T04, T05 | Есть блок `Тема интерфейса` с 2 взаимоисключающими вариантами |
 | T10 | DONE | Сделать мгновенное клиентское переключение и сохранение темы | `ThemeProvider` + `profile-theme-section.tsx` | T02, T09 | Переключение работает без reload и без submit |
-| T11 | TODO | Перекрасить лендинг, вход и регистрацию по правилам `light` | `page.tsx`, `login/*`, `signup/*` | T05, T06, T07, T08 | Публичные/auth страницы корректны в обеих темах |
+| T11 | DONE | Перекрасить лендинг, вход и регистрацию по правилам `light` | `page.tsx`, `login/*`, `signup/*`, `globals.css` | T05, T06, T07, T08 | Публичные/auth страницы корректны в обеих темах |
 | T12 | TODO | Перевести глобальный header и header dropdown | `layout.tsx` | T05, T08 | Header соответствует светлой спецификации и не ломает `dark` |
 | T13 | TODO | Перевести профильные секции, аватар, form cards и destructive states | `profile/page.tsx`, `profile-form.tsx`, `profile-avatar.tsx` | T06, T07, T08, T09 | Профиль полностью читабелен в `light` |
 | T14 | TODO | Перевести страницу досок и selector default board | `boards/page.tsx`, `boards-default-selector.tsx` | T06, T07, T08 | Белые section cards, светлые разделители, ссылки по спецификации |

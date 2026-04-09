@@ -83,6 +83,9 @@
   --text-link: #d4d4d8;
   --text-link-hover: #fafafa;
 
+  /* Лендинг: подзаголовок (§8.1 light = #475569; в dark — читаемый нейтральный) */
+  --text-landing-subtitle: #d4d4d8;
+
   /* Радиусы (спецификация §5.5) */
   --radius-control: 8px;
   --radius-surface: 12px;
@@ -161,6 +164,8 @@ html[data-theme="light"] {
 
   --text-link: #1d4ed8;
   --text-link-hover: #1e40af;
+
+  --text-landing-subtitle: #475569;
 }
 
 @tailwind base;
@@ -217,6 +222,15 @@ html[data-theme="light"] {
   }
   .text-app-link {
     color: var(--text-link);
+  }
+
+  .text-app-landing-subtitle {
+    color: var(--text-landing-subtitle);
+  }
+
+  /* Ошибки валидации форм (§8.2 — без тёмных подложек; цвет из статусного токена) */
+  .text-app-validation-error {
+    color: var(--danger-subtle-text);
   }
 
   .border-app-default {
