@@ -34,7 +34,6 @@ type CreateCardModalProps = {
   boardId: string;
   columnId: string;
   onClose: () => void;
-  members: NewCardMemberOption[];
   fieldDefinitions: NewCardFieldDefinition[];
   currentUserId: string;
 };
@@ -44,13 +43,12 @@ export function CreateCardModal({
   boardId,
   columnId,
   onClose,
-  members,
   fieldDefinitions,
   currentUserId
 }: CreateCardModalProps) {
   const router = useRouter();
   const [title, setTitle] = React.useState("");
-  const [selectedUserIds, setSelectedUserIds] = React.useState<Set<string>>(new Set());
+  const [description, setDescription] = React.useState("");
   const [drafts, setDrafts] = React.useState<Record<string, FieldDraft>>({});
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
@@ -58,24 +56,11 @@ export function CreateCardModal({
   React.useEffect(() => {
     if (!open) return;
     setTitle("");
-    setSelectedUserIds(new Set(currentUserId ? [currentUserId] : []));
+    setDescription("");
     setDrafts(buildEmptyFieldDrafts(fieldDefinitions));
     setError(null);
     setPending(false);
   }, [open, columnId, currentUserId, fieldDefinitions]);
-
-  const toggleMember = (userId: string) => {
-    setSelectedUserIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(userId)) {
-        if (next.size <= 1) return prev;
-        next.delete(userId);
-      } else {
-        next.add(userId);
-      }
-      return next;
-    });
-  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,8 +70,8 @@ export function CreateCardModal({
       setError("Название: от 1 до 200 символов.");
       return;
     }
-    if (selectedUserIds.size < 1) {
-      setError("Выберите хотя бы одного участника.");
+    if (!currentUserId) {
+      setError("Не удалось определить текущего пользователя.");
       return;
     }
 
@@ -111,7 +96,8 @@ export function CreateCardModal({
     const res: CreateCardResult = await createCardAction(boardId, {
       columnId,
       title: t,
-      assigneeUserIds: [...selectedUserIds],
+      description,
+      assigneeUserIds: [currentUserId],
       fieldValues: buildFieldValuesPayload(fieldDefinitions, drafts)
     });
     setPending(false);
@@ -141,27 +127,17 @@ export function CreateCardModal({
           />
         </label>
 
-        <div className="space-y-2">
-          <p className="text-xs text-slate-400">
-            Участники * (по умолчанию — вы; минимум один)
-          </p>
-          <ul className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-slate-800 p-2">
-            {members.map((m) => (
-              <li key={m.userId}>
-                <label className="flex cursor-pointer items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    className="rounded border-slate-600"
-                    checked={selectedUserIds.has(m.userId)}
-                    onChange={() => toggleMember(m.userId)}
-                  />
-                  <span className="text-slate-100">{m.displayName}</span>
-                  <span className="truncate text-xs text-slate-500">{m.email}</span>
-                </label>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-slate-400">Описание</span>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={4}
+            maxLength={50000}
+            placeholder="Добавьте описание карточки"
+            className={inputClass}
+          />
+        </label>
 
         {sortedFields.map((f) => {
           const d = drafts[f.id];
@@ -320,7 +296,6 @@ type CreateCardButtonProps = {
   boardId: string;
   columnId: string;
   canCreate: boolean;
-  members: NewCardMemberOption[];
   fieldDefinitions: NewCardFieldDefinition[];
   currentUserId: string;
 };
@@ -329,7 +304,6 @@ export function CreateCardButton({
   boardId,
   columnId,
   canCreate,
-  members,
   fieldDefinitions,
   currentUserId
 }: CreateCardButtonProps) {
@@ -353,7 +327,6 @@ export function CreateCardButton({
         boardId={boardId}
         columnId={columnId}
         onClose={() => setOpen(false)}
-        members={members}
         fieldDefinitions={fieldDefinitions}
         currentUserId={currentUserId}
       />

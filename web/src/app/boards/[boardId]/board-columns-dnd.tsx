@@ -61,6 +61,10 @@ function parseColumnDndId(id: UniqueIdentifier) {
   return String(id).slice(COLUMN_DND_PREFIX.length);
 }
 
+function canRenderCreateCardButton(columnType: string): boolean {
+  return columnType === "queue" || columnType === "info";
+}
+
 type ColumnRow = {
   id: string;
   name: string;
@@ -621,14 +625,15 @@ function SortableColumnShell({
           <EmptyColumnDrop columnId={col.id} emphasized={cards.length === 0} />
         : null}
       </SortableContext>
-      <CreateCardButton
-        boardId={boardId}
-        columnId={col.id}
-        canCreate={canCreateCard}
-        members={membersForNewCard}
-        fieldDefinitions={fieldDefinitions}
-        currentUserId={currentUserId}
-      />
+      {canRenderCreateCardButton(col.columnType) ? (
+        <CreateCardButton
+          boardId={boardId}
+          columnId={col.id}
+          canCreate={canCreateCard}
+          fieldDefinitions={fieldDefinitions}
+          currentUserId={currentUserId}
+        />
+      ) : null}
     </div>
   );
 }
@@ -716,14 +721,15 @@ function StaticColumnShell({
           <EmptyColumnDrop columnId={col.id} emphasized={cards.length === 0} />
         : null}
       </SortableContext>
-      <CreateCardButton
-        boardId={boardId}
-        columnId={col.id}
-        canCreate={canCreateCard}
-        members={membersForNewCard}
-        fieldDefinitions={fieldDefinitions}
-        currentUserId={currentUserId}
-      />
+      {canRenderCreateCardButton(col.columnType) ? (
+        <CreateCardButton
+          boardId={boardId}
+          columnId={col.id}
+          canCreate={canCreateCard}
+          fieldDefinitions={fieldDefinitions}
+          currentUserId={currentUserId}
+        />
+      ) : null}
     </div>
   );
 }
@@ -814,14 +820,15 @@ function BoardGridStatic({
               </div>
             : null}
           </div>
-          <CreateCardButton
-            boardId={boardId}
-            columnId={col.id}
-            canCreate={canCreateCard}
-            members={membersForNewCard}
-            fieldDefinitions={fieldDefinitions}
-            currentUserId={currentUserId}
-          />
+          {canRenderCreateCardButton(col.columnType) ? (
+            <CreateCardButton
+              boardId={boardId}
+              columnId={col.id}
+              canCreate={canCreateCard}
+              fieldDefinitions={fieldDefinitions}
+              currentUserId={currentUserId}
+            />
+          ) : null}
         </div>
       ))}
     </div>

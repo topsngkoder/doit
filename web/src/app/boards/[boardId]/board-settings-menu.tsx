@@ -34,8 +34,34 @@ export function BoardSettingsMenu({
   backgroundColor
 }: BoardSettingsMenuProps) {
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasAnySettings =
     canManageBoardLabels || canManageCardFields || canManageCardPreview || canChangeBoardBackground;
+
+  const clearCloseTimer = React.useCallback(() => {
+    if (!closeTimerRef.current) return;
+    clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = null;
+  }, []);
+
+  const openMenu = React.useCallback(() => {
+    clearCloseTimer();
+    setMenuOpen(true);
+  }, [clearCloseTimer]);
+
+  const closeMenuWithDelay = React.useCallback(() => {
+    clearCloseTimer();
+    closeTimerRef.current = setTimeout(() => {
+      setMenuOpen(false);
+      closeTimerRef.current = null;
+    }, 120);
+  }, [clearCloseTimer]);
+
+  React.useEffect(() => {
+    return () => {
+      clearCloseTimer();
+    };
+  }, [clearCloseTimer]);
 
   if (!hasAnySettings) {
     return null;
@@ -47,19 +73,21 @@ export function BoardSettingsMenu({
   return (
     <div
       className="relative inline-block"
-      onMouseEnter={() => setMenuOpen(true)}
-      onMouseLeave={() => setMenuOpen(false)}
+      onMouseEnter={openMenu}
+      onMouseLeave={closeMenuWithDelay}
     >
       <button
         type="button"
         className="inline-flex h-8 w-full items-center justify-center rounded-md border border-slate-600 bg-slate-900/60 px-3 text-xs font-medium text-slate-50 transition-colors hover:border-slate-400"
-        onFocus={() => setMenuOpen(true)}
+        onFocus={openMenu}
       >
         Настройки доски
       </button>
 
       <div
         className={`absolute left-0 top-full z-20 w-max min-w-full pt-1 transition-opacity duration-150 ${menuOpen ? "visible opacity-100 pointer-events-auto" : "invisible opacity-0 pointer-events-none"}`}
+        onMouseEnter={openMenu}
+        onMouseLeave={closeMenuWithDelay}
       >
         <div className="flex flex-col gap-1 rounded-xl border border-slate-700/80 bg-slate-950/95 p-1.5 shadow-xl shadow-black/40 backdrop-blur-sm">
           <div className={itemRevealClass()} style={{ transitionDelay: menuOpen ? "0ms" : "0ms" }}>

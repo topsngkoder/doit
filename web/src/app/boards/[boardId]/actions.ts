@@ -1586,6 +1586,7 @@ export async function createCardAction(
   payload: {
     columnId: string;
     title: string;
+    description: string;
     assigneeUserIds: string[];
     fieldValues: CreateCardFieldValuePayload[];
   }
@@ -1607,6 +1608,13 @@ export async function createCardAction(
   if (title.length > 200) {
     return { ok: false, message: "Название не длиннее 200 символов." };
   }
+  const description = payload.description ?? "";
+  if (description.length > MAX_CARD_DESCRIPTION_LENGTH) {
+    return {
+      ok: false,
+      message: `Описание не длиннее ${MAX_CARD_DESCRIPTION_LENGTH} символов.`
+    };
+  }
 
   const assignees = [...new Set(payload.assigneeUserIds)];
   if (assignees.length < 1) {
@@ -1617,6 +1625,7 @@ export async function createCardAction(
     p_board_id: boardId,
     p_column_id: payload.columnId,
     p_title: title,
+    p_description: description,
     p_assignee_user_ids: assignees,
     p_field_values: payload.fieldValues
   });
