@@ -23,6 +23,8 @@ export type ModalProps = {
   bodyWrapperClassName?: string;
   /** Управление вертикальным выравниванием overlay-контейнера. */
   verticalAlign?: "center" | "custom";
+  /** Доп. классы для строки заголовка (title + кнопка закрытия), вне области `children`. */
+  headerClassName?: string;
 };
 
 export function Modal({
@@ -35,7 +37,8 @@ export function Modal({
   panelClassName,
   bodyClassName,
   bodyWrapperClassName,
-  verticalAlign = "center"
+  verticalAlign = "center",
+  headerClassName
 }: ModalProps) {
   const [mounted, setMounted] = React.useState(false);
 
@@ -67,7 +70,12 @@ export function Modal({
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-start justify-between gap-3 px-5 pb-2 pt-5">
+        <div
+          className={cn(
+            "flex w-full shrink-0 items-start justify-between gap-3 px-5 pb-2 pt-5",
+            headerClassName
+          )}
+        >
           {typeof title === "string" ?
             <h2 className="text-base font-semibold text-slate-50">{title}</h2>
           : title ?

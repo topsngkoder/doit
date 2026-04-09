@@ -225,7 +225,7 @@ export function CardCommentsSidebar({
   };
 
   return (
-    <div className="flex h-full min-h-[240px] flex-col bg-slate-950/50 md:min-h-0">
+    <div className="flex min-h-[240px] flex-col overflow-visible bg-slate-950/50 md:h-full md:min-h-0 md:overflow-hidden">
       <div className="shrink-0 border-b border-slate-800 px-4 py-3">
         <h3 className="text-sm font-semibold text-slate-100">Комментарии</h3>
       </div>
@@ -271,7 +271,7 @@ export function CardCommentsSidebar({
         </Button>
       </form>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      <div className="px-4 py-3 md:min-h-0 md:flex-1 md:overflow-y-auto">
         {loading ?
           <p className="text-xs text-slate-500">Загрузка…</p>
         : null}

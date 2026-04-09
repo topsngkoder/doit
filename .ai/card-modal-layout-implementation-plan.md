@@ -132,6 +132,26 @@
   - на `mobile` отключен автономный scroll левой колонки (`overflow-y-visible`) для перехода к единому мобильному scroll-потоку.
 - Сохранена высотная связка `min-h-0` + `flex-1`, чтобы скролл левой колонки работал внутри фиксированной высоты modal content area и не растягивал панель.
 
+## Выполнено в `T08`
+- В `web/src/app/boards/[boardId]/edit-card-modal.tsx` для правой колонки (`aside`) зафиксирована модель высоты в `tablet/desktop`:
+  - добавлены `min-h-0 min-w-0`, чтобы flex-элемент мог сжиматься внутри строки и не раздувал модалку контентом комментариев;
+  - `overflow-hidden` на колонке, чтобы скролл оставался внутри `CardCommentsSidebar` (список комментариев), без второго конкурирующего скролла на обёртке;
+  - `md:grow-0` в паре с левой колонкой `md:grow-0`, чтобы базисы `2/3` и `1/3` стабильно держали пропорцию.
+- В `web/src/app/boards/[boardId]/card-comments-sidebar.tsx` на корневом контейнере добавлен `overflow-hidden` для согласованной цепочки `h-full` + flex + `min-h-0 flex-1 overflow-y-auto` у списка.
+
+## Выполнено в `T09`
+- В `web/src/app/boards/[boardId]/edit-card-modal.tsx` для **mobile** включена единая прокрутка области контента модалки:
+  - `bodyClassName`: `overflow-y-auto` до `md`, с `md:overflow-hidden` для сохранения двухколоночной модели на планшете/десктопе;
+  - внутренний flex-контейнер без `flex-1`/фиксированного `min-h` на узкой ширине — блок растёт по контенту и прокручивается вместе с ним;
+  - левая колонка на mobile: `w-full shrink-0` вместо `flex-1`, без собственного скролла;
+  - `aside`: сняты `max-h-[50vh]` и `overflow-hidden` на mobile (`overflow-visible`), на `md+` поведение как в T08.
+- В `web/src/app/boards/[boardId]/card-comments-sidebar.tsx`: на mobile корень без `h-full`, список комментариев без `flex-1`/`overflow-y-auto`; на `md+` прежняя вложенная прокрутка списка внутри колонки.
+
+## Выполнено в `T10`
+- Проверена DOM-структура `Modal`: строка заголовка (title + закрытие) уже **вне** обёртки `children`; колонки card modal живут только в body.
+- В `web/src/components/ui/modal.tsx` добавлен опциональный проп `headerClassName`; на контейнер шапки добавлен явный `w-full` (на случай вложенных flex-контекстов).
+- В `web/src/app/boards/[boardId]/edit-card-modal.tsx` задано `headerClassName="border-b border-slate-800"`, чтобы визуально отделить шапку от контентной области с колонками, без изменения остальных вызовов `Modal`.
+
 ## Стратегия реализации
 1. Не ломать существующий `Modal` для других сценариев.
 2. Добавить в `Modal` опциональные возможности для card modal:
@@ -242,9 +262,9 @@
 | T05 | DONE | Перестроить content area в 2/3 + 1/3 для desktop/tablet | `web/src/app/boards/[boardId]/edit-card-modal.tsx` | T04 | Комментарии справа, карточка слева, пропорция соблюдена |
 | T06 | DONE | Добавить явный вертикальный разделитель между колонками | `web/src/app/boards/[boardId]/edit-card-modal.tsx` | T05 | Разделитель виден только в desktop/tablet |
 | T07 | DONE | Настроить независимый scroll левой колонки | `web/src/app/boards/[boardId]/edit-card-modal.tsx`, `.ai/card-modal-layout-implementation-plan.md` | T05 | Левая колонка скроллится сама и не ломает высоту модалки |
-| T08 | TODO | Настроить правую колонку под независимый scroll и встроить comments sidebar без конфликтов | `web/src/app/boards/[boardId]/edit-card-modal.tsx`, `web/src/app/boards/[boardId]/card-comments-sidebar.tsx` | T05 | Правая колонка скроллится отдельно, comments block не выталкивает левую часть |
-| T09 | TODO | Реализовать mobile single-column layout с единым scroll | `web/src/app/boards/[boardId]/edit-card-modal.tsx`, `web/src/app/boards/[boardId]/card-comments-sidebar.tsx` | T04 | На mobile сначала карточка, затем комментарии, без двух независимых скроллов |
-| T10 | TODO | Проверить header на полную ширину и отделить его от колонок | `web/src/components/ui/modal.tsx`, `web/src/app/boards/[boardId]/edit-card-modal.tsx` | T04 | Заголовок и кнопка закрытия сверху, вне колонок |
+| T08 | DONE | Настроить правую колонку под независимый scroll и встроить comments sidebar без конфликтов | `web/src/app/boards/[boardId]/edit-card-modal.tsx`, `web/src/app/boards/[boardId]/card-comments-sidebar.tsx` | T05 | Правая колонка скроллится отдельно, comments block не выталкивает левую часть |
+| T09 | DONE | Реализовать mobile single-column layout с единым scroll | `web/src/app/boards/[boardId]/edit-card-modal.tsx`, `web/src/app/boards/[boardId]/card-comments-sidebar.tsx` | T04 | На mobile сначала карточка, затем комментарии, без двух независимых скроллов |
+| T10 | DONE | Проверить header на полную ширину и отделить его от колонок | `web/src/components/ui/modal.tsx`, `web/src/app/boards/[boardId]/edit-card-modal.tsx` | T04 | Заголовок и кнопка закрытия сверху, вне колонок |
 | T11 | TODO | Проверить длинный контент и отсутствие внешнего конкурирующего scroll | `edit-card-modal.tsx`, `card-comments-sidebar.tsx`, `modal.tsx` | T07, T08, T09 | Длинная история/комментарии не ломают размеры и не скроллят всю страницу |
 | T12 | TODO | Выполнить регрессионную проверку других модалок | все ключевые места использования `Modal` | T03 | Остальные модалки визуально и функционально не деградировали |
 | T13 | TODO | Прогнать линтер/диагностику по измененным файлам | измененные файлы | T03-T12 | Нет новых ошибок, связанных с layout-изменениями |

@@ -442,14 +442,15 @@ export function EditCardModal({
           </button>
       }
       onClose={onClose}
+      headerClassName="border-b border-slate-800"
       verticalAlign="custom"
       overlayClassName="items-center md:items-start md:pt-[7vh] xl:pt-[11vh]"
       className="max-w-none rounded-lg"
       panelClassName="h-[90vh] w-[96vw] md:h-[82vh] md:w-[92vw] xl:h-[70vh] xl:w-[70vw]"
-      bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden px-0 pb-0 pt-0"
+      bodyClassName="flex min-h-0 flex-1 flex-col overflow-y-auto px-0 pb-0 pt-0 md:overflow-hidden"
     >
-      <div className="flex min-h-[min(520px,calc(90vh-5rem))] flex-1 flex-col overflow-hidden md:min-h-0 md:flex-row xl:min-h-[420px]">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-visible px-5 pb-5 pt-1 md:basis-2/3 md:grow-0 md:overflow-y-auto">
+      <div className="flex flex-col md:min-h-0 md:flex-1 md:flex-row md:overflow-hidden xl:min-h-[420px]">
+        <div className="flex w-full shrink-0 flex-col overflow-y-visible px-5 pb-5 pt-1 md:min-h-0 md:min-w-0 md:basis-2/3 md:grow-0 md:overflow-y-auto">
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
               <button
@@ -809,7 +810,7 @@ export function EditCardModal({
             </div>
 
             <div>
-              <p className="mb-2 text-xs font-medium text-slate-400">Метки</p>
+              <p className="mb-2 text-xs font-medium text-slate-400">Метка</p>
               {boardLabels.length === 0 ?
                 <p className="text-xs text-slate-500">
                   На доске пока нет меток. Владелец или администратор доски может создать их кнопкой{" "}
@@ -982,7 +983,7 @@ export function EditCardModal({
         </div>
 
         <aside
-          className="flex max-h-[50vh] w-full shrink-0 flex-col border-t border-slate-800 md:max-h-none md:basis-1/3 md:border-l md:border-t-0"
+          className="flex w-full shrink-0 flex-col overflow-visible border-t border-slate-800 md:min-h-0 md:min-w-0 md:basis-1/3 md:grow-0 md:overflow-hidden md:border-l md:border-t-0"
           aria-label="Комментарии к карточке"
         >
           <CardCommentsSidebar
