@@ -268,7 +268,7 @@ function BoardCardRow({
   const labelsPreviewEnabled = enabledPreviewItems.some((item) => item.itemType === "labels");
   const cardLabels = card.labelIds
     .map((id) => labelsById.get(id))
-    .filter(Boolean)
+    .filter((label): label is BoardLabelOption => label !== undefined)
     .sort((a, b) => a.position - b.position) as BoardLabelOption[];
   const primaryLabel = labelsPreviewEnabled ? (cardLabels[0] ?? null) : null;
   const orderedAssigneeUserIds = React.useMemo(() => {
