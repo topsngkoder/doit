@@ -1,6 +1,20 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export default async function HomePage() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error
+  } = await supabase.auth.getUser();
+  const isSessionMissing = error?.message === "Auth session missing!";
+  const isAuthenticated = !!user && !(error && !isSessionMissing);
+
+  if (isAuthenticated) {
+    redirect("/go");
+  }
+
   return (
     <main className="flex flex-1 justify-center pt-16 sm:pt-24 lg:pt-28">
       <section className="flex w-full max-w-3xl flex-col items-center gap-5 text-center">

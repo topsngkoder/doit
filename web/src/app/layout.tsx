@@ -142,7 +142,7 @@ export default async function RootLayout({
                     className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 hover:bg-slate-800 hover:text-slate-50 group-focus-within/boards:bg-slate-800 group-focus-within/boards:text-slate-50"
                     aria-haspopup={headerBoards.length > 0 ? "menu" : undefined}
                   >
-                    <span>Мои доски</span>
+                    <span>Доски</span>
                     {headerBoards.length > 0 ? (
                       <svg
                         viewBox="0 0 20 20"

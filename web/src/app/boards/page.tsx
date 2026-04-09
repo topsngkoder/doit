@@ -64,15 +64,11 @@ export default async function BoardsPage({ searchParams }: BoardsPageProps) {
   };
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center gap-6">
+    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 pt-16 sm:pt-24 lg:pt-28">
       <header className="space-y-1">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-50">
-          Мои доски
+          Доски
         </h1>
-        <p className="text-sm text-slate-400">
-          Отображаются только доски, где вы участник (RLS: право{" "}
-          <code className="text-slate-300">board.view</code>).
-        </p>
       </header>
 
       {boardError ? (

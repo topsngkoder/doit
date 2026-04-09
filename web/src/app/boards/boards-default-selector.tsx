@@ -187,7 +187,7 @@ export function BoardsDefaultSelector({
                   disabled={isAnyOperationPending}
                   className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-sky-500 focus:ring-sky-500"
                 />
-                По умолчанию
+                <span title="Будет автоматически открываться при входе">По умолчанию</span>
               </label>
             </div>
           </li>
