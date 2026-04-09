@@ -426,7 +426,7 @@ function BoardCardRow({
                 if (!value) return null;
                 return (
                   <span key={item.id} className="rounded bg-slate-800/80 px-1.5 py-0.5 text-[11px] text-slate-300">
-                    {`${fieldDef.name}: ${value}`}
+                    {value}
                   </span>
                 );
               }

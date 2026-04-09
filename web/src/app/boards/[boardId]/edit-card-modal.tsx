@@ -64,6 +64,23 @@ function AssigneeAvatar({
   );
 }
 
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      className={className}
+      fill="currentColor"
+    >
+      <path
+        fillRule="evenodd"
+        d="M9 3.75A1.5 1.5 0 0 0 7.5 5.25V6H4.75a.75.75 0 0 0 0 1.5h.49l.73 10.27a2.25 2.25 0 0 0 2.24 2.08h7.56a2.25 2.25 0 0 0 2.24-2.08l.73-10.27h.49a.75.75 0 0 0 0-1.5H16.5v-.75A1.5 1.5 0 0 0 15 3.75H9Zm6 2.25v-.75h-6V6h6Zm-4.25 3.5a.75.75 0 0 0-1.5 0v6a.75.75 0 0 0 1.5 0v-6Zm4 0a.75.75 0 0 0-1.5 0v6a.75.75 0 0 0 1.5 0v-6Z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
 type EditCardModalProps = {
   open: boolean;
   boardId: string;
@@ -825,12 +842,15 @@ export function EditCardModal({
                     </>
                   : <Button
                       type="button"
-                      variant="destructive"
+                      variant="ghost"
                       size="sm"
+                      className="h-10 w-10 rounded-md p-0 text-rose-500 hover:bg-rose-950/20 hover:text-rose-400"
                       disabled={pending}
+                      aria-label="Удалить карточку"
+                      title="Удалить карточку"
                       onClick={() => setConfirmDelete(true)}
                     >
-                      Удалить карточку
+                      <TrashIcon className="h-7 w-7 text-white" />
                     </Button>}
                 </div>
               : <span />}
@@ -857,7 +877,7 @@ export function EditCardModal({
         </div>
 
         <aside
-          className="flex max-h-[50vh] w-full shrink-0 flex-col border-t border-slate-800 xl:max-h-none xl:w-[18rem] xl:min-w-[18rem] xl:border-l xl:border-t-0 2xl:w-[20rem] 2xl:min-w-[20rem]"
+          className="flex max-h-[50vh] w-full shrink-0 flex-col border-t border-slate-800 xl:max-h-none xl:w-[27rem] xl:min-w-[27rem] xl:border-l xl:border-t-0 2xl:w-[30rem] 2xl:min-w-[30rem]"
           aria-label="Комментарии к карточке"
         >
           <CardCommentsSidebar
