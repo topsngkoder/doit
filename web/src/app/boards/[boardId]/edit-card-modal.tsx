@@ -366,11 +366,11 @@ export function EditCardModal({
           </button>
       }
       onClose={onClose}
-      className="max-w-6xl"
+      className="max-w-[min(96vw,88rem)]"
       bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden px-0 pb-0 pt-0"
     >
       <div className="flex min-h-[min(520px,calc(90vh-5rem))] flex-1 flex-col overflow-hidden md:min-h-[420px] md:flex-row">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-5 pb-5 pt-1 md:basis-2/3">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-5 pb-5 pt-1">
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
               <button
@@ -432,7 +432,7 @@ export function EditCardModal({
               </label>
               <textarea
                 id={`card-desc-${card.id}`}
-                className={`${inputClass} min-h-[120px] resize-y`}
+                className={`${inputClass} min-h-[120px] resize-none`}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={readOnly || pending}
@@ -492,7 +492,7 @@ export function EditCardModal({
                               }))
                             }
                             disabled={ro}
-                            className={inputClass}
+                            className={cn(inputClass, "w-auto min-w-[11rem] self-start")}
                           />
                         </label>
                       );
@@ -857,7 +857,7 @@ export function EditCardModal({
         </div>
 
         <aside
-          className="flex max-h-[55vh] w-full shrink-0 flex-col border-t border-slate-800 md:max-h-none md:basis-1/3 md:border-l md:border-t-0"
+          className="flex max-h-[55vh] w-full shrink-0 flex-col border-t border-slate-800 md:max-h-none md:w-[20rem] md:min-w-[20rem] md:border-l md:border-t-0 lg:w-[22rem] lg:min-w-[22rem]"
           aria-label="Комментарии к карточке"
         >
           <CardCommentsSidebar

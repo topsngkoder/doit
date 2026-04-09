@@ -255,7 +255,7 @@ export function CardCommentsSidebar({
         : null}
         <textarea
           ref={inputRef}
-          className={`${textareaClass} min-h-[72px] resize-y`}
+          className={`${textareaClass} min-h-[72px] resize-none`}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           disabled={!canCreate || submitting}
@@ -320,7 +320,7 @@ export function CardCommentsSidebar({
                     {isEditing ?
                       <div className="mt-2 space-y-2">
                         <textarea
-                          className={`${textareaClass} min-h-[72px] resize-y`}
+                          className={`${textareaClass} min-h-[72px] resize-none`}
                           value={editingBody}
                           onChange={(e) => setEditingBody(e.target.value)}
                           maxLength={5000}
