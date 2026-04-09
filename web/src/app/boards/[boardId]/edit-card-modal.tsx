@@ -366,10 +366,10 @@ export function EditCardModal({
           </button>
       }
       onClose={onClose}
-      className="max-w-[min(96vw,88rem)]"
+      className="max-w-[min(98vw,96rem)]"
       bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden px-0 pb-0 pt-0"
     >
-      <div className="flex min-h-[min(520px,calc(90vh-5rem))] flex-1 flex-col overflow-hidden md:min-h-[420px] md:flex-row">
+      <div className="flex min-h-[min(520px,calc(90vh-5rem))] flex-1 flex-col overflow-hidden xl:min-h-[420px] xl:flex-row">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-5 pb-5 pt-1">
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
@@ -492,7 +492,7 @@ export function EditCardModal({
                               }))
                             }
                             disabled={ro}
-                            className={cn(inputClass, "w-auto min-w-[11rem] self-start")}
+                            className={cn(inputClass, "w-[12.5rem] max-w-full self-start")}
                           />
                         </label>
                       );
@@ -564,7 +564,7 @@ export function EditCardModal({
                               }))
                             }
                             disabled={ro}
-                            className={inputClass}
+                            className={cn(inputClass, "w-[18rem] max-w-full self-start")}
                           >
                             {!f.isRequired ?
                               <option value="">— не выбрано —</option>
@@ -745,7 +745,7 @@ export function EditCardModal({
                       </label>
                       <input
                         id={`card-labels-q-${card.id}`}
-                        className={inputClass}
+                        className={cn(inputClass, "w-[18rem] max-w-full")}
                         placeholder="Найти метку по названию…"
                         value={labelQuery}
                         disabled={labelPending || pending}
@@ -857,7 +857,7 @@ export function EditCardModal({
         </div>
 
         <aside
-          className="flex max-h-[55vh] w-full shrink-0 flex-col border-t border-slate-800 md:max-h-none md:w-[20rem] md:min-w-[20rem] md:border-l md:border-t-0 lg:w-[22rem] lg:min-w-[22rem]"
+          className="flex max-h-[50vh] w-full shrink-0 flex-col border-t border-slate-800 xl:max-h-none xl:w-[18rem] xl:min-w-[18rem] xl:border-l xl:border-t-0 2xl:w-[20rem] 2xl:min-w-[20rem]"
           aria-label="Комментарии к карточке"
         >
           <CardCommentsSidebar
