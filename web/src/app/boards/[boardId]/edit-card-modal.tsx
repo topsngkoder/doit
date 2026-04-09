@@ -449,7 +449,7 @@ export function EditCardModal({
       bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden px-0 pb-0 pt-0"
     >
       <div className="flex min-h-[min(520px,calc(90vh-5rem))] flex-1 flex-col overflow-hidden md:min-h-0 md:flex-row xl:min-h-[420px]">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-5 pb-5 pt-1 md:basis-2/3 md:grow-0">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-visible px-5 pb-5 pt-1 md:basis-2/3 md:grow-0 md:overflow-y-auto">
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
               <button
@@ -982,7 +982,7 @@ export function EditCardModal({
         </div>
 
         <aside
-          className="flex max-h-[50vh] w-full shrink-0 flex-col border-t border-slate-800 md:max-h-none md:basis-1/3 md:border-t-0 xl:border-l"
+          className="flex max-h-[50vh] w-full shrink-0 flex-col border-t border-slate-800 md:max-h-none md:basis-1/3 md:border-l md:border-t-0"
           aria-label="Комментарии к карточке"
         >
           <CardCommentsSidebar

@@ -122,6 +122,16 @@
 - Уточнение по фидбеку: значок чемодана увеличен (`h-4 w-4`) и сделан визуально ярче (более светлый тон + glow-тень).
 - Уточнение по фидбеку: иконка под аватаром ответственного заменена с чемодана на эмодзи `🛠️`.
 
+## Выполнено в `T06`
+- В `web/src/app/boards/[boardId]/edit-card-modal.tsx` добавлен явный вертикальный разделитель между колонками на `tablet/desktop` через `md:border-l`.
+- На `mobile` сохранен горизонтальный разделитель `border-t`, чтобы правый блок оставался под карточкой.
+
+## Выполнено в `T07`
+- В `web/src/app/boards/[boardId]/edit-card-modal.tsx` для левой колонки уточнена модель прокрутки:
+  - на `tablet/desktop` включен независимый scroll (`md:overflow-y-auto`);
+  - на `mobile` отключен автономный scroll левой колонки (`overflow-y-visible`) для перехода к единому мобильному scroll-потоку.
+- Сохранена высотная связка `min-h-0` + `flex-1`, чтобы скролл левой колонки работал внутри фиксированной высоты modal content area и не растягивал панель.
+
 ## Стратегия реализации
 1. Не ломать существующий `Modal` для других сценариев.
 2. Добавить в `Modal` опциональные возможности для card modal:
@@ -230,8 +240,8 @@
 | T03 | DONE | Расширить `Modal` точечными пропсами для viewport positioning/layout | `web/src/components/ui/modal.tsx`, `.ai/card-modal-layout-implementation-plan.md` | T02 | Card modal можно позиционировать и размерять отдельно от остальных |
 | T04 | DONE | Подключить новую конфигурацию modal shell в edit card modal | `web/src/app/boards/[boardId]/edit-card-modal.tsx`, `.ai/card-modal-layout-implementation-plan.md` | T03 | Размеры и позиционирование соответствуют режимам desktop/tablet/mobile |
 | T05 | DONE | Перестроить content area в 2/3 + 1/3 для desktop/tablet | `web/src/app/boards/[boardId]/edit-card-modal.tsx` | T04 | Комментарии справа, карточка слева, пропорция соблюдена |
-| T06 | TODO | Добавить явный вертикальный разделитель между колонками | `web/src/app/boards/[boardId]/edit-card-modal.tsx` | T05 | Разделитель виден только в desktop/tablet |
-| T07 | TODO | Настроить независимый scroll левой колонки | `web/src/app/boards/[boardId]/edit-card-modal.tsx` | T05 | Левая колонка скроллится сама и не ломает высоту модалки |
+| T06 | DONE | Добавить явный вертикальный разделитель между колонками | `web/src/app/boards/[boardId]/edit-card-modal.tsx` | T05 | Разделитель виден только в desktop/tablet |
+| T07 | DONE | Настроить независимый scroll левой колонки | `web/src/app/boards/[boardId]/edit-card-modal.tsx`, `.ai/card-modal-layout-implementation-plan.md` | T05 | Левая колонка скроллится сама и не ломает высоту модалки |
 | T08 | TODO | Настроить правую колонку под независимый scroll и встроить comments sidebar без конфликтов | `web/src/app/boards/[boardId]/edit-card-modal.tsx`, `web/src/app/boards/[boardId]/card-comments-sidebar.tsx` | T05 | Правая колонка скроллится отдельно, comments block не выталкивает левую часть |
 | T09 | TODO | Реализовать mobile single-column layout с единым scroll | `web/src/app/boards/[boardId]/edit-card-modal.tsx`, `web/src/app/boards/[boardId]/card-comments-sidebar.tsx` | T04 | На mobile сначала карточка, затем комментарии, без двух независимых скроллов |
 | T10 | TODO | Проверить header на полную ширину и отделить его от колонок | `web/src/components/ui/modal.tsx`, `web/src/app/boards/[boardId]/edit-card-modal.tsx` | T04 | Заголовок и кнопка закрытия сверху, вне колонок |
