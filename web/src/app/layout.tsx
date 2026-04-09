@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 import { BrowserNativeNotificationsProvider } from "@/lib/notifications/browser-native-notifications-provider";
+import { ThemeProvider } from "@/lib/theme";
 import { DoitLogoLink } from "@/components/doit-logo-link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import "./globals.css";
@@ -104,6 +105,7 @@ export default async function RootLayout({
         className="min-h-screen bg-slate-950 font-sans text-slate-50"
         style={{ backgroundColor: "#09090b", color: "#fafafa" }}
       >
+        <ThemeProvider>
         <BrowserNativeNotificationsProvider>
         <div className="flex min-h-screen flex-col pt-2">
           {isAuthenticated ? (
@@ -204,6 +206,7 @@ export default async function RootLayout({
           <main className="mx-auto flex w-full max-w-5xl flex-1 px-4">{children}</main>
         </div>
         </BrowserNativeNotificationsProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

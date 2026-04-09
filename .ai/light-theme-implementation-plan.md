@@ -1,5 +1,9 @@
 # План реализации: light theme
 
+## Прогресс (журнал)
+- **2026-04-09** — **T01 DONE**: зафиксирован аудит жёстко тёмных точек входа и финальный список файлов обязательного прохода (см. раздел «Результат T01» ниже). Миграции БД для этого шага не требовались.
+- **2026-04-09** — **T02 DONE**: добавлены `web/src/lib/theme/*` (ключ `doit:theme`, тип `dark` | `light`, чтение/запись `localStorage`, `applyThemeToDocument` → `data-theme` + `color-scheme`), клиентские `ThemeProvider` и `useTheme`, провайдер подключён в `layout.tsx`. Миграции БД не требовались. До **T03** возможна краткая несогласованность первого кадра с выбором из `localStorage` (исправляется ранним inline-script).
+
 ## Назначение
 Этот документ предназначен для AI-агента, который будет внедрять требования из `.ai/light-theme-specification.md`.
 
@@ -345,12 +349,91 @@
 - Проверить отсутствие вспышки неправильной темы.
 - Проверить, что изменение темы не ломает существующий dark UI.
 
+## Результат T01 — аудит жёстко тёмных точек входа
+
+### Инфраструктура темы
+- В `web/src` **нет** существующего theme-context / `ThemeProvider`, атрибута `data-theme` в коде, чтения темы из `localStorage` (поиск по `theme`, `ThemeProvider`, `data-theme`, `localStorage` + `theme`). Конфликтующей скрытой инфраструктуры не обнаружено.
+
+### Корневые hardcoded значения
+- `web/src/app/globals.css`: у `html` и `body` заданы `#09090b`, `#fafafa`, `color-scheme: dark` (комментарий про fallback до Tailwind сохраняет актуальность для будущей привязки к токенам).
+
+### Tailwind
+- `web/tailwind.config.ts`: палитры переопределены (`slate` → zinc, `sky` → gray). Для реализации светлой темы опираться на семантические CSS-токены, а не на смысл имён утилит `slate`/`sky`.
+
+### Финальный список файлов обязательного прохода (38 позиций)
+Путь от корня репозитория; все под `web/` кроме явно указанного.
+
+1. `web/src/app/globals.css`
+2. `web/src/app/layout.tsx`
+3. `web/src/app/page.tsx`
+4. `web/src/app/login/page.tsx`
+5. `web/src/app/login/LoginForm.tsx`
+6. `web/src/app/login/UserDebugClient.tsx`
+7. `web/src/app/signup/page.tsx`
+8. `web/src/app/signup/signup-form.tsx`
+9. `web/src/app/profile/page.tsx`
+10. `web/src/app/profile/profile-form.tsx`
+11. `web/src/app/profile/profile-avatar.tsx`
+12. `web/src/app/boards/page.tsx`
+13. `web/src/app/boards/boards-default-selector.tsx`
+14. `web/src/app/notifications/page.tsx`
+15. `web/src/app/notifications/settings/page.tsx`
+16. `web/src/app/notifications/settings/notification-settings-client.tsx`
+17. `web/src/app/boards/[boardId]/page.tsx`
+18. `web/src/app/boards/[boardId]/board-background-frame.tsx`
+19. `web/src/app/boards/[boardId]/board-columns-dnd.tsx`
+20. `web/src/app/boards/[boardId]/board-column-header.tsx`
+21. `web/src/app/boards/[boardId]/board-card-preview-button.tsx`
+22. `web/src/app/boards/[boardId]/create-card-modal.tsx`
+23. `web/src/app/boards/[boardId]/edit-card-modal.tsx`
+24. `web/src/app/boards/[boardId]/card-comments-sidebar.tsx`
+25. `web/src/app/boards/[boardId]/board-members.tsx`
+26. `web/src/app/boards/[boardId]/board-settings-menu.tsx`
+27. `web/src/app/boards/[boardId]/board-background-button.tsx`
+28. `web/src/app/boards/[boardId]/board-fields-button.tsx`
+29. `web/src/app/boards/[boardId]/board-labels-button.tsx`
+30. `web/src/app/boards/[boardId]/invite-member-button.tsx`
+31. `web/src/app/boards/[boardId]/add-board-column-button.tsx`
+32. `web/src/components/ui/button.tsx`
+33. `web/src/components/ui/input.tsx`
+34. `web/src/components/ui/modal.tsx`
+35. `web/src/components/ui/dropdown.tsx`
+36. `web/src/components/ui/popover.tsx`
+37. `web/src/components/ui/toast.tsx`
+38. `web/tailwind.config.ts` (при необходимости расширения под токены; не полагаться на имена `slate`/`sky` как на продуктовый смысл)
+
+### Дополнительно при фазе header (T12)
+- `web/src/components/doit-logo-link.tsx` — только типографика, цвет наследуется; проверить контраст/наследование после темизации header.
+
+### Минимальная разметка без цветовых utility (по необходимости в T18)
+- `web/src/app/boards/[boardId]/board-canvas.tsx` — layout-обёртка, цветовых классов нет.
+
+### Вне обязательного прохода по перекраске
+- Серверные маршруты, `lib/*` без UI (Supabase, cron, email и т.д.) — не содержат целевых `bg-`/`text-`/`border-` для темы приложения.
+
+## Результат T02 — инфраструктура темы
+
+| Что | Где |
+| --- | --- |
+| Ключ `localStorage` | `THEME_STORAGE_KEY` = `doit:theme` в `web/src/lib/theme/constants.ts` |
+| Канонические значения | `Theme` = `"dark"` \| `"light"`, массив `THEMES`, без `system` |
+| Валидация | `isTheme`, `normalizeTheme` (невалидное → `dark`) |
+| Чтение / запись | `readThemeFromStorage`, `readResolvedTheme`, `writeThemeToStorage` в `theme.ts` |
+| Применение к документу | `applyThemeToDocument`: `html[data-theme]`, `documentElement.style.colorScheme` |
+| React API | `ThemeProvider`, `useTheme()` в `theme-provider.tsx` |
+| Точка подключения | `RootLayout`: обёртка `<ThemeProvider>` внутри `<body>` |
+| Публичный вход | `import { … } from "@/lib/theme"` через `web/src/lib/theme/index.ts` |
+
+Поведение без сохранённого значения: `readResolvedTheme()` → `"dark"`. Смена через `setTheme` сразу пишет в `localStorage` и обновляет DOM.
+
+---
+
 ## Трекер задач
 
 | ID | Статус | Задача | Файлы | Зависимости | Критерий завершения |
 | --- | --- | --- | --- | --- | --- |
-| T01 | TODO | Проаудировать все жёстко тёмные entry points и собрать список целевых файлов | `globals.css`, `layout.tsx`, `components/ui/*`, `app/**/*` | - | Есть финальный список файлов обязательного прохода |
-| T02 | TODO | Спроектировать минимальную инфраструктуру темы без режима `system` | новый theme util/provider/hook | T01 | Понятно, где хранятся `dark/light`, как читать и как применять |
+| T01 | DONE | Проаудировать все жёстко тёмные entry points и собрать список целевых файлов | `globals.css`, `layout.tsx`, `components/ui/*`, `app/**/*` | - | Есть финальный список файлов обязательного прохода |
+| T02 | DONE | Спроектировать минимальную инфраструктуру темы без режима `system` | `web/src/lib/theme/*`, `layout.tsx` | T01 | Понятно, где хранятся `dark/light`, как читать и как применять |
 | T03 | TODO | Добавить раннее применение темы до первой отрисовки | `layout.tsx` | T02 | `data-theme` и `color-scheme` выставляются до гидратации |
 | T04 | TODO | Ввести семантические CSS tokens для `dark` и `light` | `globals.css` | T02 | Токены покрывают root, surfaces, text, borders, focus, overlay, statuses, shadows |
 | T05 | TODO | Перевести root `html/body` на токены и убрать жёсткий dark root | `globals.css`, `layout.tsx` | T03, T04 | Нет hardcoded dark root при `light` |
