@@ -6,6 +6,8 @@
 - **2026-04-09** — **T03 DONE**: в `web/src/app/layout.tsx` в `<head>` добавлен синхронный inline-script: чтение `localStorage` по `THEME_STORAGE_KEY`, валидация `light`/`dark`, иначе `dark`; выставление `data-theme` и `documentElement.style.colorScheme` до гидратации. Ключ подставляется из `constants.ts` (без расхождения с клиентом). Fallback-цвета root пока прежние (жёсткий dark в layout/globals) — снимаются в **T04–T05**. Миграции БД не требовались.
 - **2026-04-09** — **Hydration fix**: на `<html>` добавлен `suppressHydrationWarning` (ранний script выставляет `data-theme` и `color-scheme` до гидратации). Убраны inline `style` с `html`/`body`; у `body` классы заменены на `bg-app-page text-app-primary` (токены из T04). Пересечение с **T05** (root на токенах) частично закрыто.
 - **2026-04-09** — **T04 DONE**: в `web/src/app/globals.css` введены семантические CSS variables для `:root` (dark, близко к текущему zinc/gray UI) и `html[data-theme="light"]` (значения из `.ai/light-theme-specification.md` §5–5.4). Покрыты: surfaces, text, borders, accent, focus, overlay, три тени, success/warning/danger/info, радиусы 8/12/9999px, дополнительно `--border-divider`, `--text-link` / `--text-link-hover`. `html`/`body` переведены на `var(--bg-page)` и `var(--text-primary)`; **inline-стили в `layout.tsx` по-прежнему перебивают фон/цвет body** до **T05**. Добавлен слой `@layer utilities`: `bg-app-*`, `text-app-*`, `border-app-*`, `surface-card`, `surface-muted`, `surface-elevated`, `focus-ring-app`. Миграции БД не требовались.
+- **2026-04-09** — **T05 DONE**: root полностью на токенах — стили `html`/`body` (фон, цвет текста, `min-height`, `antialiased`) перенесены в `@layer base` после `@tailwind`, без жёстких цветов вне переменных. В `layout.tsx` у `body` убраны дублирующие `bg-app-page` / `text-app-primary` (остались `min-h-screen font-sans`). При `html[data-theme="light"]` фон страницы — светлый (`--bg-page` из спецификации). Миграции БД не требовались.
+- **2026-04-09** — **T06 DONE**: `web/src/components/ui/button.tsx` переведён на CSS-переменные (`--accent-*`, `--danger-*`, `--text-*`, `--bg-*`, токены secondary/disabled из `globals.css`). Focus ring: `var(--focus-ring)` + offset `var(--bg-page)`; радиус `var(--radius-control)`. В `globals.css` добавлены `--accent-btn-disabled-bg`, `--button-secondary-border`, `--button-secondary-border-hover`, `--btn-secondary-bg` / `--btn-secondary-hover-bg` (в `light` secondary фон/hover по §7.1 через поверхности). Убраны утилиты `slate`/`sky`/`rose`/`white` с кнопки. Миграции БД не требовались.
 
 ## Назначение
 Этот документ предназначен для AI-агента, который будет внедрять требования из `.ai/light-theme-specification.md`.
@@ -454,6 +456,24 @@
 
 `light`: значения из спецификации. `dark`: текущая тёмная база (zinc-страница, gray-акцент как в конфиге). Полная светлая картинка на экране после снятия inline root в **T05**.
 
+## Результат T05 — root на токенах
+
+| Что | Где |
+| --- | --- |
+| Фон и цвет `html`/`body` | `globals.css` → `@layer base`: только `var(--bg-page)`, `var(--text-primary)` |
+| Светлая тема | Переопределение токенов на `html[data-theme="light"]` (как в T04); корень визуально светлый без отдельных hardcoded в layout |
+| `layout.tsx` | У `body` нет утилит фона/текста — не дублируем root; остаётся каркас `min-h-screen font-sans` |
+| Порядок слоёв | Токены объявлены до `@tailwind`; root-стили в `base` после preflight |
+
+## Результат T06 — Button на токенах
+
+| Что | Где |
+| --- | --- |
+| Варианты | `primary` / `secondary` / `ghost` / `destructive` — цвета только через `var(--…)` |
+| Доп. токены | `globals.css`: `--accent-btn-disabled-bg`, `--button-secondary-border`, `--button-secondary-border-hover`, `--btn-secondary-bg`, `--btn-secondary-hover-bg` |
+| Focus | `ring` от `--focus-ring` / `--focus-ring-width`, offset `--bg-page` |
+| Радиус | `--radius-control` (8px) |
+
 ---
 
 ## Трекер задач
@@ -464,8 +484,8 @@
 | T02 | DONE | Спроектировать минимальную инфраструктуру темы без режима `system` | `web/src/lib/theme/*`, `layout.tsx` | T01 | Понятно, где хранятся `dark/light`, как читать и как применять |
 | T03 | DONE | Добавить раннее применение темы до первой отрисовки | `layout.tsx` | T02 | `data-theme` и `color-scheme` выставляются до гидратации |
 | T04 | DONE | Ввести семантические CSS tokens для `dark` и `light` | `globals.css` | T02 | Токены покрывают root, surfaces, text, borders, focus, overlay, statuses, shadows |
-| T05 | TODO | Перевести root `html/body` на токены и убрать жёсткий dark root | `globals.css`, `layout.tsx` | T03, T04 | Нет hardcoded dark root при `light` |
-| T06 | TODO | Перевести `Button` на семантические варианты `primary/secondary/ghost/destructive` | `components/ui/button.tsx` | T04 | Кнопки соответствуют обоим режимам и спецификации `light` |
+| T05 | DONE | Перевести root `html/body` на токены и убрать жёсткий dark root | `globals.css`, `layout.tsx` | T03, T04 | Нет hardcoded dark root при `light` |
+| T06 | DONE | Перевести `Button` на семантические варианты `primary/secondary/ghost/destructive` | `components/ui/button.tsx`, `globals.css` | T04 | Кнопки соответствуют обоим режимам и спецификации `light` |
 | T07 | TODO | Перевести `Input` и общий стиль полей ввода | `components/ui/input.tsx`, экранные формы | T04 | Input/select/textarea используют белую базовую surface в `light` |
 | T08 | TODO | Перевести `Modal`, `Dropdown`, `Popover`, `Toast` на тему и статусы | `components/ui/modal.tsx`, `dropdown.tsx`, `popover.tsx`, `toast.tsx` | T04 | Все popup/toast surface и overlay тематизируются без локальных костылей |
 | T09 | TODO | Добавить UI выбора темы на страницу `Личный кабинет` | `profile/page.tsx`, новый client control при необходимости | T02, T04, T05 | Есть блок `Тема интерфейса` с 2 взаимоисключающими вариантами |

@@ -1,6 +1,7 @@
 /*
- * Тема: семантические токены на :root (dark по умолчанию) и html[data-theme="light"].
- * Inline-script в layout выставляет data-theme до отрисовки; color-scheme дублируется в CSS как запасной вариант.
+ * Тема: токены на :root (dark по умолчанию, в т.ч. без JS) и переопределение в html[data-theme="light"].
+ * Ранний script в layout выставляет data-theme + color-scheme до гидратации.
+ * Фон и цвет root — только через var(--bg-page) / var(--text-primary) (T05).
  */
 :root {
   color-scheme: dark;
@@ -31,6 +32,17 @@
   --accent-subtle-bg: rgba(113, 113, 122, 0.15);
   --accent-subtle-border: #3f3f46;
   --accent-subtle-text: #d4d4d8;
+
+  /* Кнопка primary: disabled (§7.1 light; в dark — приглушённый акцент) */
+  --accent-btn-disabled-bg: #52525b;
+
+  /* Кнопка secondary: граница и hover-граница (§7.1) */
+  --button-secondary-border: #52525b;
+  --button-secondary-border-hover: #a1a1aa;
+
+  /* Кнопка secondary: фон / hover-фон из семантических поверхностей */
+  --btn-secondary-bg: var(--bg-surface-muted);
+  --btn-secondary-hover-bg: var(--bg-surface-subtle);
 
   --focus-ring: #9ca3af;
 
@@ -98,6 +110,14 @@ html[data-theme="light"] {
   --accent-subtle-border: #bfdbfe;
   --accent-subtle-text: #1d4ed8;
 
+  --accent-btn-disabled-bg: #93c5fd;
+
+  --button-secondary-border: #cbd5e1;
+  --button-secondary-border-hover: #94a3b8;
+
+  --btn-secondary-bg: var(--bg-surface);
+  --btn-secondary-hover-bg: var(--bg-surface-muted);
+
   --focus-ring: #93c5fd;
 
   --overlay: rgba(15, 23, 42, 0.32);
@@ -130,26 +150,21 @@ html[data-theme="light"] {
   --text-link-hover: #1e40af;
 }
 
-html {
-  background-color: var(--bg-page);
-  color: var(--text-primary);
-}
-
-body {
-  margin: 0;
-  min-height: 100vh;
-  background-color: var(--bg-page);
-  color: var(--text-primary);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  html {
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+  }
+
   body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--bg-page);
+    color: var(--text-primary);
     @apply antialiased;
   }
 

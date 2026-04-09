@@ -108,7 +108,7 @@ export default async function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBeforePaintScript }} />
       </head>
-      <body className="min-h-screen bg-app-page font-sans text-app-primary">
+      <body className="min-h-screen font-sans">
         <ThemeProvider>
         <BrowserNativeNotificationsProvider>
         <div className="flex min-h-screen flex-col pt-2">

@@ -10,14 +10,17 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const baseClasses =
-  "inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:pointer-events-none disabled:opacity-60";
+  "inline-flex items-center justify-center text-sm font-medium transition-colors rounded-[length:var(--radius-control)] focus-visible:outline-none focus-visible:ring-[length:var(--focus-ring-width)] focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-page)] disabled:pointer-events-none disabled:opacity-60";
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: "bg-sky-500 text-white shadow hover:bg-sky-600",
+  primary:
+    "bg-[var(--accent-bg)] text-[var(--text-on-accent)] shadow-sm hover:bg-[var(--accent-hover)] active:bg-[var(--accent-active)] disabled:bg-[var(--accent-btn-disabled-bg)]",
   secondary:
-    "border border-slate-600 bg-slate-900/60 text-slate-50 hover:border-slate-400",
-  ghost: "text-slate-200 hover:bg-slate-800/80",
-  destructive: "bg-rose-500 text-white hover:bg-rose-600"
+    "border border-[var(--button-secondary-border)] bg-[var(--btn-secondary-bg)] text-[var(--text-secondary)] hover:border-[var(--button-secondary-border-hover)] hover:bg-[var(--btn-secondary-hover-bg)]",
+  ghost:
+    "bg-transparent text-[var(--text-secondary)] hover:bg-[var(--bg-surface-subtle)] hover:text-[var(--text-primary)]",
+  destructive:
+    "bg-[var(--danger-strong)] text-[var(--text-on-accent)] hover:bg-[var(--danger-hover)]"
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
