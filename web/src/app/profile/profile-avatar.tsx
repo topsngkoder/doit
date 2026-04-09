@@ -191,21 +191,21 @@ export function ProfileAvatar({
   }
 
   return (
-    <section className="space-y-4 rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-4">
+    <section className="surface-card space-y-4 px-4 py-4">
       <div className="flex flex-wrap items-start gap-4">
         <div className="relative h-24 w-24 shrink-0">
           <button
             type="button"
             onClick={openPicker}
             disabled={isPending}
-            className="h-24 w-24 overflow-hidden rounded-lg border border-slate-700 bg-slate-900 transition hover:border-sky-500/70 disabled:cursor-not-allowed disabled:opacity-70"
+            className="focus-ring-app h-24 w-24 overflow-hidden rounded-lg border border-app-strong bg-app-surface-muted transition hover:border-app-accent disabled:cursor-not-allowed disabled:opacity-60"
             aria-label="Загрузить аватар"
             title="Нажмите, чтобы загрузить аватар"
           >
             {signedUrl ? (
               <img src={signedUrl} alt="Аватар профиля" className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-xl font-semibold text-slate-300">
+              <div className="flex h-full w-full items-center justify-center text-xl font-semibold text-app-secondary">
                 {avatarFallback}
               </div>
             )}
@@ -218,7 +218,7 @@ export function ProfileAvatar({
                 setIsDeleteConfirmOpen(true);
               }}
               disabled={isPending}
-              className="absolute -right-2 -top-2 rounded-full border border-slate-700 bg-slate-900 px-1.5 py-0.5 text-xs text-slate-400 transition hover:text-rose-400 disabled:opacity-70"
+              className="absolute -right-2 -top-2 rounded-full border border-app-default bg-app-surface px-1.5 py-0.5 text-xs text-app-tertiary transition hover:border-[color:var(--danger-subtle-border)] hover:text-[color:var(--danger-strong)] disabled:opacity-60"
               aria-label="Удалить аватар"
               title="Удалить аватар"
             >
@@ -229,14 +229,14 @@ export function ProfileAvatar({
 
         <div className="min-w-[220px] flex-1 space-y-2">
           <div>
-            <div className="text-xs text-slate-400">Email</div>
-            <div className="text-sm text-slate-100">{email ?? "—"}</div>
+            <div className="text-xs text-app-tertiary">Email</div>
+            <div className="text-sm text-app-primary">{email ?? "—"}</div>
           </div>
           <div>
-            <div className="text-xs text-slate-400">Отображаемое имя</div>
-            <div className="text-sm text-slate-100">{displayName?.trim() || "—"}</div>
+            <div className="text-xs text-app-tertiary">Отображаемое имя</div>
+            <div className="text-sm text-app-primary">{displayName?.trim() || "—"}</div>
           </div>
-          <div className="text-xs text-slate-500">{isPending ? "Обработка..." : " "}</div>
+          <div className="text-xs text-app-tertiary">{isPending ? "Обработка..." : " "}</div>
         </div>
       </div>
 
@@ -264,7 +264,7 @@ export function ProfileAvatar({
         }}
       >
         <div className="space-y-4">
-          <p className="text-sm text-slate-300">Вы уверены, что хотите удалить аватар?</p>
+          <p className="text-sm text-app-secondary">Вы уверены, что хотите удалить аватар?</p>
           <div className="flex justify-end gap-2">
             <Button
               type="button"

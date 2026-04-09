@@ -33,17 +33,17 @@ export default async function ProfilePage() {
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-4 py-8">
       <header className="flex items-start justify-between gap-4">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-50">
+          <h1 className="text-2xl font-semibold tracking-tight text-app-primary">
             Личный кабинет
           </h1>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-app-secondary">
             Настройки профиля и аватара.
           </p>
         </div>
         <form action={signOutAction} className="shrink-0">
           <button
             type="submit"
-            className="rounded-md border border-slate-700 px-3 py-1.5 text-sm text-slate-200 transition hover:border-rose-500/70 hover:text-rose-300"
+            className="rounded-md border border-app-default px-3 py-1.5 text-sm text-app-secondary transition hover:border-[color:var(--danger-subtle-border)] hover:bg-[color:var(--danger-subtle-bg)] hover:text-[color:var(--danger-subtle-text)]"
           >
             Выйти из приложения
           </button>

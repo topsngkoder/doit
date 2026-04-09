@@ -13,6 +13,9 @@
 - **2026-04-10** — **T09 DONE**: добавлен `profile-theme-section.tsx` (client): блок «Тема интерфейса» после `<header>`, до аватара/формы; два варианта «Тёмная» / «Светлая» как `role="radio"` кнопки (без toggle/select/checkbox), `useTheme` → `setTheme`. Секция в `surface-card`, токены `text-app-*`, `border-app-*`. Подключено в `profile/page.tsx`. Миграции БД не требовались.
 - **2026-04-10** — **T10 DONE**: мгновенное применение и запись в `localStorage` уже в `ThemeProvider`/`setTheme`; UI профиля вызывает `setTheme` без submit и без reload. Отдельный код не потребовался.
 - **2026-04-10** — **T11 DONE**: лендинг `page.tsx` — заголовок/подзаголовок на токенах (`--text-landing-subtitle` §8.1), CTA как primary/secondary кнопки через CSS-переменные акцента и secondary. `login/page.tsx`, `signup/page.tsx` — карточки форм `surface-card`, типографика `text-app-*`, ссылка «Регистрация» через `text-app-link`. `LoginForm.tsx` / `signup-form.tsx` — лейблы `text-app-secondary`, ошибки `.text-app-validation-error` (§8.2). `UserDebugClient.tsx` — muted surface и токены границ/текста. В `globals.css`: `--text-landing-subtitle`, утилиты `text-app-landing-subtitle`, `text-app-validation-error`. Миграции БД не требовались.
+- **2026-04-10** — **T12 DONE**: глобальный header в `layout.tsx` на семантических токенах §6.2. В `globals.css`: `--header-*` (фон, граница, текст/hover навигации, панель dropdown досок, строки меню, badge уведомлений, аватар). Утилиты `app-global-header`, `app-header-toolbar`, `app-header-hit`, `app-header-boards-*`, `app-header-notif-badge`, `app-header-avatar*`. Светлая тема: полупрозрачный белый фон header + `backdrop-filter`, граница `#E5EAF1`, dropdown как белая карточка с `#D7DFE8` и `var(--shadow-card)`. Тёмная: прежняя читаемость (hover на zinc-подобных поверхностях, полупрозрачная панель списка досок). Логотип наследует цвет строки toolbar. Миграции БД не требовались.
+- **2026-04-10** — **T13 DONE**: профиль — убраны «серые тёмные» блоки: `profile/page.tsx` заголовок/подзаголовок `text-app-*`, кнопка выхода на границах/тексте токенов + hover через `--danger-subtle-*`. `profile-avatar.tsx` и `profile-form.tsx` обёрнуты в `surface-card` (§6.3), подписи полей `text-app-tertiary`, значения `text-app-primary`, ошибки `.text-app-validation-error`, баннер незаполненного профиля через `--warning-subtle-*`. Превью аватара: `bg-app-surface-muted`, границы/hover на токенах, удаление — мягкий destructive hover. Миграции БД не требовались.
+- **2026-04-10** — **T14 DONE**: страница досок §8.4 — секция создания/списка: `surface-card`, заголовок и основной текст `text-app-primary`, подписи `text-app-tertiary`, разделитель `border-app-divider`, пустое состояние `text-app-secondary`. `boards-default-selector.tsx`: список с `border-app-default`, `divide-[color:var(--border-divider)]` (#E5EAF1 в light), ссылки на доски как §8.4 через `text-app-link` + `hover:text-[color:var(--text-link-hover)]`; подпись «По умолчанию» `text-app-secondary`; модалки — типографика на токенах. В `globals.css`: утилита `.checkbox-app` (§7.3 — `accent-color` + focus ring + disabled 60%). Миграции БД не требовались.
 
 ## Назначение
 Этот документ предназначен для AI-агента, который будет внедрять требования из `.ai/light-theme-specification.md`.
@@ -516,6 +519,32 @@
 | Формы | `LoginForm.tsx`, `signup-form.tsx` — лейблы и `.text-app-validation-error` |
 | Dev-блок входа | `UserDebugClient.tsx` на семантических классах |
 
+## Результат T12 — глобальный header
+
+| Что | Где |
+| --- | --- |
+| Токены §6.2 | `globals.css`: `--header-bg`, `--header-border`, `--header-nav-text`, `--header-hover-*`, `--header-dropdown-*`, `--header-badge-*`, `--header-avatar-*` |
+| Разметка | `layout.tsx`: `app-global-header`, `app-header-toolbar` (цвет для логотипа + nav), интерактивы `app-header-hit`, dropdown `app-header-boards-panel` / `app-header-boards-item` |
+| Focus | `focus-ring-app` на пунктах навигации; у строк досок — inset ring по `--focus-ring` |
+
+## Результат T13 — профиль
+
+| Что | Где |
+| --- | --- |
+| Page header / выход | `profile/page.tsx` — `text-app-primary` / `secondary`, кнопка выхода на `border-app-default` + hover danger-subtle |
+| Карточки §6.3 | `profile-avatar.tsx`, `profile-form.tsx` — `surface-card` вместо `bg-slate-950/60` |
+| Форма | Лейблы `text-app-tertiary`, ошибки `text-app-validation-error`, предупреждение имя/фамилия — inline стили из `--warning-subtle-*` |
+| Аватар | Превью на `bg-app-surface-muted`, `focus-ring-app`, hover граница `border-app-accent`, chip удаления с токенами |
+
+## Результат T14 — страница «Доски»
+
+| Что | Где |
+| --- | --- |
+| Белая секция §8.4 | `boards/page.tsx` — `surface-card`, типографика `text-app-*` |
+| Разделители §8.4 | Внутренняя граница формы/списка `border-app-divider`; список — `divide` по `var(--border-divider)` |
+| Ссылки на доски §8.4 | `boards-default-selector.tsx` — `text-app-link` + hover `--text-link-hover` (как login) |
+| Checkbox §7.3 | `globals.css` — `.checkbox-app`; чекбокс «По умолчанию» в селекторе |
+
 ---
 
 ## Трекер задач
@@ -533,9 +562,9 @@
 | T09 | DONE | Добавить UI выбора темы на страницу `Личный кабинет` | `profile/page.tsx`, `profile-theme-section.tsx` | T02, T04, T05 | Есть блок `Тема интерфейса` с 2 взаимоисключающими вариантами |
 | T10 | DONE | Сделать мгновенное клиентское переключение и сохранение темы | `ThemeProvider` + `profile-theme-section.tsx` | T02, T09 | Переключение работает без reload и без submit |
 | T11 | DONE | Перекрасить лендинг, вход и регистрацию по правилам `light` | `page.tsx`, `login/*`, `signup/*`, `globals.css` | T05, T06, T07, T08 | Публичные/auth страницы корректны в обеих темах |
-| T12 | TODO | Перевести глобальный header и header dropdown | `layout.tsx` | T05, T08 | Header соответствует светлой спецификации и не ломает `dark` |
-| T13 | TODO | Перевести профильные секции, аватар, form cards и destructive states | `profile/page.tsx`, `profile-form.tsx`, `profile-avatar.tsx` | T06, T07, T08, T09 | Профиль полностью читабелен в `light` |
-| T14 | TODO | Перевести страницу досок и selector default board | `boards/page.tsx`, `boards-default-selector.tsx` | T06, T07, T08 | Белые section cards, светлые разделители, ссылки по спецификации |
+| T12 | DONE | Перевести глобальный header и header dropdown | `layout.tsx` | T05, T08 | Header соответствует светлой спецификации и не ломает `dark` |
+| T13 | DONE | Перевести профильные секции, аватар, form cards и destructive states | `profile/page.tsx`, `profile-form.tsx`, `profile-avatar.tsx` | T06, T07, T08, T09 | Профиль полностью читабелен в `light` |
+| T14 | DONE | Перевести страницу досок и selector default board | `boards/page.tsx`, `boards-default-selector.tsx` | T06, T07, T08 | Белые section cards, светлые разделители, ссылки по спецификации |
 | T15 | TODO | Перевести центр уведомлений | `notifications/page.tsx` | T06, T08 | Непрочитанные и прочитанные уведомления соответствуют спецификации |
 | T16 | TODO | Перевести настройки уведомлений и checkbox-like controls | `notifications/settings/*` | T06, T07, T08 | Табличные и карточные блоки работают в обеих темах |
 | T17 | TODO | Реализовать светлую вуаль над board image и сохранить пользовательские фоновые исключения | `board-background-frame.tsx` | T04, T05 | Изображение/цвет доски не ломаются, светлая вуаль есть только в `light` |

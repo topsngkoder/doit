@@ -145,13 +145,13 @@ export function BoardsDefaultSelector({
 
   return (
     <div className="space-y-2">
-      <ul className="divide-y divide-slate-800 rounded-lg border border-slate-800">
+      <ul className="divide-y divide-[color:var(--border-divider)] rounded-lg border border-app-default">
         {visibleBoards.map((board) => (
           <li key={board.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
             <div className="min-w-0 flex-1">
               <Link
                 href={`/boards/${board.id}`}
-                className="font-medium text-sky-400 hover:text-sky-300 hover:underline"
+                className="font-medium text-app-link underline-offset-2 hover:text-[color:var(--text-link-hover)] hover:underline"
               >
                 {board.name}
               </Link>
@@ -179,13 +179,13 @@ export function BoardsDefaultSelector({
                   Удалить
                 </Button>
               ) : null}
-              <label className="inline-flex items-center gap-2 text-xs text-slate-300">
+              <label className="inline-flex items-center gap-2 text-xs text-app-secondary">
                 <input
                   type="checkbox"
                   checked={defaultBoardId === board.id}
                   onChange={(event) => onToggle(board.id, event.currentTarget.checked)}
                   disabled={isAnyOperationPending}
-                  className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-sky-500 focus:ring-sky-500"
+                  className="checkbox-app"
                 />
                 <span title="Будет автоматически открываться при входе">По умолчанию</span>
               </label>
@@ -197,7 +197,7 @@ export function BoardsDefaultSelector({
       <Modal open={!!renameBoard} title="Переименовать доску" onClose={closeRenameModal}>
         <div className="space-y-4">
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-slate-400">Название доски</span>
+            <span className="text-xs text-app-tertiary">Название доски</span>
             <input
               type="text"
               maxLength={100}
@@ -231,11 +231,11 @@ export function BoardsDefaultSelector({
       </Modal>
       <Modal open={!!deleteBoard} title="Удалить доску?" onClose={closeDeleteModal}>
         <div className="space-y-4">
-          <p className="text-sm text-slate-300">
+          <p className="text-sm text-app-secondary">
             Доска будет удалена для всех участников. Данные восстановить нельзя.
           </p>
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-app-tertiary">
               Введите название доски для подтверждения
             </span>
             <input

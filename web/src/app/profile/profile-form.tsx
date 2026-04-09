@@ -105,16 +105,23 @@ export function ProfileForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-4 rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-5">
+    <form onSubmit={onSubmit} className="surface-card space-y-4 px-4 py-5">
       {requiresNameCompletion ? (
-        <p className="rounded-md border border-amber-600/50 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+        <p
+          className="rounded-md border px-3 py-2 text-xs"
+          style={{
+            borderColor: "var(--warning-subtle-border)",
+            backgroundColor: "var(--warning-subtle-bg)",
+            color: "var(--warning-subtle-text)"
+          }}
+        >
           Профиль считается заполненным только после ввода имени и фамилии.
         </p>
       ) : null}
 
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="flex flex-col gap-1.5 text-sm text-slate-200">
-          <span className="text-xs text-slate-400">Имя *</span>
+        <label className="flex flex-col gap-1.5 text-sm text-app-primary">
+          <span className="text-xs text-app-tertiary">Имя *</span>
           <input
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
@@ -122,11 +129,11 @@ export function ProfileForm({
             disabled={isPending}
             className="field-base"
           />
-          {errors.firstName ? <span className="text-xs text-rose-300">{errors.firstName}</span> : null}
+          {errors.firstName ? <span className="text-xs text-app-validation-error">{errors.firstName}</span> : null}
         </label>
 
-        <label className="flex flex-col gap-1.5 text-sm text-slate-200">
-          <span className="text-xs text-slate-400">Фамилия *</span>
+        <label className="flex flex-col gap-1.5 text-sm text-app-primary">
+          <span className="text-xs text-app-tertiary">Фамилия *</span>
           <input
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
@@ -134,11 +141,11 @@ export function ProfileForm({
             disabled={isPending}
             className="field-base"
           />
-          {errors.lastName ? <span className="text-xs text-rose-300">{errors.lastName}</span> : null}
+          {errors.lastName ? <span className="text-xs text-app-validation-error">{errors.lastName}</span> : null}
         </label>
 
-        <label className="flex flex-col gap-1.5 text-sm text-slate-200">
-          <span className="text-xs text-slate-400">Должность</span>
+        <label className="flex flex-col gap-1.5 text-sm text-app-primary">
+          <span className="text-xs text-app-tertiary">Должность</span>
           <input
             value={position}
             onChange={(e) => setPosition(e.target.value)}
@@ -146,11 +153,11 @@ export function ProfileForm({
             disabled={isPending}
             className="field-base"
           />
-          {errors.position ? <span className="text-xs text-rose-300">{errors.position}</span> : null}
+          {errors.position ? <span className="text-xs text-app-validation-error">{errors.position}</span> : null}
         </label>
 
-        <label className="flex flex-col gap-1.5 text-sm text-slate-200">
-          <span className="text-xs text-slate-400">Отдел</span>
+        <label className="flex flex-col gap-1.5 text-sm text-app-primary">
+          <span className="text-xs text-app-tertiary">Отдел</span>
           <input
             value={department}
             onChange={(e) => setDepartment(e.target.value)}
@@ -158,12 +165,12 @@ export function ProfileForm({
             disabled={isPending}
             className="field-base"
           />
-          {errors.department ? <span className="text-xs text-rose-300">{errors.department}</span> : null}
+          {errors.department ? <span className="text-xs text-app-validation-error">{errors.department}</span> : null}
         </label>
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs text-slate-500">{isPending ? "Сохранение..." : " "}</span>
+        <span className="text-xs text-app-tertiary">{isPending ? "Сохранение..." : " "}</span>
         <Button type="submit" size="sm" disabled={isPending || hasErrors || !isDirty}>
           Сохранить
         </Button>

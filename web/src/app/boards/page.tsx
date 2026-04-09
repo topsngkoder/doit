@@ -66,7 +66,7 @@ export default async function BoardsPage({ searchParams }: BoardsPageProps) {
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 pt-16 sm:pt-24 lg:pt-28">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-50">
+        <h1 className="text-2xl font-semibold tracking-tight text-app-primary">
           Доски
         </h1>
       </header>
@@ -107,10 +107,10 @@ export default async function BoardsPage({ searchParams }: BoardsPageProps) {
         />
       ) : null}
 
-      <section className="space-y-4 rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-5 text-sm text-slate-200">
+      <section className="surface-card space-y-4 px-4 py-5 text-sm text-app-primary">
         <form action={createBoardWithDefaultsAction} className="flex flex-wrap items-end gap-3">
           <label className="flex min-w-[200px] flex-1 flex-col gap-1">
-            <span className="text-xs text-slate-400">Название новой доски</span>
+            <span className="text-xs text-app-tertiary">Название новой доски</span>
             <input
               name="name"
               type="text"
@@ -125,9 +125,9 @@ export default async function BoardsPage({ searchParams }: BoardsPageProps) {
           </Button>
         </form>
 
-        <div className="border-t border-slate-800 pt-4">
+        <div className="border-t border-app-divider pt-4">
           {boardsPageData.boards.length === 0 ? (
-            <p className="text-slate-400">Пока нет досок. Создайте первую выше.</p>
+            <p className="text-app-secondary">Пока нет досок. Создайте первую выше.</p>
           ) : (
             <BoardsDefaultSelector
               boards={boardsPageData.boards}

@@ -92,6 +92,25 @@
   --radius-pill: 9999px;
 
   --focus-ring-width: 2px;
+
+  /* Глобальный header (§6.2 light; в dark — как прежний slate/zinc каркас) */
+  --header-bg: transparent;
+  --header-border: #27272a;
+  --header-nav-text: var(--text-secondary);
+  --header-hover-bg: #27272a;
+  --header-hover-text: var(--text-primary);
+  --header-chevron: var(--text-tertiary);
+  --header-dropdown-bg: rgba(9, 9, 11, 0.95);
+  --header-dropdown-border: var(--border-default);
+  --header-dropdown-row-text: var(--text-secondary);
+  --header-dropdown-row-hover-bg: rgba(39, 39, 42, 0.92);
+  --header-dropdown-row-hover-text: var(--text-primary);
+  --header-badge-bg: var(--accent-bg);
+  --header-badge-text: var(--text-on-accent);
+  --header-avatar-border: var(--border-strong);
+  --header-avatar-bg: var(--bg-surface-muted);
+  --header-avatar-text: var(--text-secondary);
+  --header-avatar-border-hover: rgba(107, 114, 128, 0.7);
 }
 
 html[data-theme="light"] {
@@ -166,6 +185,24 @@ html[data-theme="light"] {
   --text-link-hover: #1e40af;
 
   --text-landing-subtitle: #475569;
+
+  --header-bg: rgba(255, 255, 255, 0.92);
+  --header-border: #e5eaf1;
+  --header-nav-text: #334155;
+  --header-hover-bg: #eef2f7;
+  --header-hover-text: #0f172a;
+  --header-chevron: var(--text-tertiary);
+  --header-dropdown-bg: #ffffff;
+  --header-dropdown-border: #d7dfe8;
+  --header-dropdown-row-text: #0f172a;
+  --header-dropdown-row-hover-bg: #f8fafc;
+  --header-dropdown-row-hover-text: #0f172a;
+  --header-badge-bg: var(--accent-bg);
+  --header-badge-text: var(--text-on-accent);
+  --header-avatar-border: #cbd5e1;
+  --header-avatar-bg: #f8fafc;
+  --header-avatar-text: #334155;
+  --header-avatar-border-hover: #2563eb;
 }
 
 @tailwind base;
@@ -306,6 +343,25 @@ html[data-theme="light"] {
     cursor: not-allowed;
   }
 
+  /* Нативный checkbox (§7.3 light: акцент и focus ring из токенов) */
+  .checkbox-app {
+    height: 1rem;
+    width: 1rem;
+    border-radius: 0.25rem;
+    accent-color: var(--accent-bg);
+    cursor: pointer;
+  }
+
+  .checkbox-app:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
+  }
+
+  .checkbox-app:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
   /* Toast: статусные подложки по токенам (dark/light из :root / html[data-theme="light"]) */
   .toast-variant-info {
     border: 1px solid var(--info-subtle-border);
@@ -336,5 +392,133 @@ html[data-theme="light"] {
     background-color: var(--bg-surface);
     border: 1px solid var(--border-default);
     border-radius: var(--radius-surface);
+  }
+
+  /* Глобальный header (layout.tsx) */
+  .app-global-header {
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--header-border);
+    background-color: var(--header-bg);
+  }
+
+  html[data-theme="light"] .app-global-header {
+    backdrop-filter: blur(12px);
+  }
+
+  /* Строка header: логотип + nav (логотип не внутри nav) */
+  .app-header-toolbar {
+    color: var(--header-nav-text);
+  }
+
+  .app-header-hit {
+    border-radius: 0.375rem;
+    color: inherit;
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .app-header-hit:hover,
+  .app-header-hit:focus-visible {
+    background-color: var(--header-hover-bg);
+    color: var(--header-hover-text);
+  }
+
+  .group\/boards:hover .app-header-boards-trigger,
+  .group\/boards:focus-within .app-header-boards-trigger {
+    background-color: var(--header-hover-bg);
+    color: var(--header-hover-text);
+  }
+
+  .app-header-boards-chevron {
+    color: var(--header-chevron);
+    transition: color 0.15s ease;
+  }
+
+  .group\/boards:hover .app-header-boards-chevron,
+  .group\/boards:focus-within .app-header-boards-chevron,
+  .app-header-boards-trigger:hover .app-header-boards-chevron,
+  .app-header-boards-trigger:focus-visible .app-header-boards-chevron {
+    color: var(--header-hover-text);
+  }
+
+  .app-header-boards-panel {
+    width: 18rem;
+    overflow: hidden;
+    border-radius: var(--radius-surface);
+    border: 1px solid var(--header-dropdown-border);
+    background-color: var(--header-dropdown-bg);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(12px);
+  }
+
+  .app-header-boards-item {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    color: var(--header-dropdown-row-text);
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease;
+  }
+
+  .app-header-boards-item:hover,
+  .app-header-boards-item:focus {
+    background-color: var(--header-dropdown-row-hover-bg);
+    color: var(--header-dropdown-row-hover-text);
+    outline: none;
+  }
+
+  .app-header-boards-item:focus-visible {
+    box-shadow: inset 0 0 0 2px var(--focus-ring);
+  }
+
+  .app-header-notif-badge {
+    min-width: 1rem;
+    border-radius: var(--radius-pill);
+    background-color: var(--header-badge-bg);
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1rem;
+    color: var(--header-badge-text);
+  }
+
+  .app-header-avatar {
+    display: flex;
+    height: 1.5rem;
+    width: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--header-avatar-border);
+    background-color: var(--header-avatar-bg);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--header-avatar-text);
+    transition: border-color 0.15s ease;
+  }
+
+  .app-header-avatar-wrap {
+    border-radius: var(--radius-pill);
+    padding: 0.125rem;
+    transition: background-color 0.15s ease;
+  }
+
+  .app-header-avatar-wrap:hover,
+  .app-header-avatar-wrap:focus-visible {
+    background-color: var(--header-hover-bg);
+  }
+
+  .app-header-avatar-wrap:hover .app-header-avatar,
+  .app-header-avatar-wrap:focus-visible .app-header-avatar {
+    border-color: var(--header-avatar-border-hover);
   }
 }
