@@ -11,12 +11,32 @@ export type ModalProps = {
   title?: React.ReactNode;
   onClose?: () => void;
   children: React.ReactNode;
+  /** Backward-compatible классы для panel. */
   className?: string;
+  /** Доп. классы для overlay-контейнера. */
+  overlayClassName?: string;
+  /** Доп. классы для panel-контейнера (дополнительно к className). */
+  panelClassName?: string;
   /** Доп. классы для области контента (под скролл/раскладку, например двухколоночный модал). */
   bodyClassName?: string;
+  /** Доп. классы для body-обертки (алиас для более явной настройки). */
+  bodyWrapperClassName?: string;
+  /** Управление вертикальным выравниванием overlay-контейнера. */
+  verticalAlign?: "center" | "custom";
 };
 
-export function Modal({ open, title, onClose, children, className, bodyClassName }: ModalProps) {
+export function Modal({
+  open,
+  title,
+  onClose,
+  children,
+  className,
+  overlayClassName,
+  panelClassName,
+  bodyClassName,
+  bodyWrapperClassName,
+  verticalAlign = "center"
+}: ModalProps) {
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -30,7 +50,11 @@ export function Modal({ open, title, onClose, children, className, bodyClassName
   return createPortal(
     <div
       role="presentation"
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 py-8"
+      className={cn(
+        "fixed inset-0 z-40 flex justify-center bg-black/60 px-4 py-8",
+        verticalAlign === "center" ? "items-center" : "items-start",
+        overlayClassName
+      )}
       onClick={() => onClose?.()}
     >
       <div
@@ -38,7 +62,8 @@ export function Modal({ open, title, onClose, children, className, bodyClassName
         aria-modal="true"
         className={cn(
           "flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-slate-800 bg-slate-950/95 shadow-xl",
-          className
+          className,
+          panelClassName
         )}
         onClick={(e) => e.stopPropagation()}
       >
@@ -63,7 +88,8 @@ export function Modal({ open, title, onClose, children, className, bodyClassName
         <div
           className={cn(
             "min-h-0 flex-1 overflow-y-auto px-5 pb-5 text-sm text-slate-200",
-            bodyClassName
+            bodyClassName,
+            bodyWrapperClassName
           )}
         >
           {children}

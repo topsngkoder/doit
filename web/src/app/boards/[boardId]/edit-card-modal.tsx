@@ -29,6 +29,46 @@ import type { BoardCardListItem, BoardLabelOption } from "./column-types";
 const inputClass =
   "w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-slate-100 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none focus:ring-1 focus:ring-sky-600";
 
+function AutoSizeTextarea({
+  value,
+  className,
+  disabled,
+  onChange,
+  id,
+  rows = 1
+}: {
+  value: string;
+  className: string;
+  disabled?: boolean;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  id?: string;
+  rows?: number;
+}) {
+  const ref = React.useRef<HTMLTextAreaElement>(null);
+
+  React.useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const lineHeight = Number.parseFloat(getComputedStyle(el).lineHeight) || 20;
+    const verticalPadding = 16;
+    const singleLineHeight = Math.ceil(lineHeight + verticalPadding);
+    el.style.height = `${singleLineHeight}px`;
+    el.style.height = `${Math.max(singleLineHeight, el.scrollHeight)}px`;
+  }, [value]);
+
+  return (
+    <textarea
+      ref={ref}
+      id={id}
+      className={className}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      rows={rows}
+    />
+  );
+}
+
 function memberInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
@@ -383,11 +423,14 @@ export function EditCardModal({
           </button>
       }
       onClose={onClose}
-      className="max-w-[min(98vw,96rem)]"
+      verticalAlign="custom"
+      overlayClassName="items-center md:items-start md:pt-[7vh] xl:pt-[11vh]"
+      className="max-w-none rounded-lg"
+      panelClassName="h-[90vh] w-[96vw] md:h-[82vh] md:w-[92vw] xl:h-[70vh] xl:w-[70vw]"
       bodyClassName="flex min-h-0 flex-1 flex-col overflow-hidden px-0 pb-0 pt-0"
     >
-      <div className="flex min-h-[min(520px,calc(90vh-5rem))] flex-1 flex-col overflow-hidden xl:min-h-[420px] xl:flex-row">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-5 pb-5 pt-1">
+      <div className="flex min-h-[min(520px,calc(90vh-5rem))] flex-1 flex-col overflow-hidden md:min-h-0 md:flex-row xl:min-h-[420px]">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto px-5 pb-5 pt-1 md:basis-2/3 md:grow-0">
           <div className="flex flex-col gap-4">
             <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
               <button
@@ -440,20 +483,20 @@ export function EditCardModal({
                   </ul>}
               </div>
             : <>
-            <div>
+            <div className="sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-start sm:gap-3">
               <label
                 htmlFor={`card-desc-${card.id}`}
-                className="mb-1 block text-xs text-slate-400"
+                className="mb-1 block pt-2 text-xs text-slate-400 sm:mb-0"
               >
                 Описание
               </label>
-              <textarea
+              <AutoSizeTextarea
                 id={`card-desc-${card.id}`}
-                className={`${inputClass} min-h-[120px] resize-none`}
+                className={`${inputClass} resize-none overflow-hidden`}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={readOnly || pending}
-                rows={5}
+                rows={1}
               />
             </div>
 
@@ -471,12 +514,15 @@ export function EditCardModal({
 
                     if (f.fieldType === "text" && d.fieldType === "text") {
                       return (
-                        <label key={f.id} className="flex flex-col gap-1">
-                          <span className="text-xs text-slate-400">
+                        <label
+                          key={f.id}
+                          className="sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-start sm:gap-3"
+                        >
+                          <span className="pb-1 pt-2 text-xs text-slate-400 sm:pb-0">
                             {f.name}
                             {reqLabel}
                           </span>
-                          <textarea
+                          <AutoSizeTextarea
                             value={d.value}
                             onChange={(e) =>
                               setFieldDrafts((prev) => ({
@@ -484,9 +530,9 @@ export function EditCardModal({
                                 [f.id]: { fieldType: "text", value: e.target.value }
                               }))
                             }
-                            rows={3}
+                            rows={1}
                             disabled={ro}
-                            className={inputClass}
+                            className={`${inputClass} resize-none overflow-hidden`}
                           />
                         </label>
                       );
@@ -494,8 +540,11 @@ export function EditCardModal({
 
                     if (f.fieldType === "date" && d.fieldType === "date") {
                       return (
-                        <label key={f.id} className="flex flex-col gap-1">
-                          <span className="text-xs text-slate-400">
+                        <label
+                          key={f.id}
+                          className="sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-start sm:gap-3"
+                        >
+                          <span className="pb-1 pt-2 text-xs text-slate-400 sm:pb-0">
                             {f.name}
                             {reqLabel}
                           </span>
@@ -509,7 +558,7 @@ export function EditCardModal({
                               }))
                             }
                             disabled={ro}
-                            className={cn(inputClass, "w-[12.5rem] max-w-full self-start")}
+                            className={cn(inputClass, "w-[12.5rem] max-w-[12.5rem] self-start")}
                           />
                         </label>
                       );
@@ -517,12 +566,16 @@ export function EditCardModal({
 
                     if (f.fieldType === "link" && d.fieldType === "link") {
                       return (
-                        <div key={f.id} className="space-y-2 rounded-md border border-slate-800/80 p-3">
-                          <p className="text-xs font-medium text-slate-400">
+                        <div
+                          key={f.id}
+                          className="sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-start sm:gap-3"
+                        >
+                          <p className="pb-1 pt-2 text-xs font-medium text-slate-400 sm:pb-0">
                             {f.name}
                             {reqLabel}
                           </p>
-                          <label className="flex flex-col gap-1">
+                          <div className="space-y-2 rounded-md border border-slate-800/80 p-3">
+                            <label className="flex flex-col gap-1">
                             <span className="text-xs text-slate-500">URL</span>
                             <input
                               type="url"
@@ -541,25 +594,26 @@ export function EditCardModal({
                               disabled={ro}
                               className={inputClass}
                             />
-                          </label>
-                          <label className="flex flex-col gap-1">
-                            <span className="text-xs text-slate-500">Текст ссылки (необязательно)</span>
-                            <input
-                              value={d.text}
-                              onChange={(e) =>
-                                setFieldDrafts((prev) => ({
-                                  ...prev,
-                                  [f.id]: {
-                                    fieldType: "link",
-                                    url: d.url,
-                                    text: e.target.value
-                                  }
-                                }))
-                              }
-                              disabled={ro}
-                              className={inputClass}
-                            />
-                          </label>
+                            </label>
+                            <label className="flex flex-col gap-1">
+                              <span className="text-xs text-slate-500">Текст ссылки (необязательно)</span>
+                              <input
+                                value={d.text}
+                                onChange={(e) =>
+                                  setFieldDrafts((prev) => ({
+                                    ...prev,
+                                    [f.id]: {
+                                      fieldType: "link",
+                                      url: d.url,
+                                      text: e.target.value
+                                    }
+                                  }))
+                                }
+                                disabled={ro}
+                                className={inputClass}
+                              />
+                            </label>
+                          </div>
                         </div>
                       );
                     }
@@ -567,8 +621,11 @@ export function EditCardModal({
                     if (f.fieldType === "select" && d.fieldType === "select") {
                       const opts = [...f.selectOptions].sort((a, b) => a.position - b.position);
                       return (
-                        <label key={f.id} className="flex flex-col gap-1">
-                          <span className="text-xs text-slate-400">
+                        <label
+                          key={f.id}
+                          className="sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-start sm:gap-3"
+                        >
+                          <span className="pb-1 pt-2 text-xs text-slate-400 sm:pb-0">
                             {f.name}
                             {reqLabel}
                           </span>
@@ -581,7 +638,7 @@ export function EditCardModal({
                               }))
                             }
                             disabled={ro}
-                            className={cn(inputClass, "w-[18rem] max-w-full self-start")}
+                            className={cn(inputClass, "w-[18rem] max-w-[18rem] self-start")}
                           >
                             {!f.isRequired ?
                               <option value="">— не выбрано —</option>
@@ -627,23 +684,19 @@ export function EditCardModal({
                           setOpenAssigneePanelUserId((cur) => (cur === m.userId ? null : m.userId))
                         }
                         className={cn(
-                          "flex max-w-[200px] items-center gap-2 rounded-full border py-1 pl-1 pr-2 text-left text-sm transition-colors",
+                          "flex items-center justify-center rounded-full border p-1 text-left text-sm transition-colors",
                           isResponsible ?
                             "border-sky-700/80 bg-sky-950/50 text-sky-100"
                           : "border-slate-700 bg-slate-900/80 text-slate-100 hover:border-slate-600"
                         )}
+                        title={m.displayName}
                       >
                         <AssigneeAvatar
                           label={m.displayName}
                           src={m.avatarUrl ?? null}
                           className="h-7 w-7 shrink-0 text-xs"
                         />
-                        <span className="min-w-0 flex-1 truncate">{m.displayName}</span>
-                        {isResponsible ?
-                          <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-sky-300">
-                            Отв.
-                          </span>
-                        : null}
+                        <span className="sr-only">{m.displayName}</span>
                       </button>
                       {panelOpen ?
                         <div className="absolute left-0 top-[calc(100%+6px)] z-[60] w-max min-w-[240px] max-w-[min(100vw-3rem,280px)]">
@@ -700,7 +753,10 @@ export function EditCardModal({
                   <ul className="space-y-2">
                     {membersToAdd.map((m) => (
                       <li key={m.userId}>
-                        <label className="flex cursor-pointer items-center gap-2 text-sm">
+                        <label
+                          className="flex cursor-pointer items-center gap-2 text-sm"
+                          title={`${m.displayName} (${m.email})`}
+                        >
                           <input
                             type="checkbox"
                             className="rounded border-slate-600"
@@ -713,8 +769,8 @@ export function EditCardModal({
                             src={m.avatarUrl ?? null}
                             className="h-6 w-6 shrink-0 text-[10px]"
                           />
-                          <span className="text-slate-100">{m.displayName}</span>
-                          <span className="truncate text-xs text-slate-500">{m.email}</span>
+                          <span className="sr-only">{m.displayName}</span>
+                          <span className="sr-only">{m.email}</span>
                         </label>
                       </li>
                     ))}
@@ -762,7 +818,7 @@ export function EditCardModal({
                       </label>
                       <input
                         id={`card-labels-q-${card.id}`}
-                        className={cn(inputClass, "w-[18rem] max-w-full")}
+                        className={cn(inputClass, "w-[18rem] max-w-[18rem]")}
                         placeholder="Найти метку по названию…"
                         value={labelQuery}
                         disabled={labelPending || pending}
@@ -877,7 +933,7 @@ export function EditCardModal({
         </div>
 
         <aside
-          className="flex max-h-[50vh] w-full shrink-0 flex-col border-t border-slate-800 xl:max-h-none xl:w-[27rem] xl:min-w-[27rem] xl:border-l xl:border-t-0 2xl:w-[30rem] 2xl:min-w-[30rem]"
+          className="flex max-h-[50vh] w-full shrink-0 flex-col border-t border-slate-800 md:max-h-none md:basis-1/3 md:border-t-0 xl:border-l"
           aria-label="Комментарии к карточке"
         >
           <CardCommentsSidebar

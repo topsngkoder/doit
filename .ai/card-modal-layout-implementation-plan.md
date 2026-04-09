@@ -35,6 +35,83 @@
   - текущая прокрутка и высоты завязаны на `min-h`/`max-h`, а не на строгую модель со скроллом внутри колонок.
 - `card-comments-sidebar.tsx` уже умеет отдельно прокручивать список комментариев, но его нужно встроить в новую модель высот без конкурирующего внешнего скролла.
 
+## Зафиксированные обязательные значения из спецификации
+- `desktop >= 1280px`
+  - размер модалки: `70vw x 70vh`
+  - позиционирование: центр по `X`, центр панели на `46vh` от верхней границы viewport
+  - layout: 2 колонки `66.6667% / 33.3333%`
+  - scroll: независимый vertical scroll в обеих колонках, без внешнего конкурирующего scroll у modal shell
+- `tablet 768..1279px`
+  - размер модалки: `92vw x 82vh`
+  - позиционирование: центр панели на `48vh` от верхней границы viewport
+  - layout: 2 колонки `66.6667% / 33.3333%`
+  - scroll: независимый vertical scroll в обеих колонках, без внешнего конкурирующего scroll у modal shell
+- `mobile <= 767px`
+  - размер модалки: `96vw x 90vh`
+  - позиционирование: обычное центрирование без вертикального смещения
+  - layout: один столбец, сначала карточка, потом комментарии
+  - scroll: единая вертикальная прокрутка содержимого модалки
+- header модалки всегда на всю ширину окна и не входит в колонки
+- вертикальный разделитель между колонками обязателен только для `desktop/tablet`
+
+## Результат аудита `Modal` (T02)
+- Текущее API `Modal`:
+  - `open`, `title`, `onClose`, `children`
+  - `className` (на panel)
+  - `bodyClassName` (на body-wrapper)
+- Фактическая база использования:
+  - найдено `12` вызовов `Modal` в `web/src/app`
+  - почти все вызовы используют только дефолтное поведение + иногда `className`
+  - `bodyClassName` используется только в `edit-card-modal.tsx`
+- Критичный риск:
+  - нельзя менять дефолтные классы overlay/panel/body и вертикальное центрирование, иначе затронем остальные модалки
+- Выбран минимально-инвазивный способ расширения API:
+  - добавить **опциональные** пропсы:
+    - `overlayClassName` (точечная настройка overlay-контейнера)
+    - `panelClassName` (алиас к panel-слою; `className` оставить для backward compatibility)
+    - `bodyWrapperClassName` (алиас/расширение для body-обертки без изменения дефолтов)
+    - `verticalAlign?: "center" | "custom"` (по умолчанию `center`; для card modal будет использоваться `custom` через классы)
+  - дефолтный layout и scroll у `Modal` остаются прежними для всех существующих вызовов
+  - card modal будет подключать новые пропсы локально в `edit-card-modal.tsx`
+
+## Выполнено в `T03`
+- Обновлен `web/src/components/ui/modal.tsx`:
+  - добавлены новые **опциональные** пропсы `overlayClassName`, `panelClassName`, `bodyWrapperClassName`
+  - добавлен `verticalAlign?: "center" | "custom"` с дефолтом `"center"`
+  - `className` сохранен как backward-compatible способ стилизации panel
+  - `panelClassName` применяется дополнительно к `className`
+  - `bodyWrapperClassName` применяется дополнительно к `bodyClassName`
+- Для дефолтного режима (`verticalAlign="center"`) поведение прежнее:
+  - overlay продолжает центрировать модалку по вертикали
+  - существующие вызовы `Modal` не требуют изменений
+- Для кастомного режима (`verticalAlign="custom"`) доступно отключение дефолтного vertical centering через классы overlay.
+- Линтер по измененному файлу: без новых ошибок.
+
+## Выполнено в `T04`
+- Обновлен `web/src/app/boards/[boardId]/edit-card-modal.tsx`: card modal переведен на новый modal shell API.
+- Подключена конфигурация viewport по брейкпоинтам:
+  - `mobile (<=767)`: panel `96vw x 90vh`, центрирование без вертикального смещения (`items-center`)
+  - `tablet (768..1279)`: panel `92vw x 82vh`, смещение вверх через `pt-[7vh]` (центр панели на `48vh`)
+  - `desktop (>=1280)`: panel `70vw x 70vh`, смещение вверх через `pt-[11vh]` (центр панели на `46vh`)
+- Применение:
+  - `verticalAlign="custom"`
+  - `overlayClassName` для адаптивного vertical positioning
+  - `panelClassName` для точных размеров panel
+- Линтер по `edit-card-modal.tsx`: без новых ошибок.
+
+## Выполнено в `T05`
+- Обновлен `web/src/app/boards/[boardId]/edit-card-modal.tsx`: content area переведена на двухколоночную схему начиная с `tablet` (`md`).
+- Для `desktop/tablet` зафиксирована пропорция колонок:
+  - левая колонка: `md:basis-2/3`
+  - правая колонка: `md:basis-1/3`
+- У правой колонки удалены фиксированные ширины (`27rem/30rem`), чтобы ширина определялась только пропорцией.
+- На `mobile` сохранен один столбец (`flex-col`) с комментариями ниже карточки.
+- Уточнение по фидбеку: поля типа `date` и `select` в блоке пользовательских полей оставлены компактными фиксированной ширины (`12.5rem` и `18rem`), без растяжения на всю ширину колонки.
+- Уточнение по фидбеку: поле меток (поисковый input для добавления метки) также зафиксировано в компактной ширине `18rem` без растяжения на всю ширину.
+- Уточнение по фидбеку: текстовые поля (`Описание` и пользовательские поля типа `text`) сделаны адаптивными по высоте (auto-resize). В пустом состоянии высота равна одной строке, при вводе поле растет по содержимому.
+- Уточнение по фидбеку: в секции `Участники карточки` скрыто видимое отображение имен (и email в списке добавления), оставлены только аватары для более компактного вида. Имена доступны в `title`/`sr-only`.
+- Уточнение по фидбеку: `Описание` и пользовательские поля в деталях перестроены в компактные строки `label слева / control справа` (на `sm+`), чтобы уменьшить вертикальную высоту карточки.
+
 ## Стратегия реализации
 1. Не ломать существующий `Modal` для других сценариев.
 2. Добавить в `Modal` опциональные возможности для card modal:
@@ -138,11 +215,11 @@
 
 | ID | Статус | Задача | Файлы | Зависимости | Критерий завершения |
 | --- | --- | --- | --- | --- | --- |
-| T01 | TODO | Прочитать спецификацию и зафиксировать обязательные числа/брейкпоинты | `.ai/card-modal-layout-specification.md` | - | Есть список точных значений для desktop/tablet/mobile |
-| T02 | TODO | Проаудировать текущее использование `Modal` и выбрать безопасный способ расширения API | `web/src/components/ui/modal.tsx`, все места `<Modal` | T01 | Понятно, какие новые пропсы добавить без поломки других модалок |
-| T03 | TODO | Расширить `Modal` точечными пропсами для viewport positioning/layout | `web/src/components/ui/modal.tsx` | T02 | Card modal можно позиционировать и размерять отдельно от остальных |
-| T04 | TODO | Подключить новую конфигурацию modal shell в edit card modal | `web/src/app/boards/[boardId]/edit-card-modal.tsx` | T03 | Размеры и позиционирование соответствуют режимам desktop/tablet/mobile |
-| T05 | TODO | Перестроить content area в 2/3 + 1/3 для desktop/tablet | `web/src/app/boards/[boardId]/edit-card-modal.tsx` | T04 | Комментарии справа, карточка слева, пропорция соблюдена |
+| T01 | DONE | Прочитать спецификацию и зафиксировать обязательные числа/брейкпоинты | `.ai/card-modal-layout-specification.md`, `.ai/card-modal-layout-implementation-plan.md` | - | Есть список точных значений для desktop/tablet/mobile |
+| T02 | DONE | Проаудировать текущее использование `Modal` и выбрать безопасный способ расширения API | `web/src/components/ui/modal.tsx`, все места `<Modal`, `.ai/card-modal-layout-implementation-plan.md` | T01 | Понятно, какие новые пропсы добавить без поломки других модалок |
+| T03 | DONE | Расширить `Modal` точечными пропсами для viewport positioning/layout | `web/src/components/ui/modal.tsx`, `.ai/card-modal-layout-implementation-plan.md` | T02 | Card modal можно позиционировать и размерять отдельно от остальных |
+| T04 | DONE | Подключить новую конфигурацию modal shell в edit card modal | `web/src/app/boards/[boardId]/edit-card-modal.tsx`, `.ai/card-modal-layout-implementation-plan.md` | T03 | Размеры и позиционирование соответствуют режимам desktop/tablet/mobile |
+| T05 | DONE | Перестроить content area в 2/3 + 1/3 для desktop/tablet | `web/src/app/boards/[boardId]/edit-card-modal.tsx` | T04 | Комментарии справа, карточка слева, пропорция соблюдена |
 | T06 | TODO | Добавить явный вертикальный разделитель между колонками | `web/src/app/boards/[boardId]/edit-card-modal.tsx` | T05 | Разделитель виден только в desktop/tablet |
 | T07 | TODO | Настроить независимый scroll левой колонки | `web/src/app/boards/[boardId]/edit-card-modal.tsx` | T05 | Левая колонка скроллится сама и не ломает высоту модалки |
 | T08 | TODO | Настроить правую колонку под независимый scroll и встроить comments sidebar без конфликтов | `web/src/app/boards/[boardId]/edit-card-modal.tsx`, `web/src/app/boards/[boardId]/card-comments-sidebar.tsx` | T05 | Правая колонка скроллится отдельно, comments block не выталкивает левую часть |
