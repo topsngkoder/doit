@@ -1,18 +1,145 @@
 /*
- * Явный фон/цвет до пайплайна Tailwind: если PostCSS не отработал
- * или чанк CSS не подгрузился, без этого останутся белый фон и чёрный текст.
+ * Тема: семантические токены на :root (dark по умолчанию) и html[data-theme="light"].
+ * Inline-script в layout выставляет data-theme до отрисовки; color-scheme дублируется в CSS как запасной вариант.
  */
-html {
-  background-color: #09090b;
-  color: #fafafa;
+:root {
   color-scheme: dark;
+
+  /* Surfaces */
+  --bg-page: #09090b;
+  --bg-surface: #09090b;
+  --bg-surface-muted: #18181b;
+  --bg-surface-subtle: #27272a;
+
+  /* Text */
+  --text-primary: #fafafa;
+  --text-secondary: #d4d4d8;
+  --text-tertiary: #a1a1aa;
+  --text-disabled: #71717a;
+  --text-on-accent: #ffffff;
+
+  /* Borders */
+  --border-default: #27272a;
+  --border-strong: #3f3f46;
+  --border-accent: #52525b;
+  --border-divider: #27272a;
+
+  /* Accent (соответствует текущему primary: sky → gray в tailwind.config) */
+  --accent-bg: #6b7280;
+  --accent-hover: #4b5563;
+  --accent-active: #374151;
+  --accent-subtle-bg: rgba(113, 113, 122, 0.15);
+  --accent-subtle-border: #3f3f46;
+  --accent-subtle-text: #d4d4d8;
+
+  --focus-ring: #9ca3af;
+
+  --overlay: rgba(0, 0, 0, 0.55);
+  --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-card-hover: 0 12px 28px rgba(0, 0, 0, 0.45);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.55);
+
+  --success-strong: #34d399;
+  --success-subtle-bg: rgba(16, 185, 129, 0.12);
+  --success-subtle-border: rgba(52, 211, 153, 0.35);
+  --success-subtle-text: #6ee7b7;
+
+  --warning-strong: #fbbf24;
+  --warning-subtle-bg: rgba(251, 191, 36, 0.12);
+  --warning-subtle-border: rgba(251, 191, 36, 0.35);
+  --warning-subtle-text: #fcd34d;
+
+  --danger-strong: #f87171;
+  --danger-hover: #ef4444;
+  --danger-subtle-bg: rgba(248, 113, 113, 0.12);
+  --danger-subtle-border: rgba(248, 113, 113, 0.35);
+  --danger-subtle-text: #fca5a5;
+
+  --info-strong: #60a5fa;
+  --info-subtle-bg: rgba(96, 165, 250, 0.12);
+  --info-subtle-border: rgba(96, 165, 250, 0.35);
+  --info-subtle-text: #93c5fd;
+
+  /* Ссылки (тёмная тема — нейтральный акцент) */
+  --text-link: #d4d4d8;
+  --text-link-hover: #fafafa;
+
+  /* Радиусы (спецификация §5.5) */
+  --radius-control: 8px;
+  --radius-surface: 12px;
+  --radius-pill: 9999px;
+
+  --focus-ring-width: 2px;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+
+  --bg-page: #f4f7fb;
+  --bg-surface: #ffffff;
+  --bg-surface-muted: #f8fafc;
+  --bg-surface-subtle: #eef2f7;
+
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-tertiary: #64748b;
+  --text-disabled: #94a3b8;
+  --text-on-accent: #ffffff;
+
+  --border-default: #d7dfe8;
+  --border-strong: #b8c4d3;
+  --border-accent: #bfdbfe;
+  --border-divider: #e5eaf1;
+
+  --accent-bg: #2563eb;
+  --accent-hover: #1d4ed8;
+  --accent-active: #1e40af;
+  --accent-subtle-bg: #eff6ff;
+  --accent-subtle-border: #bfdbfe;
+  --accent-subtle-text: #1d4ed8;
+
+  --focus-ring: #93c5fd;
+
+  --overlay: rgba(15, 23, 42, 0.32);
+  --shadow-card: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow-card-hover: 0 12px 28px rgba(15, 23, 42, 0.12);
+  --shadow-modal: 0 24px 64px rgba(15, 23, 42, 0.18);
+
+  --success-strong: #059669;
+  --success-subtle-bg: #ecfdf5;
+  --success-subtle-border: #a7f3d0;
+  --success-subtle-text: #065f46;
+
+  --warning-strong: #d97706;
+  --warning-subtle-bg: #fffbeb;
+  --warning-subtle-border: #fcd34d;
+  --warning-subtle-text: #92400e;
+
+  --danger-strong: #dc2626;
+  --danger-hover: #b91c1c;
+  --danger-subtle-bg: #fef2f2;
+  --danger-subtle-border: #fecaca;
+  --danger-subtle-text: #991b1b;
+
+  --info-strong: #2563eb;
+  --info-subtle-bg: #eff6ff;
+  --info-subtle-border: #bfdbfe;
+  --info-subtle-text: #1e40af;
+
+  --text-link: #1d4ed8;
+  --text-link-hover: #1e40af;
+}
+
+html {
+  background-color: var(--bg-page);
+  color: var(--text-primary);
 }
 
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: #09090b;
-  color: #fafafa;
+  background-color: var(--bg-page);
+  color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -31,3 +158,73 @@ body {
   }
 }
 
+@layer utilities {
+  .bg-app-page {
+    background-color: var(--bg-page);
+  }
+  .bg-app-surface {
+    background-color: var(--bg-surface);
+  }
+  .bg-app-surface-muted {
+    background-color: var(--bg-surface-muted);
+  }
+  .bg-app-surface-subtle {
+    background-color: var(--bg-surface-subtle);
+  }
+
+  .text-app-primary {
+    color: var(--text-primary);
+  }
+  .text-app-secondary {
+    color: var(--text-secondary);
+  }
+  .text-app-tertiary {
+    color: var(--text-tertiary);
+  }
+  .text-app-disabled {
+    color: var(--text-disabled);
+  }
+  .text-app-on-accent {
+    color: var(--text-on-accent);
+  }
+  .text-app-link {
+    color: var(--text-link);
+  }
+
+  .border-app-default {
+    border-color: var(--border-default);
+  }
+  .border-app-strong {
+    border-color: var(--border-strong);
+  }
+  .border-app-accent {
+    border-color: var(--border-accent);
+  }
+  .border-app-divider {
+    border-color: var(--border-divider);
+  }
+
+  .surface-card {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-surface);
+    box-shadow: var(--shadow-card);
+  }
+
+  .surface-muted {
+    background-color: var(--bg-surface-muted);
+    border-radius: var(--radius-surface);
+  }
+
+  .surface-elevated {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-surface);
+    box-shadow: var(--shadow-card-hover);
+  }
+
+  .focus-ring-app:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 var(--focus-ring-width) var(--focus-ring);
+  }
+}

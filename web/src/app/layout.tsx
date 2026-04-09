@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Manrope } from "next/font/google";
 import { BrowserNativeNotificationsProvider } from "@/lib/notifications/browser-native-notifications-provider";
 import { ThemeProvider } from "@/lib/theme";
+import { THEME_STORAGE_KEY } from "@/lib/theme/constants";
 import { DoitLogoLink } from "@/components/doit-logo-link";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import "./globals.css";
@@ -29,6 +30,9 @@ export const metadata: Metadata = {
   title: "Doit",
   description: "Task boards app"
 };
+
+/** Синхронно до первой отрисовки; логика дублирует normalizeTheme + applyThemeToDocument (см. lib/theme). */
+const themeBeforePaintScript = `(function(){var k=${JSON.stringify(THEME_STORAGE_KEY)};function apply(t){document.documentElement.setAttribute("data-theme",t);document.documentElement.style.colorScheme=t;}try{var raw=localStorage.getItem(k);var t=raw==="light"||raw==="dark"?raw:"dark";apply(t);}catch(e){apply("dark");}})();`;
 
 type HeaderBoardLink = {
   id: string;
@@ -100,11 +104,11 @@ export default async function RootLayout({
   }
 
   return (
-    <html lang="ru" className={manrope.variable} style={{ backgroundColor: "#09090b" }}>
-      <body
-        className="min-h-screen bg-slate-950 font-sans text-slate-50"
-        style={{ backgroundColor: "#09090b", color: "#fafafa" }}
-      >
+    <html lang="ru" className={manrope.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBeforePaintScript }} />
+      </head>
+      <body className="min-h-screen bg-app-page font-sans text-app-primary">
         <ThemeProvider>
         <BrowserNativeNotificationsProvider>
         <div className="flex min-h-screen flex-col pt-2">
