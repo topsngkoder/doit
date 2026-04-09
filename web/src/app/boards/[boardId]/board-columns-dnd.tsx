@@ -911,7 +911,7 @@ export function BoardColumnsDnD({
       cardsById: buildCardsById(cardsByColumnId),
       cardOrderByColumn: buildCardOrderRecord(cardsByColumnId)
     }));
-  }, [boardId, cardSig]);
+  }, [boardId, cardsByColumnId, cardSig]);
 
   const editingCard =
     editingCardId != null ? (local.cardsById.get(editingCardId) ?? null) : null;
