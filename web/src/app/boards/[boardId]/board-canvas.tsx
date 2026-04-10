@@ -92,7 +92,7 @@ export function BoardCanvas({
     <BoardBackgroundFrame
       backgroundType={board.backgroundType}
       backgroundImagePath={board.backgroundImagePath}
-      className="flex h-full min-h-[320px] flex-1 flex-col p-4"
+      className="flex h-full min-h-[320px] flex-1 flex-col py-4"
     >
       <div
         ref={columnsStageRef}
