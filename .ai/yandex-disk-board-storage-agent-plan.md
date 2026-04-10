@@ -83,13 +83,19 @@
 ## 4) Трекер задач (живой чеклист)
 Статусы: `todo | doing | blocked | done`.
 
+### Прогресс (журнал)
+| Дата | Задача | Что сделано |
+|------|--------|-------------|
+| 2026-04-10 | YDB1.1 | Миграция `20260410180000_board_yandex_disk_integrations.sql`: таблица `board_yandex_disk_integrations`, поля по спец. 7.1, `UNIQUE(board_id)`, индекс по `status`, CHECK статусов, FK на `boards` CASCADE и `profiles` SET NULL, токены nullable для состояний без секрета, RLS включён без политик (политики — YDB1.4), триггер `updated_at`. `supabase db push` применён. |
+| 2026-04-10 | YDB1.2 | Миграция `20260410181000_card_attachments.sql`: таблица `card_attachments`, поля по спец. 7.2, `storage_provider` с CHECK `yandex_disk`, статусы `uploading|ready|failed`, индексы на `card_id`, `board_id`, `status`, FK `board_id`/`card_id` CASCADE, `uploaded_by_user_id` → `profiles` RESTRICT, RLS без политик. `supabase db push` применён. |
+
 ### EPIC YDB1 - Подготовить модель данных и миграции
-- [ ] **YDB1.1 (todo)** Спроектировать таблицу привязки Яндекс.Диска к доске
+- [x] **YDB1.1 (done)** Спроектировать таблицу привязки Яндекс.Диска к доске
   - поля: `id`, `board_id`, `yandex_account_id`, `yandex_login`, `root_folder_path`, `encrypted_access_token`, `encrypted_refresh_token`, `access_token_expires_at`, `status`, `connected_by_user_id`, `created_at`, `updated_at`, `last_authorized_at`, `last_error_text`;
   - ограничение: не более одной `active` записи на доску;
   - ограничение/индекс: удобный доступ по `board_id`;
   - **DoD**: таблица и индексы покрывают все обязательные поля из раздела 7.1 спецификации.
-- [ ] **YDB1.2 (todo)** Спроектировать таблицу вложений карточек
+- [x] **YDB1.2 (done)** Спроектировать таблицу вложений карточек
   - поля: `id`, `board_id`, `card_id`, `storage_provider`, `storage_path`, `original_file_name`, `mime_type`, `size_bytes`, `uploaded_by_user_id`, `uploaded_at`, `status`;
   - `storage_provider` в этой доработке фиксирован на Yandex Disk, но поле всё равно сохраняется как часть продуктового контракта;
   - предусмотреть индексы по `card_id`, `board_id`, `status`;
