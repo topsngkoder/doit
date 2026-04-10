@@ -69,7 +69,7 @@ function ThemeChoiceButton({
       aria-checked={selected}
       onClick={() => onChoose(value)}
       className={cn(
-        "focus-ring-app rounded-[length:var(--radius-control)] border px-4 py-2.5 text-left text-sm font-medium transition-colors",
+        "focus-ring-app rounded-[var(--radius-control)] border px-4 py-2.5 text-left text-sm font-medium transition-colors",
         selected ?
           "border-app-accent bg-app-surface-muted text-app-primary"
         : "border-app-default text-app-secondary hover:bg-app-surface-muted"

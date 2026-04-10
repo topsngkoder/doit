@@ -46,7 +46,7 @@ export function UserDebugClient() {
   }, []);
 
   return (
-    <section className="mt-4 rounded-[length:var(--radius-surface)] border border-dashed border-app-default bg-app-surface-muted px-3 py-3 text-xs text-app-secondary">
+    <section className="mt-4 rounded-[var(--radius-surface)] border border-dashed border-app-default bg-app-surface-muted px-3 py-3 text-xs text-app-secondary">
       <div className="mb-1 font-medium text-app-primary">Supabase auth (client)</div>
       {state.status === "idle" || state.status === "loading" ? (
         <p>Загрузка информации о пользователе…</p>

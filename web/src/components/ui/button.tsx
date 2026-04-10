@@ -10,7 +10,7 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const baseClasses =
-  "inline-flex items-center justify-center text-sm font-medium transition-colors rounded-[length:var(--radius-control)] focus-visible:outline-none focus-visible:ring-[length:var(--focus-ring-width)] focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-page)] disabled:pointer-events-none disabled:opacity-60";
+  "inline-flex items-center justify-center text-sm font-medium transition-colors rounded-[var(--radius-control)] focus-visible:outline-none focus-visible:ring-[length:var(--focus-ring-width)] focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-page)] disabled:pointer-events-none disabled:opacity-60";
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary:

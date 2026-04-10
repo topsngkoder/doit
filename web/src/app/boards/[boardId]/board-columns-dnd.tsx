@@ -658,7 +658,7 @@ function SortableColumnShell({
       />
       <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1" role="list">
+          <div className="board-column-cards-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1" role="list">
             {cards.map((card) => (
               <SortableBoardCard
                 key={card.id}
@@ -759,7 +759,7 @@ function StaticColumnShell({
       />
       <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1" role="list">
+          <div className="board-column-cards-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1" role="list">
             {cards.map((card) => (
               <SortableBoardCard
                 key={card.id}
@@ -841,7 +841,7 @@ function BoardGridStatic({
 }) {
   const columnCount = columnRows.length;
   return (
-    <div className="flex h-full min-h-0 w-max min-w-full items-start gap-3 pb-2 md:gap-4">
+    <div className="flex h-full min-h-0 w-max min-w-full items-start gap-3 pl-3 pr-3 md:gap-4 md:pl-4 md:pr-4">
       {columnRows.map((col, index) => (
         <div
           key={col.id}
@@ -864,7 +864,7 @@ function BoardGridStatic({
             canDelete={columnPermissions.canDelete}
             columnDrag={null}
           />
-          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1" role="list">
+          <div className="board-column-cards-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1" role="list">
             {(cardOrderByColumn[col.id] ?? [])
               .map((id) => cardsById.get(id))
               .filter(Boolean)
@@ -1860,7 +1860,7 @@ export function BoardColumnsDnD({
         items={visibleColumnItems.map((c) => columnDndId(c.id))}
         strategy={horizontalListSortingStrategy}
       >
-        <div className="flex h-full min-h-0 w-max min-w-full items-start gap-3 pb-2 md:gap-4">
+        <div className="flex h-full min-h-0 w-max min-w-full items-start gap-3 pl-3 pr-3 md:gap-4 md:pl-4 md:pr-4">
           {visibleColumnItems.map((col, index) => (
             <SortableColumnShell
               key={col.id}
@@ -1887,7 +1887,7 @@ export function BoardColumnsDnD({
           ))}
         </div>
       </SortableContext>
-    : <div className="flex h-full min-h-0 w-max min-w-full items-start gap-3 pb-2 md:gap-4">
+    : <div className="flex h-full min-h-0 w-max min-w-full items-start gap-3 pl-3 pr-3 md:gap-4 md:pl-4 md:pr-4">
         {visibleColumnItems.map((col, index) => (
           <StaticColumnShell
             key={col.id}

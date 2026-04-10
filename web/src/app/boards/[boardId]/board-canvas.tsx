@@ -92,11 +92,11 @@ export function BoardCanvas({
     <BoardBackgroundFrame
       backgroundType={board.backgroundType}
       backgroundImagePath={board.backgroundImagePath}
-      className="flex h-full min-h-[320px] flex-1 flex-col py-4"
+      className="flex h-full min-h-[320px] flex-1 flex-col pt-3 md:pt-4"
     >
       <div
         ref={columnsStageRef}
-        className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden"
+        className="board-columns-scroll min-h-0 flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth"
       >
         <BoardColumnsDnD
           boardId={boardId}

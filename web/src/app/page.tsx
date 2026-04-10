@@ -29,13 +29,13 @@ export default async function HomePage() {
         <div className="flex flex-wrap items-center justify-center gap-3">
           <Link
             href="/login"
-            className="inline-flex items-center justify-center rounded-[length:var(--radius-control)] bg-[var(--accent-bg)] px-5 py-2.5 text-sm font-medium text-[var(--text-on-accent)] shadow-sm transition-colors hover:bg-[var(--accent-hover)] active:bg-[var(--accent-active)] focus-visible:outline-none focus-visible:ring-[length:var(--focus-ring-width)] focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-page)]"
+            className="inline-flex items-center justify-center rounded-[var(--radius-control)] bg-[var(--accent-bg)] px-5 py-2.5 text-sm font-medium text-[var(--text-on-accent)] shadow-sm transition-colors hover:bg-[var(--accent-hover)] active:bg-[var(--accent-active)] focus-visible:outline-none focus-visible:ring-[length:var(--focus-ring-width)] focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-page)]"
           >
             Войти
           </Link>
           <Link
             href="/signup"
-            className="inline-flex items-center justify-center rounded-[length:var(--radius-control)] border border-[var(--button-secondary-border)] bg-[var(--btn-secondary-bg)] px-5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--button-secondary-border-hover)] hover:bg-[var(--btn-secondary-hover-bg)] focus-visible:outline-none focus-visible:ring-[length:var(--focus-ring-width)] focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-page)]"
+            className="inline-flex items-center justify-center rounded-[var(--radius-control)] border border-[var(--button-secondary-border)] bg-[var(--btn-secondary-bg)] px-5 py-2.5 text-sm font-medium text-[var(--text-secondary)] transition-colors hover:border-[var(--button-secondary-border-hover)] hover:bg-[var(--btn-secondary-hover-bg)] focus-visible:outline-none focus-visible:ring-[length:var(--focus-ring-width)] focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-page)]"
           >
             Зарегистрироваться
           </Link>
