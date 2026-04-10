@@ -313,8 +313,8 @@ export default async function BoardPage({ params }: BoardPageProps) {
 
   return (
     <main className="-mx-4 grid h-full min-h-0 w-[calc(100%+2rem)] grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden pb-0 md:gap-4">
-      <div className="h-12 shrink-0 md:h-14">
-        <div className="flex h-full min-w-0 items-center justify-between gap-3">
+      <div className="shrink-0">
+        <div className="flex min-w-0 items-center justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <h1 className="ml-2 min-w-0 truncate text-2xl font-semibold tracking-tight text-app-primary">
             {board.name}
