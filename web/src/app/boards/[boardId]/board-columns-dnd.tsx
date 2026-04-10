@@ -8,6 +8,7 @@ import {
   DndContext,
   KeyboardSensor,
   PointerSensor,
+  TouchSensor,
   closestCorners,
   useDroppable,
   useSensor,
@@ -48,6 +49,8 @@ import {
 } from "./column-types";
 
 const COLUMN_DND_PREFIX = "column:";
+/** Окно подавления открытия модалки после drag карточки (хвостовой click / touch synthetic click). */
+const CARD_DRAG_SUPPRESS_MODAL_OPEN_MS = 500;
 const COLUMN_SHELL_CLASS =
   "flex max-h-full w-72 shrink-0 flex-col gap-3 rounded-[var(--radius-surface)] border border-app-default bg-[color:var(--board-column-bg)] p-3 shadow-[var(--shadow-card)] backdrop-blur-sm";
 
@@ -270,7 +273,11 @@ function BoardCardRow({
   memberNamesById = new Map<string, string>(),
   memberAvatarsById = new Map<string, string | null>(),
   onOpen,
-  dragHandleProps
+  sortableDragSurface,
+  /** Только визуальный parity с drag-surface до mount `@dnd-kit` (см. `BoardGridStatic`, план DND7.1). Без listeners/attributes. */
+  visualMoveSurface = false,
+  isSortableDragging = false,
+  shouldSuppressCardModalOpenClick
 }: {
   card: BoardCardListItem;
   currentUserId: string;
@@ -281,12 +288,23 @@ function BoardCardRow({
   memberNamesById?: Map<string, string>;
   memberAvatarsById?: Map<string, string | null>;
   onOpen: (card: BoardCardListItem) => void;
-  dragHandleProps?: Pick<
+  sortableDragSurface?: Pick<
     ReturnType<typeof useSortable>,
-    "attributes" | "listeners"
+    "attributes" | "listeners" | "setActivatorNodeRef"
   >;
+  visualMoveSurface?: boolean;
+  /** Визуальное состояние drag для курсора `grabbing` на всей поверхности карточки. */
+  isSortableDragging?: boolean;
+  /** Подавление открытия после завершённого drag карточки (хвостовой `click`). */
+  shouldSuppressCardModalOpenClick?: () => boolean;
 }) {
   const canOpen = canOpenCardModal(cardContentPermissions, card, currentUserId);
+  // Матрица move × open (`canMoveCards` → sortableDragSurface или visualMoveSurface до mount, `canOpenCardModal` → canOpen), план DND3.x / DND6.x / DND7.1:
+  // — sortableDragSurface && !canOpen: только drag, без открытия (DND3.2); tabIndex снят с последовательного фокуса (DND6.1).
+  // — !sortableDragSurface && canOpen: клик/Enter/Space по всей поверхности, без drag listeners (DND3.3).
+  // — sortableDragSurface && canOpen: drag + открытие, с anti-click после drag (DND3.1); Enter/Space на корне + атрибуты sortable (DND6.1).
+  // — !sortableDragSurface && !canOpen: статичный блок — без role кнопки, tabIndex, listeners, cursor-pointer, hover/focus chrome (DND3.4).
+  // — DND6.2: превью внутри — только div/span/img/svg (svg с focusable=false); отдельных control/tabIndex у детей нет — tab stop только корень карточки.
   const enabledPreviewItems = previewItems
     .filter((i) => i.enabled)
     .sort((a, b) => a.position - b.position);
@@ -315,14 +333,45 @@ function BoardCardRow({
       .join("");
   }
 
+  const assignSortableActivatorRef = sortableDragSurface?.setActivatorNodeRef;
+  const cardSurfaceRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      assignSortableActivatorRef?.(node);
+    },
+    [assignSortableActivatorRef]
+  );
+
+  // DND6.1: при только drag (move=yes, open=no) не ставим карточку в tab order ради dnd-kit —
+  // иначе `useSortable` даёт tabIndex:0 + role button на всей поверхности.
+  const sortableSurfaceAttributes =
+    sortableDragSurface ?
+      canOpen ? sortableDragSurface.attributes
+      : { ...sortableDragSurface.attributes, tabIndex: -1 as const }
+    : undefined;
+
+  const hasMoveSurface = Boolean(sortableDragSurface) || visualMoveSurface;
+  const surfaceInteractive = canOpen || hasMoveSurface;
+  const cursorClass =
+    hasMoveSurface ?
+      isSortableDragging ? "cursor-grabbing"
+      : "cursor-grab active:cursor-grabbing"
+    : canOpen ? "cursor-pointer"
+    : "";
+  const interactiveChrome = surfaceInteractive ?
+    "transition-[border-color,box-shadow] hover:border-app-strong focus-visible:outline-none focus-visible:shadow-[0_0_0_var(--focus-ring-width)_var(--focus-ring)]"
+  : "";
+
   return (
     <div
-      role={canOpen ? "button" : undefined}
-      className={
-        canOpen ?
-          "flex cursor-pointer gap-2 rounded-[var(--radius-control)] border border-app-default bg-app-surface px-3 py-2 text-sm text-app-primary shadow-[var(--shadow-card)] transition-[border-color,box-shadow] hover:border-app-strong focus-visible:outline-none focus-visible:shadow-[0_0_0_var(--focus-ring-width)_var(--focus-ring)]"
-        : "flex gap-2 rounded-[var(--radius-control)] border border-app-default bg-app-surface px-3 py-2 text-sm text-app-primary shadow-[var(--shadow-card)]"
-      }
+      ref={sortableDragSurface ? cardSurfaceRef : undefined}
+      className={[
+        "flex rounded-[var(--radius-control)] border border-app-default bg-app-surface px-3 py-2 text-sm text-app-primary shadow-[var(--shadow-card)]",
+        hasMoveSurface ? "select-none" : "",
+        cursorClass,
+        interactiveChrome
+      ]
+        .filter(Boolean)
+        .join(" ")}
       style={
         primaryLabel ?
           {
@@ -332,31 +381,39 @@ function BoardCardRow({
           }
         : undefined
       }
-      onClick={canOpen ? () => onOpen(card) : undefined}
+      {...(sortableDragSurface?.listeners ?? {})}
+      {...(sortableSurfaceAttributes ?? {})}
+      {...(!sortableDragSurface && canOpen ? { role: "button" as const, tabIndex: 0 as const } : {})}
+      onClick={
+        canOpen ?
+          () => {
+            if (
+              sortableDragSurface &&
+              shouldSuppressCardModalOpenClick?.()
+            ) {
+              return;
+            }
+            onOpen(card);
+          }
+        : undefined
+      }
       onKeyDown={
         canOpen ?
           (e) => {
             if (e.key === "Enter" || e.key === " ") {
+              if (
+                sortableDragSurface &&
+                shouldSuppressCardModalOpenClick?.()
+              ) {
+                return;
+              }
               e.preventDefault();
               onOpen(card);
             }
           }
         : undefined
       }
-      tabIndex={canOpen ? 0 : undefined}
     >
-      {dragHandleProps ?
-        <button
-          type="button"
-          className="mt-0.5 shrink-0 cursor-grab text-app-tertiary hover:text-app-secondary active:cursor-grabbing"
-          aria-label="Перетащить карточку"
-          {...dragHandleProps.attributes}
-          {...dragHandleProps.listeners}
-          onClick={(e) => e.stopPropagation()}
-        >
-          ⋮⋮
-        </button>
-      : null}
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <span className="line-clamp-2 min-w-0 text-[16px]">{card.title}</span>
@@ -382,7 +439,12 @@ function BoardCardRow({
                           title={displayName}
                         >
                           {avatarUrl ?
-                            <img src={avatarUrl} alt={displayName} className="h-full w-full object-cover" />
+                            <img
+                              src={avatarUrl}
+                              alt={displayName}
+                              draggable={false}
+                              className="h-full w-full object-cover"
+                            />
                           : initials(displayName)}
                         </span>
                       );
@@ -399,7 +461,6 @@ function BoardCardRow({
                     key={item.id}
                     className="inline-flex items-center gap-1 rounded bg-app-surface-muted px-1.5 py-0.5 text-[11px] text-app-secondary"
                     title={`Комментариев: ${card.commentsCount}`}
-                    aria-label={`Комментариев: ${card.commentsCount}`}
                   >
                     <svg
                       viewBox="0 0 16 16"
@@ -501,7 +562,8 @@ function SortableBoardCard({
   memberNamesById,
   memberAvatarsById,
   onOpen,
-  enableDrag
+  enableDrag,
+  shouldSuppressCardModalOpenClick
 }: {
   card: BoardCardListItem;
   currentUserId: string;
@@ -513,21 +575,38 @@ function SortableBoardCard({
   memberAvatarsById: Map<string, string | null>;
   onOpen: (card: BoardCardListItem) => void;
   enableDrag: boolean;
+  shouldSuppressCardModalOpenClick: () => boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({
     id: card.id,
     disabled: !enableDrag
   });
 
+  // Без DragOverlay активный элемент получает transform из useDraggable по обеим осям — карточка «уезжает» вправо/влево
+  // и ломает горизонтальную сетку колонки. Вертикальный список: только translateY (стратегия уже даёт x:0 для соседей).
   const style: CSSProperties = {
-    transform: CSS.Transform.toString(transform),
+    transform:
+      transform ? CSS.Transform.toString({ ...transform, x: 0 }) : undefined,
     transition,
     opacity: isDragging ? 0.82 : 1,
     zIndex: isDragging ? 20 : undefined
   };
 
   return (
-    <div ref={setNodeRef} style={style} role="listitem">
+    <div
+      ref={setNodeRef}
+      style={style}
+      role="listitem"
+      className="w-full min-w-0 max-w-full shrink-0"
+    >
       <BoardCardRow
         card={card}
         currentUserId={currentUserId}
@@ -538,7 +617,11 @@ function SortableBoardCard({
         memberNamesById={memberNamesById}
         memberAvatarsById={memberAvatarsById}
         onOpen={onOpen}
-        dragHandleProps={enableDrag ? { attributes, listeners } : undefined}
+        sortableDragSurface={
+          enableDrag ? { attributes, listeners, setActivatorNodeRef } : undefined
+        }
+        isSortableDragging={isDragging}
+        shouldSuppressCardModalOpenClick={shouldSuppressCardModalOpenClick}
       />
     </div>
   );
@@ -583,7 +666,8 @@ function SortableColumnShell({
   memberNamesById,
   memberAvatarsById,
   columnSortableEnabled,
-  onOpenCard
+  onOpenCard,
+  shouldSuppressCardModalOpenClick
 }: {
   boardId: string;
   currentUserId: string;
@@ -604,6 +688,7 @@ function SortableColumnShell({
   memberAvatarsById: Map<string, string | null>;
   columnSortableEnabled: boolean;
   onOpenCard: (card: BoardCardListItem) => void;
+  shouldSuppressCardModalOpenClick: () => boolean;
 }) {
   const colDragId = columnDndId(col.id);
   const {
@@ -672,6 +757,7 @@ function SortableColumnShell({
                 memberAvatarsById={memberAvatarsById}
                 onOpen={onOpenCard}
                 enableDrag={canMoveCards}
+                shouldSuppressCardModalOpenClick={shouldSuppressCardModalOpenClick}
               />
             ))}
             {cards.length === 0 ?
@@ -716,7 +802,8 @@ function StaticColumnShell({
   previewItems,
   memberNamesById,
   memberAvatarsById,
-  onOpenCard
+  onOpenCard,
+  shouldSuppressCardModalOpenClick
 }: {
   boardId: string;
   currentUserId: string;
@@ -736,6 +823,7 @@ function StaticColumnShell({
   memberNamesById: Map<string, string>;
   memberAvatarsById: Map<string, string | null>;
   onOpenCard: (card: BoardCardListItem) => void;
+  shouldSuppressCardModalOpenClick: () => boolean;
 }) {
   const cards = cardIds.map((id) => cardsById.get(id)).filter(Boolean) as BoardCardListItem[];
 
@@ -773,6 +861,7 @@ function StaticColumnShell({
                 memberAvatarsById={memberAvatarsById}
                 onOpen={onOpenCard}
                 enableDrag={canMoveCards}
+                shouldSuppressCardModalOpenClick={shouldSuppressCardModalOpenClick}
               />
             ))}
             {cards.length === 0 ?
@@ -821,7 +910,9 @@ function BoardGridStatic({
   columnRows,
   cardOrderByColumn,
   cardsById,
-  onOpenCard
+  onOpenCard,
+  /** `true` только пока ждём client mount DnD при `canMoveCards` — визуальный контракт как у `sortableDragSurface`, без listeners (DND7.1). */
+  visualMoveSurface = false
 }: {
   boardId: string;
   currentUserId: string;
@@ -838,6 +929,7 @@ function BoardGridStatic({
   cardOrderByColumn: Record<string, string[]>;
   cardsById: Map<string, BoardCardListItem>;
   onOpenCard: (card: BoardCardListItem) => void;
+  visualMoveSurface?: boolean;
 }) {
   const columnCount = columnRows.length;
   return (
@@ -880,6 +972,7 @@ function BoardGridStatic({
                     memberNamesById={memberNamesById}
                     memberAvatarsById={memberAvatarsById}
                     onOpen={onOpenCard}
+                    visualMoveSurface={visualMoveSurface}
                   />
                 </div>
               ))}
@@ -942,6 +1035,11 @@ export function BoardColumnsDnD({
   const pendingCardSignatureRef = React.useRef<string | null>(null);
   const refreshTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragInProgressRef = React.useRef(false);
+  /**
+   * После drop/cancel drag карточки браузер (мышь или touch) может сгенерировать «хвостовой» click
+   * на элемент под курсором — не открываем модалку, пока живёт это окно.
+   */
+  const suppressCardModalOpenUntilMsRef = React.useRef(0);
   const refreshQueuedDuringDragRef = React.useRef(false);
   const supabaseRef = React.useRef<SupabaseClient | null>(null);
   const channelRef = React.useRef<RealtimeChannel | null>(null);
@@ -999,6 +1097,10 @@ export function BoardColumnsDnD({
     }
     return m;
   }, [membersForNewCard]);
+
+  const shouldSuppressCardModalOpenClick = React.useCallback(() => {
+    return Date.now() < suppressCardModalOpenUntilMsRef.current;
+  }, []);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -1610,6 +1712,12 @@ export function BoardColumnsDnD({
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    // Touch: `touchstart` раньше `pointerdown` и удерживает `activeRef`, поэтому для пальца
+    // работает только этот сенсор — задержка даёт колонке `overflow-y-auto` время на вертикальный scroll
+    // без старта drag при смещении >8px (как у PointerSensor). Мышь/перо без touch — только PointerSensor.
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 250, tolerance: 8 }
+    }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates
     })
@@ -1626,8 +1734,11 @@ export function BoardColumnsDnD({
     dragInProgressRef.current = true;
   };
 
-  const handleDragCancel = (_event: DragCancelEvent) => {
+  const handleDragCancel = (event: DragCancelEvent) => {
     dragInProgressRef.current = false;
+    if (!isColumnDndId(event.active.id)) {
+      suppressCardModalOpenUntilMsRef.current = Date.now() + CARD_DRAG_SUPPRESS_MODAL_OPEN_MS;
+    }
     if (refreshQueuedDuringDragRef.current) {
       refreshQueuedDuringDragRef.current = false;
       router.refresh();
@@ -1636,8 +1747,11 @@ export function BoardColumnsDnD({
 
   const handleDragEnd = async (event: DragEndEvent) => {
     dragInProgressRef.current = false;
-    setPersistError(null);
     const { active, over } = event;
+    if (!isColumnDndId(active.id)) {
+      suppressCardModalOpenUntilMsRef.current = Date.now() + CARD_DRAG_SUPPRESS_MODAL_OPEN_MS;
+    }
+    setPersistError(null);
     if (!over) {
       if (refreshQueuedDuringDragRef.current) {
         refreshQueuedDuringDragRef.current = false;
@@ -1849,6 +1963,7 @@ export function BoardColumnsDnD({
           cardOrderByColumn={local.cardOrderByColumn}
           cardsById={local.cardsById}
           onOpenCard={(c) => setEditingCardId(c.id)}
+          visualMoveSurface={canMoveCards}
         />
       </>
     );
@@ -1883,6 +1998,7 @@ export function BoardColumnsDnD({
               memberAvatarsById={memberAvatarsById}
               columnSortableEnabled
               onOpenCard={(c) => setEditingCardId(c.id)}
+              shouldSuppressCardModalOpenClick={shouldSuppressCardModalOpenClick}
             />
           ))}
         </div>
@@ -1909,6 +2025,7 @@ export function BoardColumnsDnD({
             memberNamesById={memberNamesById}
             memberAvatarsById={memberAvatarsById}
             onOpenCard={(c) => setEditingCardId(c.id)}
+            shouldSuppressCardModalOpenClick={shouldSuppressCardModalOpenClick}
           />
         ))}
       </div>;

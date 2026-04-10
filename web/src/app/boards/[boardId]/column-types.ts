@@ -91,6 +91,11 @@ export function canEditCardBodyAsAssignee(
   return card.assigneeUserIds.includes(currentUserId);
 }
 
+/**
+ * «Открыть карточку» с доски: производная от прав редактирования/удаления и роли assignee
+ * (см. тело функции). Отдельного permission `cards.open` в проекте нет.
+ * Ось поведения независима от права `cards.move` (`canMoveCards` на странице доски).
+ */
 export function canOpenCardModal(
   perms: CardContentPermissions,
   card: BoardCardListItem,

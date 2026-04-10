@@ -139,6 +139,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
   const canEditCardOwn = has("cards.edit_own");
   const canDeleteCardAny = has("cards.delete_any");
   const canDeleteCardOwn = has("cards.delete_own");
+  /** Перемещение карточек между колонками; не совпадает с «открыть карточку» (`canOpenCardModal`). */
   const canMoveCards = has("cards.move");
   const canCreateComment = has("comments.create");
   const canEditOwnComment = has("comments.edit_own");
