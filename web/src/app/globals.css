@@ -123,6 +123,11 @@
   /* Board image veil (dark/light) */
   --board-image-veil: rgba(2, 6, 23, 0.25);
   --board-column-bg: rgba(9, 9, 11, 0.7);
+
+  /* Scrollbars */
+  --scrollbar-track: rgba(255, 255, 255, 0.04);
+  --scrollbar-thumb: rgba(161, 161, 170, 0.38);
+  --scrollbar-thumb-hover: rgba(161, 161, 170, 0.52);
 }
 
 html[data-theme="light"] {
@@ -225,6 +230,11 @@ html[data-theme="light"] {
 
   --board-image-veil: rgba(255, 255, 255, 0.18);
   --board-column-bg: rgba(255, 255, 255, 0.88);
+
+  /* Scrollbars */
+  --scrollbar-track: rgba(148, 163, 184, 0.16);
+  --scrollbar-thumb: rgba(100, 116, 139, 0.42);
+  --scrollbar-thumb-hover: rgba(71, 85, 105, 0.56);
 }
 
 @tailwind base;
@@ -235,6 +245,8 @@ html[data-theme="light"] {
   html {
     background-color: var(--bg-page);
     color: var(--text-primary);
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+    scrollbar-width: thin;
   }
 
   body {
@@ -247,6 +259,58 @@ html[data-theme="light"] {
 
   textarea {
     resize: none;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+    border-radius: 9999px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    background-color: var(--scrollbar-thumb);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-button {
+    -webkit-appearance: none;
+    width: 0;
+    height: 0;
+    display: none;
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-button:single-button {
+    -webkit-appearance: none;
+    width: 0;
+    height: 0;
+    display: none;
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-button:vertical:decrement,
+  *::-webkit-scrollbar-button:vertical:increment,
+  *::-webkit-scrollbar-button:horizontal:decrement,
+  *::-webkit-scrollbar-button:horizontal:increment {
+    -webkit-appearance: none;
+    width: 0;
+    height: 0;
+    display: none;
+    background: transparent;
   }
 }
 

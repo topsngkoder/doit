@@ -1,6 +1,21 @@
 # План реализации: экран доски с фиксированным фоном и фиксированными верхними панелями
 
 ## Прогресс (журнал)
+- **2026-04-10** — **T14 IN PROGRESS**: начата ручная адаптивная проверка. Нужна верификация в браузере по 4 сценариям: (1) широкий экран, (2) узкий экран, (3) маленькая высота окна, (4) одновременно маленькие ширина и высота. Критерии: верхние зоны (global header, board bar, toolbar) остаются фиксированными; колонки не перестраиваются в столбец; горизонтальный/вертикальный scroll при необходимости появляется только внутри viewport колонок.
+- **2026-04-10** — **T13 DONE**: выполнен аудит защит от побочных scroll-контейнеров. На уровне board-shell не обнаружено конкурирующих page-level scroll-узлов: `web/src/app/boards/[boardId]/page.tsx` использует только `overflow-hidden` для обвязки canvas, `web/src/app/boards/[boardId]/board-background-frame.tsx` не содержит scroll и рендерит фон отдельным `pointer-events-none` слоем, основной scroll остаётся у viewport `web/src/app/boards/[boardId]/board-canvas.tsx` (`min-h-0 flex-1 overflow-auto`). Найденные `overflow-y-auto` в `board-members`, `board-fields-button`, `board-labels-button`, `board-card-preview-button`, `edit-card-modal`, `card-comments-sidebar` относятся к допустимым локальным popup/modal-контейнерам и не формируют второй основной scroll страницы доски.
+- **2026-04-10** — **T12 DONE**: ручная проверка в браузере подтверждена пользователем: при вертикальной и горизонтальной прокрутке внутри viewport колонок фон остаётся визуально неподвижным, смещения точки привязки и параллакс не наблюдаются.
+- **2026-04-10** — **T12 IN PROGRESS**: кодовая проверка фонового слоя выполнена. В `web/src/app/boards/[boardId]/board-background-frame.tsx` фон рендерится отдельным абсолютным слоем (`absolute inset-0 pointer-events-none`) под контентом (`relative z-10`), с `background-size: cover`, `background-position: center`, `background-repeat: no-repeat`; прокрутка находится в sibling-viewport (`web/src/app/boards/[boardId]/board-canvas.tsx`: `min-h-0 flex-1 overflow-auto`), поэтому фон не должен двигаться вместе с лентой колонок. **Осталось для закрытия T12:** ручная визуальная проверка в браузере на вертикальном и горизонтальном scroll (подтвердить отсутствие смещения/параллакса).
+- **2026-04-10** — **T11 DONE**: подтверждена динамическая высотная модель верхних зон без `ResizeObserver` и без доп. правок кода. В `web/src/app/boards/[boardId]/page.tsx` board-screen собран как `grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]`, где row1 (board bar) остаётся `auto`, а row2 получает остаток высоты. В `web/src/app/boards/[boardId]/board-canvas.tsx` внутри второй строки toolbar остаётся `shrink-0`, а viewport колонок — `min-h-0 flex-1 overflow-auto`, поэтому при переносах/росте верхних зон доступная высота viewport пересчитывается автоматически через CSS.
+- **2026-04-10** — **T10 DONE**: выполнена проверка адаптивной горизонтальной модели без доп. правок кода. В `web/src/app/boards/[boardId]/board-columns-dnd.tsx` лента колонок остаётся в одном ряду (`flex w-max min-w-full`), сами колонки фиксированной ширины (`w-72 shrink-0`) и не переходят в вертикальный стек на узких экранах. В `web/src/app/boards/[boardId]/board-canvas.tsx` обе оси прокрутки остаются у единого viewport (`overflow-auto`), что сохраняет требование `T10` после изменений `T08`/`T09`.
+- **2026-04-10** — **T09 DONE**: выполнена проверка вертикальной scroll-модели после T08. В `web/src/app/boards/[boardId]/board-columns-dnd.tsx` не осталось page-level вертикальных scroll-контейнеров (`overflow-y-*`/`overflow-auto` для основной области), а колонки остаются естественно растягиваемыми без отдельного scroll внутри каждой колонки. Основная вертикальная прокрутка остаётся только у shell-level viewport в `web/src/app/boards/[boardId]/board-canvas.tsx` (`min-h-0 flex-1 overflow-auto`).
+- **2026-04-10** — **T08 DONE**: в `web/src/app/boards/[boardId]/board-columns-dnd.tsx` убран top-level `overflow-x-auto` во всех основных ветках рендера (SSR-static, sortable, non-sortable DnD). Контейнеры ленты колонок переведены на `flex w-max min-w-full ...`, чтобы ширина определялась содержимым, а горизонтальная прокрутка принадлежала только shell-level viewport из `BoardCanvas` (`overflow-auto`).
+- **2026-04-10** — **T07 DONE**: в `web/src/app/boards/[boardId]/board-canvas.tsx` введён shell-level viewport колонок как отдельный контейнер `min-h-0 flex-1 overflow-auto` под toolbar. Родительские зоны оставлены без конкурирующего scroll (`page.tsx`: `overflow-hidden` вокруг `BoardCanvas`). На этом шаге фиксируется единый page-level viewport-контейнер; вынос горизонтального scroll из внутренних рядов `BoardColumnsDnD` завершается в `T08`.
+- **2026-04-10** — **T06 DONE**: `web/src/app/boards/[boardId]/board-background-frame.tsx` переведён на двухслойную модель: отдельный абсолютный фон (`absolute inset-0 pointer-events-none`) и отдельный контент-слой (`relative z-10`). Для image-фона сохранены signed URL и кеш; добавлен `background-repeat: no-repeat`. Теперь фон привязан к board-screen слою и не двигается вместе с прокручиваемым содержимым колонок.
+- **2026-04-10** — **T05 DONE**: в `web/src/app/boards/[boardId]/board-canvas.tsx` панель действий над колонками отделена от зоны колонок как отдельный `shrink-0` toolbar-блок и рендерится только при наличии видимого содержимого (`columnPermissions.canCreate`). Зона с `BoardColumnsDnD` вынесена в отдельный sibling-контейнер `min-h-0 flex-1`, чтобы панель не участвовала в прокрутке колонок и не занимала высоту при отсутствии элементов.
+- **2026-04-10** — **T04 DONE**: полоса доски в `web/src/app/boards/[boardId]/page.tsx` выделена как явная фиксированная зона (`shrink-0`) и оставлена отдельным sibling-блоком над canvas. Нижняя зона с `BoardCanvas` получила `min-h-0 overflow-hidden`, чтобы верхняя полоса не попадала в scroll-контекст колонок и не сдвигалась по осям при внутренней прокрутке рабочей области.
+- **2026-04-10** — **T03 DONE**: собран full-height каркас для board-route без scroll у `body`. В `web/src/app/layout.tsx` общий app-shell переведён на `h-dvh/min-h-0/overflow-hidden`, а route-container (`main`) получил `min-h-0` и `overflow-y-auto`, чтобы скролл жил внутри контейнера приложения, а не документа. В `web/src/app/boards/[boardId]/page.tsx` убран full-bleed хак (`w-screen` + отрицательные margins), корневой board-root переведён на `grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]`, что даёт корректную основу под модель `верхние auto + viewport 1fr` в следующих шагах.
+- **2026-04-10** — **T02 DONE**: зафиксирована целевая DOM-модель board-screen и распределение ответственности по зонам. Принято решение оставить `BoardCanvas` точкой входа shell (без добавления нового файла на этом шаге): в следующих шагах он будет разрезан на 3 явные зоны (toolbar + viewport) и фоновый слой. Data-fetching и бизнес-логика остаются в `page.tsx`/текущих компонентах без переноса.
+- **2026-04-10** — **T01 DONE**: выполнен аудит текущей scroll-цепочки (`body` → `layout` → `board page` → `BoardCanvas` → `BoardColumnsDnD`). Зафиксировано, что page-level вертикальный scroll сейчас уходит в `body`/документ (нет route-level контейнера с `overflow: auto` и ограничением высоты viewport), а горизонтальный scroll сидит внутри `BoardColumnsDnD` (`overflow-x-auto` в нескольких ветках). Подтверждён конфликтный каркас: в `layout.tsx` есть `main.mx-auto.max-w-5xl.flex-1.px-4`, а в `page.tsx` используется full-bleed через `w-screen` + отрицательные margins. Сформирован список узлов для замены в T02/T03/T07/T08.
 - **2026-04-10** — **T00 DONE**: подготовлен исполняемый implementation-plan для AI-агента по `.ai/board-screen-fixed-scroll-specification.md`. План привязан к текущей структуре `web/src/app/boards/[boardId]`, содержит детальную декомпозицию, трекер задач, стоп-условия и чек-лист приёмки.
 
 ## Назначение
@@ -135,6 +150,24 @@ JS-измерения или `ResizeObserver` разрешены только к
 - Проверить, не ломает ли `main.max-w-5xl` высотную модель board-экрана.
 - Зафиксировать список классов/узлов, которые нужно убрать или заменить.
 
+Результат аудита T01 (зафиксировано):
+- `web/src/app/layout.tsx`:
+  - `body.min-h-screen`;
+  - корневой контейнер `div.flex.min-h-screen.flex-col.pt-2`;
+  - общий `main.mx-auto.flex.w-full.max-w-5xl.flex-1.px-4` (ограничивает board-route через общий shell).
+- `web/src/app/globals.css`:
+  - `body { min-height: 100vh; }` без отключения page-level scroll для board-route.
+- `web/src/app/boards/[boardId]/page.tsx`:
+  - локальный `<main ... w-screen ... min-h-full grid grid-rows-[auto_1fr]>` поверх уже существующего root `<main>` из layout;
+  - full-bleed через `left/right 1/2` и отрицательные margin, что конфликтует с `max-w-5xl` родителя;
+  - `div.min-h-0` вокруг `BoardCanvas`, но без собственного scroll-контейнера уровня board-screen.
+- `web/src/app/boards/[boardId]/board-canvas.tsx`:
+  - фиксированная панель действий (`AddBoardColumnButton`) и зона колонок пока смешаны в одном `flex-col`;
+  - фон задаётся на том же контейнере, где находится движущееся содержимое.
+- `web/src/app/boards/[boardId]/board-columns-dnd.tsx`:
+  - top-level горизонтальный scroll на внутренних контейнерах (`overflow-x-auto`) в ветках `BoardGridStatic`, sortable и static;
+  - это делает `BoardColumnsDnD` конкурентным scroll-узлом вместо shell-level viewport.
+
 ### Фаза 2. Заморозка целевой DOM-модели
 - Определить конечный DOM-состав board-screen до начала массовых правок.
 - Зафиксировать, какой компонент отвечает за каждую зону:
@@ -145,6 +178,25 @@ JS-измерения или `ResizeObserver` разрешены только к
 - Отдельно решить, останется ли `BoardCanvas` точкой входа shell или его нужно разрезать.
 - Если для чистой реализации нужен новый shell-компонент, создать его на этом шаге.
 - Не переносить бизнес-логику и data-fetching без необходимости.
+
+Результат фиксации T02 (целевая DOM-модель):
+- Зона 1 (глобальный header): остаётся в `web/src/app/layout.tsx`.
+- Зона 2 (полоса доски с названием/участниками/меню): остаётся в `web/src/app/boards/[boardId]/page.tsx` как отдельный блок над canvas.
+- Зона 3 (панель действий над колонками): переносится в `web/src/app/boards/[boardId]/board-canvas.tsx` в отдельный фиксированный блок (вне scroll viewport).
+- Зона 4 (viewport колонок): формируется в `web/src/app/boards/[boardId]/board-canvas.tsx` как единственный page-level scroll-container (`overflow: auto`, `min-h-0`, `1fr`-остаток).
+
+Целевой каркас (концептуально):
+- `layout.tsx`: `header (auto)` + route container (`min-h-0`, для board-route без конкурирующего scroll).
+- `page.tsx`: `board-screen` с вертикальной моделью `auto auto minmax(0,1fr)`:
+  - row1: board bar (fixed zone),
+  - row2: board canvas toolbar (fixed zone),
+  - row3: columns viewport (single scroll container).
+- `BoardBackgroundFrame`: становится фоновым слоем board-screen (абсолютный слой под контентом, без pointer events), а не фоном прокручиваемого контейнера.
+- `BoardColumnsDnD`: перестаёт владеть page-level scroll; остаётся только лентой колонок внутри переданного viewport-контекста.
+
+Решение по структуре файлов на T02:
+- Новый shell-файл **не создаётся** на этом шаге (избежание лишней миграции структуры).
+- Точка входа shell остаётся `BoardCanvas`; разрезание ответственности выполняется последовательно в `T03`–`T08`.
 
 ### Фаза 3. Высотный каркас board-страницы
 - Привести `/boards/[boardId]` к полноценной высоте viewport.
@@ -249,20 +301,20 @@ JS-измерения или `ResizeObserver` разрешены только к
 | ID | Статус | Зависит от | Файлы | Что должно получиться |
 | --- | --- | --- | --- | --- |
 | T00 | DONE | — | `.ai/board-screen-fixed-scroll-implementation-plan.md` | План создан и может использоваться как рабочий документ |
-| T01 | TODO | T00 | `layout.tsx`, `page.tsx`, `board-canvas.tsx`, `board-columns-dnd.tsx`, `globals.css` | Зафиксирована текущая цепочка scroll/overflow и список проблемных узлов |
-| T02 | TODO | T01 | `page.tsx`, `board-canvas.tsx`, возможно новый shell-файл | Зафиксирована целевая DOM-модель board-screen |
-| T03 | TODO | T02 | `layout.tsx`, `page.tsx`, `globals.css` | Board-route живёт в корректном full-height каркасе без body scroll |
-| T04 | TODO | T03 | `page.tsx` | Полоса доски стала отдельной фиксированной зоной |
-| T05 | TODO | T03 | `board-canvas.tsx`, `add-board-column-button.tsx`, возможно новый toolbar-файл | Панель действий над колонками отделена от scroll-зоны |
-| T06 | TODO | T03 | `board-background-frame.tsx`, `board-canvas.tsx`, `page.tsx` | Фон закреплён относительно viewport board-screen |
-| T07 | TODO | T04, T05, T06 | `board-canvas.tsx`, возможно новый viewport-файл, `globals.css` | Появился единственный viewport колонок с `overflow: auto` |
-| T08 | TODO | T07 | `board-columns-dnd.tsx` | Горизонтальный scroll принадлежит viewport колонок, а не внутренним рядам |
-| T09 | TODO | T07 | `board-columns-dnd.tsx`, `board-canvas.tsx` | Вертикальный scroll идёт только через viewport колонок |
-| T10 | TODO | T08, T09 | `board-columns-dnd.tsx`, `globals.css` | На узких экранах сохранена горизонтальная модель доски |
-| T11 | TODO | T04, T05, T07 | `layout.tsx`, `page.tsx`, `board-canvas.tsx`, `globals.css` | Высота viewport корректно пересчитывается при изменении верхних зон |
-| T12 | TODO | T06, T08, T09 | `board-background-frame.tsx`, `page.tsx`, `board-canvas.tsx` | Подтверждено неподвижное поведение фона по обеим осям |
-| T13 | TODO | T07, T08, T09, T11 | `board-*`, `layout.tsx`, `globals.css` | Удалены конкурирующие page-level scroll-container'ы |
-| T14 | TODO | T10, T11, T12, T13 | изменённые board-файлы | Пройдена ручная адаптивная проверка по основным сценариям |
+| T01 | DONE | T00 | `layout.tsx`, `page.tsx`, `board-canvas.tsx`, `board-columns-dnd.tsx`, `globals.css` | Зафиксирована текущая цепочка scroll/overflow и список проблемных узлов |
+| T02 | DONE | T01 | `page.tsx`, `board-canvas.tsx`, возможно новый shell-файл | Зафиксирована целевая DOM-модель board-screen |
+| T03 | DONE | T02 | `layout.tsx`, `page.tsx`, `globals.css` | Board-route живёт в корректном full-height каркасе без body scroll |
+| T04 | DONE | T03 | `page.tsx` | Полоса доски стала отдельной фиксированной зоной |
+| T05 | DONE | T03 | `board-canvas.tsx`, `add-board-column-button.tsx`, возможно новый toolbar-файл | Панель действий над колонками отделена от scroll-зоны |
+| T06 | DONE | T03 | `board-background-frame.tsx`, `board-canvas.tsx`, `page.tsx` | Фон закреплён относительно viewport board-screen |
+| T07 | DONE | T04, T05, T06 | `board-canvas.tsx`, возможно новый viewport-файл, `globals.css` | Появился единственный viewport колонок с `overflow: auto` |
+| T08 | DONE | T07 | `board-columns-dnd.tsx` | Горизонтальный scroll принадлежит viewport колонок, а не внутренним рядам |
+| T09 | DONE | T07 | `board-columns-dnd.tsx`, `board-canvas.tsx` | Вертикальный scroll идёт только через viewport колонок |
+| T10 | DONE | T08, T09 | `board-columns-dnd.tsx`, `globals.css` | На узких экранах сохранена горизонтальная модель доски |
+| T11 | DONE | T04, T05, T07 | `layout.tsx`, `page.tsx`, `board-canvas.tsx`, `globals.css` | Высота viewport корректно пересчитывается при изменении верхних зон |
+| T12 | DONE | T06, T08, T09 | `board-background-frame.tsx`, `page.tsx`, `board-canvas.tsx` | Подтверждено неподвижное поведение фона по обеим осям |
+| T13 | DONE | T07, T08, T09, T11 | `board-*`, `layout.tsx`, `globals.css` | Удалены конкурирующие page-level scroll-container'ы |
+| T14 | IN PROGRESS | T10, T11, T12, T13 | изменённые board-файлы | Пройдена ручная адаптивная проверка по основным сценариям |
 | T15 | TODO | T14 | изменённые файлы | Нет новых линтерных ошибок, финальная структура стабилизирована |
 
 ## Исполняемый порядок для AI-агента

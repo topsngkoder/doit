@@ -312,14 +312,15 @@ export default async function BoardPage({ params }: BoardPageProps) {
   }));
 
   return (
-    <main className="relative left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] grid min-h-full w-screen grid-rows-[auto_1fr] gap-4 pb-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4">
+    <main className="grid h-full min-h-0 w-full grid-rows-[auto_minmax(0,1fr)] gap-4 overflow-hidden px-4 pb-0">
+      <div className="h-12 shrink-0 md:h-14">
+        <div className="flex h-full min-w-0 items-center justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
           <h1 className="ml-2 min-w-0 truncate text-2xl font-semibold tracking-tight text-app-primary">
             {board.name}
           </h1>
         </div>
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+        <div className="flex shrink-0 items-center justify-end gap-2">
           <BoardMembersPanel
             boardId={board.id}
             members={members}
@@ -342,7 +343,8 @@ export default async function BoardPage({ params }: BoardPageProps) {
           />
         </div>
       </div>
-      <div className="min-h-0">
+      </div>
+      <div className="min-h-0 overflow-hidden">
         <BoardCanvas
           boardId={board.id}
           currentUserId={snapshot.current_user_id}

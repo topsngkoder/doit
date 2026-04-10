@@ -111,7 +111,7 @@ export default async function RootLayout({
       <body className="min-h-screen font-sans">
         <ThemeProvider>
         <BrowserNativeNotificationsProvider>
-        <div className="flex min-h-screen flex-col pt-2">
+        <div className="flex h-dvh min-h-0 flex-col overflow-hidden pt-2">
           {isAuthenticated ? (
             <header className="app-global-header">
               <div className="app-header-toolbar flex w-full items-center justify-between gap-2 px-3 pb-1.5">
@@ -204,7 +204,7 @@ export default async function RootLayout({
               </div>
             </header>
           ) : null}
-          <main className="mx-auto flex w-full max-w-5xl flex-1 px-4">{children}</main>
+          <main className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 overflow-hidden px-4">{children}</main>
         </div>
         </BrowserNativeNotificationsProvider>
         </ThemeProvider>

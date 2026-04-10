@@ -48,6 +48,8 @@ import {
 } from "./column-types";
 
 const COLUMN_DND_PREFIX = "column:";
+const COLUMN_SHELL_CLASS =
+  "flex h-full min-h-0 w-full shrink-0 flex-col gap-3 rounded-[var(--radius-surface)] border border-app-default bg-[color:var(--board-column-bg)] p-3 shadow-[var(--shadow-card)] backdrop-blur-sm md:w-72";
 
 function columnDndId(columnId: string) {
   return `${COLUMN_DND_PREFIX}${columnId}`;
@@ -164,22 +166,26 @@ function buildCardOrderFromLayoutRows(
 
 function resolveCardDropTarget(
   overId: UniqueIdentifier,
-  cardOrder: Record<string, string[]>
+  cardOrder: Record<string, string[]>,
+  allowedColumnIds?: Set<string>
 ): { columnId: string; index: number } | null {
   const oid = String(overId);
   if (oid.startsWith("empty-")) {
     const colId = oid.slice("empty-".length);
+    if (allowedColumnIds && !allowedColumnIds.has(colId)) return null;
     const list = cardOrder[colId];
     if (!list) return null;
     return { columnId: colId, index: list.length };
   }
   if (isColumnDndId(overId)) {
     const colId = parseColumnDndId(overId);
+    if (allowedColumnIds && !allowedColumnIds.has(colId)) return null;
     const list = cardOrder[colId];
     if (!list) return null;
     return { columnId: colId, index: list.length };
   }
   for (const [colId, ids] of Object.entries(cardOrder)) {
+    if (allowedColumnIds && !allowedColumnIds.has(colId)) continue;
     const idx = ids.indexOf(oid);
     if (idx >= 0) return { columnId: colId, index: idx };
   }
@@ -212,6 +218,27 @@ function applyCardReorder(
   toArr.splice(insertAt, 0, activeId);
   next[target.columnId] = toArr;
   return next;
+}
+
+function reorderVisibleColumnsInGlobalOrder(
+  allColumns: ColumnRow[],
+  visibleColumnIds: Set<string>,
+  activeColumnId: string,
+  overColumnId: string
+): ColumnRow[] {
+  const visibleColumns = allColumns.filter((column) => visibleColumnIds.has(column.id));
+  const oldVisibleIndex = visibleColumns.findIndex((column) => column.id === activeColumnId);
+  const newVisibleIndex = visibleColumns.findIndex((column) => column.id === overColumnId);
+  if (oldVisibleIndex < 0 || newVisibleIndex < 0) return allColumns;
+  const reorderedVisibleColumns = arrayMove(visibleColumns, oldVisibleIndex, newVisibleIndex);
+
+  let visiblePointer = 0;
+  return allColumns.map((column) => {
+    if (!visibleColumnIds.has(column.id)) return column;
+    const nextVisibleColumn = reorderedVisibleColumns[visiblePointer];
+    visiblePointer += 1;
+    return nextVisibleColumn ?? column;
+  });
 }
 
 function EmptyColumnDrop({ columnId, emphasized }: { columnId: string; emphasized: boolean }) {
@@ -533,7 +560,12 @@ type BoardColumnsDnDProps = {
   columnPermissions: BoardColumnPermissions;
   cardContentPermissions: CardContentPermissions;
   columns: ColumnRow[];
+  visibleColumnIds: string[];
+  currentPage: number;
+  totalPages: number;
+  currentPageStartIndex: number;
   cardsByColumnId: Map<string, BoardCardListItem[]>;
+  onRequestPageChange: (page: number) => void;
 };
 
 function SortableColumnShell({
@@ -555,6 +587,10 @@ function SortableColumnShell({
   memberNamesById,
   memberAvatarsById,
   columnSortableEnabled,
+  canMoveToPrevPage,
+  canMoveToNextPage,
+  onMoveToPrevPage,
+  onMoveToNextPage,
   onOpenCard
 }: {
   boardId: string;
@@ -575,6 +611,10 @@ function SortableColumnShell({
   memberNamesById: Map<string, string>;
   memberAvatarsById: Map<string, string | null>;
   columnSortableEnabled: boolean;
+  canMoveToPrevPage: boolean;
+  canMoveToNextPage: boolean;
+  onMoveToPrevPage: (columnId: string) => Promise<void>;
+  onMoveToNextPage: (columnId: string) => Promise<void>;
   onOpenCard: (card: BoardCardListItem) => void;
 }) {
   const colDragId = columnDndId(col.id);
@@ -609,7 +649,7 @@ function SortableColumnShell({
     <div
       ref={setNodeRef}
       style={columnStyle}
-      className="flex w-72 shrink-0 flex-col gap-3 rounded-[var(--radius-surface)] border border-app-default bg-[color:var(--board-column-bg)] p-3 shadow-[var(--shadow-card)] backdrop-blur-sm"
+      className={COLUMN_SHELL_CLASS}
     >
       <BoardColumnHeader
         boardId={boardId}
@@ -622,34 +662,40 @@ function SortableColumnShell({
         canRename={columnPermissions.canRename}
         canReorder={columnSortableEnabled}
         canDelete={columnPermissions.canDelete}
+        canMoveToPrevPage={canMoveToPrevPage}
+        canMoveToNextPage={canMoveToNextPage}
+        onMoveToPrevPage={() => onMoveToPrevPage(col.id)}
+        onMoveToNextPage={() => onMoveToNextPage(col.id)}
         columnDrag={columnDrag}
       />
       <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
-        <div className="flex min-h-0 flex-col gap-2" role="list">
-          {cards.map((card) => (
-            <SortableBoardCard
-              key={card.id}
-              card={card}
-              currentUserId={currentUserId}
-              cardContentPermissions={cardContentPermissions}
-              boardLabels={boardLabels}
-              previewItems={previewItems}
-              fieldDefinitions={fieldDefinitions}
-              memberNamesById={memberNamesById}
-              memberAvatarsById={memberAvatarsById}
-              onOpen={onOpenCard}
-              enableDrag={canMoveCards}
-            />
-          ))}
-          {cards.length === 0 ?
-            <div className="rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
-              Пока нет карточек
-            </div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1" role="list">
+            {cards.map((card) => (
+              <SortableBoardCard
+                key={card.id}
+                card={card}
+                currentUserId={currentUserId}
+                cardContentPermissions={cardContentPermissions}
+                boardLabels={boardLabels}
+                previewItems={previewItems}
+                fieldDefinitions={fieldDefinitions}
+                memberNamesById={memberNamesById}
+                memberAvatarsById={memberAvatarsById}
+                onOpen={onOpenCard}
+                enableDrag={canMoveCards}
+              />
+            ))}
+            {cards.length === 0 ?
+              <div className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
+                Пока нет карточек
+              </div>
+            : null}
+          </div>
+          {canMoveCards ?
+            <EmptyColumnDrop columnId={col.id} emphasized={cards.length === 0} />
           : null}
         </div>
-        {canMoveCards ?
-          <EmptyColumnDrop columnId={col.id} emphasized={cards.length === 0} />
-        : null}
       </SortableContext>
       {canRenderCreateCardButton(col.columnType) ? (
         <CreateCardButton
@@ -682,6 +728,10 @@ function StaticColumnShell({
   previewItems,
   memberNamesById,
   memberAvatarsById,
+  canMoveToPrevPage,
+  canMoveToNextPage,
+  onMoveToPrevPage,
+  onMoveToNextPage,
   onOpenCard
 }: {
   boardId: string;
@@ -701,12 +751,16 @@ function StaticColumnShell({
   previewItems: BoardCardPreviewItem[];
   memberNamesById: Map<string, string>;
   memberAvatarsById: Map<string, string | null>;
+  canMoveToPrevPage: boolean;
+  canMoveToNextPage: boolean;
+  onMoveToPrevPage: (columnId: string) => Promise<void>;
+  onMoveToNextPage: (columnId: string) => Promise<void>;
   onOpenCard: (card: BoardCardListItem) => void;
 }) {
   const cards = cardIds.map((id) => cardsById.get(id)).filter(Boolean) as BoardCardListItem[];
 
   return (
-    <div className="flex w-72 shrink-0 flex-col gap-3 rounded-[var(--radius-surface)] border border-app-default bg-[color:var(--board-column-bg)] p-3 shadow-[var(--shadow-card)] backdrop-blur-sm">
+    <div className={COLUMN_SHELL_CLASS}>
       <BoardColumnHeader
         boardId={boardId}
         columnId={col.id}
@@ -718,34 +772,40 @@ function StaticColumnShell({
         canRename={columnPermissions.canRename}
         canReorder={false}
         canDelete={columnPermissions.canDelete}
+        canMoveToPrevPage={canMoveToPrevPage}
+        canMoveToNextPage={canMoveToNextPage}
+        onMoveToPrevPage={() => onMoveToPrevPage(col.id)}
+        onMoveToNextPage={() => onMoveToNextPage(col.id)}
         columnDrag={null}
       />
       <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
-        <div className="flex min-h-0 flex-col gap-2" role="list">
-          {cards.map((card) => (
-            <SortableBoardCard
-              key={card.id}
-              card={card}
-              currentUserId={currentUserId}
-              cardContentPermissions={cardContentPermissions}
-              boardLabels={boardLabels}
-              previewItems={previewItems}
-              fieldDefinitions={fieldDefinitions}
-              memberNamesById={memberNamesById}
-              memberAvatarsById={memberAvatarsById}
-              onOpen={onOpenCard}
-              enableDrag={canMoveCards}
-            />
-          ))}
-          {cards.length === 0 ?
-            <div className="rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
-              Пока нет карточек
-            </div>
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1" role="list">
+            {cards.map((card) => (
+              <SortableBoardCard
+                key={card.id}
+                card={card}
+                currentUserId={currentUserId}
+                cardContentPermissions={cardContentPermissions}
+                boardLabels={boardLabels}
+                previewItems={previewItems}
+                fieldDefinitions={fieldDefinitions}
+                memberNamesById={memberNamesById}
+                memberAvatarsById={memberAvatarsById}
+                onOpen={onOpenCard}
+                enableDrag={canMoveCards}
+              />
+            ))}
+            {cards.length === 0 ?
+              <div className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
+                Пока нет карточек
+              </div>
+            : null}
+          </div>
+          {canMoveCards ?
+            <EmptyColumnDrop columnId={col.id} emphasized={cards.length === 0} />
           : null}
         </div>
-        {canMoveCards ?
-          <EmptyColumnDrop columnId={col.id} emphasized={cards.length === 0} />
-        : null}
       </SortableContext>
       {canRenderCreateCardButton(col.columnType) ? (
         <CreateCardButton
@@ -782,7 +842,11 @@ function BoardGridStatic({
   columnRows,
   cardOrderByColumn,
   cardsById,
-  onOpenCard
+  onOpenCard,
+  canMoveToPrevPage,
+  canMoveToNextPage,
+  onMoveToPrevPage,
+  onMoveToNextPage
 }: {
   boardId: string;
   currentUserId: string;
@@ -799,14 +863,18 @@ function BoardGridStatic({
   cardOrderByColumn: Record<string, string[]>;
   cardsById: Map<string, BoardCardListItem>;
   onOpenCard: (card: BoardCardListItem) => void;
+  canMoveToPrevPage: boolean;
+  canMoveToNextPage: boolean;
+  onMoveToPrevPage: (columnId: string) => Promise<void>;
+  onMoveToNextPage: (columnId: string) => Promise<void>;
 }) {
   const columnCount = columnRows.length;
   return (
-    <div className="flex gap-4 overflow-x-auto pb-2">
+    <div className="flex h-full min-h-0 w-max min-w-full gap-3 pb-2 md:gap-4">
       {columnRows.map((col, index) => (
         <div
           key={col.id}
-          className="flex w-72 shrink-0 flex-col gap-3 rounded-[var(--radius-surface)] border border-app-default bg-[color:var(--board-column-bg)] p-3 shadow-[var(--shadow-card)] backdrop-blur-sm"
+          className={COLUMN_SHELL_CLASS}
         >
           <BoardColumnHeader
             boardId={boardId}
@@ -819,9 +887,13 @@ function BoardGridStatic({
             canRename={columnPermissions.canRename}
             canReorder={false}
             canDelete={columnPermissions.canDelete}
+            canMoveToPrevPage={canMoveToPrevPage}
+            canMoveToNextPage={canMoveToNextPage}
+            onMoveToPrevPage={() => onMoveToPrevPage(col.id)}
+            onMoveToNextPage={() => onMoveToNextPage(col.id)}
             columnDrag={null}
           />
-          <div className="flex flex-col gap-2" role="list">
+          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1" role="list">
             {(cardOrderByColumn[col.id] ?? [])
               .map((id) => cardsById.get(id))
               .filter(Boolean)
@@ -841,7 +913,7 @@ function BoardGridStatic({
                 </div>
               ))}
             {(cardOrderByColumn[col.id] ?? []).length === 0 ?
-              <div className="rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
+              <div className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
                 Пока нет карточек
               </div>
             : null}
@@ -877,7 +949,12 @@ export function BoardColumnsDnD({
   columnPermissions,
   cardContentPermissions,
   columns,
-  cardsByColumnId
+  visibleColumnIds,
+  currentPage,
+  totalPages,
+  currentPageStartIndex,
+  cardsByColumnId,
+  onRequestPageChange
 }: BoardColumnsDnDProps) {
   const router = useRouter();
   const [local, setLocal] = React.useState<BoardLocalState>(() => {
@@ -1573,6 +1650,73 @@ export function BoardColumnsDnD({
 
   const showColumnDnd = columnPermissions.canReorder;
   const showAnyDnd = showColumnDnd || canMoveCards;
+  const visibleColumnIdsSet = React.useMemo(() => new Set(visibleColumnIds), [visibleColumnIds]);
+  const visibleColumnItems = React.useMemo(
+    () => local.columnItems.filter((column) => visibleColumnIdsSet.has(column.id)),
+    [local.columnItems, visibleColumnIdsSet]
+  );
+  const canMoveToPrevPage = columnPermissions.canReorder && currentPage > 0;
+  const canMoveToNextPage = columnPermissions.canReorder && currentPage + 1 < totalPages;
+
+  const moveColumnToAdjacentPage = React.useCallback(
+    async (columnId: string, direction: "prev" | "next") => {
+      if (!columnPermissions.canReorder) return;
+
+      const previousCols = local.columnItems;
+      const fromIndex = previousCols.findIndex((column) => column.id === columnId);
+      if (fromIndex < 0) return;
+
+      const movingColumn = previousCols[fromIndex];
+      if (!movingColumn) return;
+
+      const colsWithoutMoving = previousCols.filter((column) => column.id !== columnId);
+      let insertIndex = fromIndex;
+      let targetPage = currentPage;
+
+      if (direction === "prev") {
+        if (!canMoveToPrevPage) return;
+        targetPage = currentPage - 1;
+        insertIndex = Math.max(0, Math.min(colsWithoutMoving.length, currentPageStartIndex));
+      } else {
+        if (!canMoveToNextPage) return;
+        targetPage = currentPage + 1;
+        const originalNextPageStart = currentPageStartIndex + visibleColumnItems.length;
+        insertIndex = Math.max(0, Math.min(colsWithoutMoving.length, originalNextPageStart - 1));
+      }
+
+      const nextCols = [...colsWithoutMoving];
+      nextCols.splice(insertIndex, 0, movingColumn);
+      if (columnsSignature(nextCols) === columnsSignature(previousCols)) return;
+
+      setPersistError(null);
+      setLocal((prev) => ({ ...prev, columnItems: nextCols }));
+      pendingColumnSignatureRef.current = columnsSignature(nextCols);
+
+      const result = await reorderBoardColumnsAction(
+        boardId,
+        nextCols.map((column) => column.id)
+      );
+
+      if (!result.ok) {
+        pendingColumnSignatureRef.current = null;
+        setLocal((prev) => ({ ...prev, columnItems: previousCols }));
+        throw new Error(result.message);
+      }
+
+      onRequestPageChange(targetPage);
+    },
+    [
+      boardId,
+      canMoveToNextPage,
+      canMoveToPrevPage,
+      columnPermissions.canReorder,
+      currentPage,
+      currentPageStartIndex,
+      local.columnItems,
+      onRequestPageChange,
+      visibleColumnItems.length
+    ]
+  );
 
   const handleDragStart = (_event: DragStartEvent) => {
     dragInProgressRef.current = true;
@@ -1605,13 +1749,16 @@ export function BoardColumnsDnD({
       const activeKey = parseColumnDndId(active.id);
       const overKey = parseColumnDndId(over.id);
       if (activeKey === overKey) return;
-
-      const oldIndex = local.columnItems.findIndex((c) => c.id === activeKey);
-      const newIndex = local.columnItems.findIndex((c) => c.id === overKey);
-      if (oldIndex < 0 || newIndex < 0) return;
+      if (!visibleColumnIdsSet.has(activeKey) || !visibleColumnIdsSet.has(overKey)) return;
 
       const previousCols = local.columnItems;
-      const nextCols = arrayMove(local.columnItems, oldIndex, newIndex);
+      const nextCols = reorderVisibleColumnsInGlobalOrder(
+        local.columnItems,
+        visibleColumnIdsSet,
+        activeKey,
+        overKey
+      );
+      if (nextCols === previousCols) return;
       setLocal((prev) => ({ ...prev, columnItems: nextCols }));
       pendingColumnSignatureRef.current = columnsSignature(nextCols);
 
@@ -1643,8 +1790,9 @@ export function BoardColumnsDnD({
     const activeCardId = String(active.id);
     const fromCol = findColumnForCard(local.cardOrderByColumn, activeCardId);
     if (!fromCol) return;
+    if (!visibleColumnIdsSet.has(fromCol)) return;
 
-    const target = resolveCardDropTarget(over.id, local.cardOrderByColumn);
+    const target = resolveCardDropTarget(over.id, local.cardOrderByColumn, visibleColumnIdsSet);
     if (!target) return;
 
     if (
@@ -1768,10 +1916,14 @@ export function BoardColumnsDnD({
           previewItems={previewItems}
           memberNamesById={memberNamesById}
           memberAvatarsById={memberAvatarsById}
-          columnRows={columns}
+          columnRows={visibleColumnItems}
           cardOrderByColumn={local.cardOrderByColumn}
           cardsById={local.cardsById}
           onOpenCard={(c) => setEditingCardId(c.id)}
+          canMoveToPrevPage={canMoveToPrevPage}
+          canMoveToNextPage={canMoveToNextPage}
+          onMoveToPrevPage={(columnId) => moveColumnToAdjacentPage(columnId, "prev")}
+          onMoveToNextPage={(columnId) => moveColumnToAdjacentPage(columnId, "next")}
         />
       </>
     );
@@ -1793,10 +1945,14 @@ export function BoardColumnsDnD({
           previewItems={previewItems}
           memberNamesById={memberNamesById}
           memberAvatarsById={memberAvatarsById}
-          columnRows={local.columnItems}
+          columnRows={visibleColumnItems}
           cardOrderByColumn={local.cardOrderByColumn}
           cardsById={local.cardsById}
           onOpenCard={(c) => setEditingCardId(c.id)}
+          canMoveToPrevPage={canMoveToPrevPage}
+          canMoveToNextPage={canMoveToNextPage}
+          onMoveToPrevPage={(columnId) => moveColumnToAdjacentPage(columnId, "prev")}
+          onMoveToNextPage={(columnId) => moveColumnToAdjacentPage(columnId, "next")}
         />
       </>
     );
@@ -1805,11 +1961,11 @@ export function BoardColumnsDnD({
   const columnRow =
     showColumnDnd ?
       <SortableContext
-        items={local.columnItems.map((c) => columnDndId(c.id))}
+        items={visibleColumnItems.map((c) => columnDndId(c.id))}
         strategy={horizontalListSortingStrategy}
       >
-        <div className="flex gap-4 overflow-x-auto pb-2">
-          {local.columnItems.map((col, index) => (
+        <div className="flex h-full min-h-0 w-max min-w-full gap-3 pb-2 md:gap-4">
+          {visibleColumnItems.map((col, index) => (
             <SortableColumnShell
               key={col.id}
               boardId={boardId}
@@ -1820,7 +1976,7 @@ export function BoardColumnsDnD({
               fieldDefinitions={fieldDefinitions}
               col={col}
               index={index}
-              columnCount={local.columnItems.length}
+              columnCount={visibleColumnItems.length}
               columnPermissions={columnPermissions}
               cardContentPermissions={cardContentPermissions}
               cardIds={local.cardOrderByColumn[col.id] ?? []}
@@ -1830,13 +1986,17 @@ export function BoardColumnsDnD({
               memberNamesById={memberNamesById}
               memberAvatarsById={memberAvatarsById}
               columnSortableEnabled
+              canMoveToPrevPage={canMoveToPrevPage}
+              canMoveToNextPage={canMoveToNextPage}
+              onMoveToPrevPage={(columnId) => moveColumnToAdjacentPage(columnId, "prev")}
+              onMoveToNextPage={(columnId) => moveColumnToAdjacentPage(columnId, "next")}
               onOpenCard={(c) => setEditingCardId(c.id)}
             />
           ))}
         </div>
       </SortableContext>
-    : <div className="flex gap-4 overflow-x-auto pb-2">
-        {local.columnItems.map((col, index) => (
+    : <div className="flex h-full min-h-0 w-max min-w-full gap-3 pb-2 md:gap-4">
+        {visibleColumnItems.map((col, index) => (
           <StaticColumnShell
             key={col.id}
             boardId={boardId}
@@ -1847,7 +2007,7 @@ export function BoardColumnsDnD({
             fieldDefinitions={fieldDefinitions}
             col={col}
             index={index}
-            columnCount={local.columnItems.length}
+            columnCount={visibleColumnItems.length}
             columnPermissions={columnPermissions}
             cardContentPermissions={cardContentPermissions}
             cardIds={local.cardOrderByColumn[col.id] ?? []}
@@ -1856,13 +2016,17 @@ export function BoardColumnsDnD({
             previewItems={previewItems}
             memberNamesById={memberNamesById}
             memberAvatarsById={memberAvatarsById}
+            canMoveToPrevPage={canMoveToPrevPage}
+            canMoveToNextPage={canMoveToNextPage}
+            onMoveToPrevPage={(columnId) => moveColumnToAdjacentPage(columnId, "prev")}
+            onMoveToNextPage={(columnId) => moveColumnToAdjacentPage(columnId, "next")}
             onOpenCard={(c) => setEditingCardId(c.id)}
           />
         ))}
       </div>;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-1">
+    <div className="flex h-full min-h-0 flex-1 flex-col gap-1">
       {editModal}
       <div className="flex flex-wrap items-center justify-between gap-2">
         {realtimeStatus !== "SUBSCRIBED" || realtimeError ? (
@@ -1886,7 +2050,7 @@ export function BoardColumnsDnD({
           {persistError}
         </p>
       : null}
-      <div className="min-h-0 flex-1">
+      <div className="min-h-0 flex-1 overflow-y-hidden">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCorners}

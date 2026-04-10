@@ -1,3 +1,6 @@
+"use client";
+
+import * as React from "react";
 import { AddBoardColumnButton } from "./add-board-column-button";
 import { BoardColumnsDnD } from "./board-columns-dnd";
 import type { NewCardFieldDefinition, NewCardMemberOption } from "./create-card-modal";
@@ -9,6 +12,7 @@ import type {
   CardContentPermissions
 } from "./column-types";
 import { BoardBackgroundFrame } from "./board-background-frame";
+import { BOARD_LAYOUT_TOKENS } from "./board-layout-geometry";
 
 export type { BoardColumnPermissions, BoardCardListItem, BoardLabelOption, CardContentPermissions };
 
@@ -59,33 +63,49 @@ export function BoardCanvas({
   columns,
   cardsByColumnId
 }: BoardCanvasProps) {
+  const columnsStageRef = React.useRef<HTMLDivElement | null>(null);
+
   return (
     <BoardBackgroundFrame
       backgroundType={board.backgroundType}
       backgroundImagePath={board.backgroundImagePath}
-      className="flex h-full min-h-[320px] flex-1 flex-col gap-4 p-4"
+      className="flex h-full min-h-[320px] flex-1 flex-col p-4"
     >
-      <div className="flex flex-wrap items-center gap-2">
-        <AddBoardColumnButton boardId={boardId} canCreate={columnPermissions.canCreate} />
+      <div className="shrink-0" style={{ height: BOARD_LAYOUT_TOKENS.controlRowHeight }}>
+        <div className="flex h-full min-w-0 items-center gap-2">
+          {columnPermissions.canCreate ? (
+            <AddBoardColumnButton boardId={boardId} canCreate={columnPermissions.canCreate} />
+          ) : null}
+        </div>
       </div>
-      <BoardColumnsDnD
-        boardId={boardId}
-        currentUserId={currentUserId}
-        canCreateCard={canCreateCard}
-        membersForNewCard={membersForNewCard}
-        boardLabels={boardLabels}
-        previewItems={previewItems}
-        fieldDefinitions={fieldDefinitions}
-        columnPermissions={columnPermissions}
-        canMoveCards={canMoveCards}
-        canCreateComment={canCreateComment}
-        canEditOwnComment={canEditOwnComment}
-        canDeleteOwnComment={canDeleteOwnComment}
-        canModerateComments={canModerateComments}
-        cardContentPermissions={cardContentPermissions}
-        columns={columns}
-        cardsByColumnId={cardsByColumnId}
-      />
+      <div
+        ref={columnsStageRef}
+        className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden"
+      >
+        <BoardColumnsDnD
+          boardId={boardId}
+          currentUserId={currentUserId}
+          canCreateCard={canCreateCard}
+          membersForNewCard={membersForNewCard}
+          boardLabels={boardLabels}
+          previewItems={previewItems}
+          fieldDefinitions={fieldDefinitions}
+          columnPermissions={columnPermissions}
+          canMoveCards={canMoveCards}
+          canCreateComment={canCreateComment}
+          canEditOwnComment={canEditOwnComment}
+          canDeleteOwnComment={canDeleteOwnComment}
+          canModerateComments={canModerateComments}
+          cardContentPermissions={cardContentPermissions}
+          columns={columns}
+          visibleColumnIds={columns.map((column) => column.id)}
+          currentPage={0}
+          totalPages={1}
+          currentPageStartIndex={0}
+          cardsByColumnId={cardsByColumnId}
+          onRequestPageChange={() => {}}
+        />
+      </div>
     </BoardBackgroundFrame>
   );
 }

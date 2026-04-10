@@ -103,7 +103,7 @@ export function AddBoardColumnButton({ boardId, canCreate }: AddBoardColumnButto
       </Button>
       <Modal open={open} title="Новая колонка" onClose={() => setOpen(false)}>
         <p className="mb-4 text-xs text-app-tertiary">
-          Колонка добавляется в конец списка. Порядок можно менять стрелками в заголовке колонки.
+          Колонка добавляется в конец единого горизонтального ряда.
         </p>
         <CreateColumnForm key={formKey} boardId={boardId} onSuccess={onSuccess} />
         <div className="mt-3 flex justify-end border-t border-app-divider pt-3">

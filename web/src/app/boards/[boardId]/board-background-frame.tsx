@@ -90,11 +90,19 @@ export function BoardBackgroundFrame(props: {
     style.backgroundImage = `linear-gradient(var(--board-image-veil), var(--board-image-veil)), url("${signedUrl}")`;
     style.backgroundSize = "cover";
     style.backgroundPosition = "center";
+    style.backgroundRepeat = "no-repeat";
   }
 
   return (
-    <section className={[className, surfaceClass].filter(Boolean).join(" ")} style={style}>
-      {children}
+    <section className={["relative", className].filter(Boolean).join(" ")}>
+      <div
+        aria-hidden
+        className={["pointer-events-none absolute inset-0", surfaceClass].filter(Boolean).join(" ")}
+        style={style}
+      />
+      <div className="relative z-10 flex h-full min-h-0 flex-1 flex-col">
+        {children}
+      </div>
     </section>
   );
 }
