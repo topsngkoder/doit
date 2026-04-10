@@ -69,7 +69,7 @@ function AvatarCircle({
     <div
       className={cn(
         dim,
-        "flex items-center justify-center rounded-full bg-slate-700 font-medium text-slate-200"
+        "flex items-center justify-center rounded-full bg-app-surface-muted font-medium text-app-secondary"
       )}
       title={label}
       aria-label={label}
@@ -137,7 +137,7 @@ export function BoardMembersPanel({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="flex items-center rounded-full outline-none ring-offset-2 ring-offset-slate-950 focus-visible:ring-2 focus-visible:ring-sky-500"
+          className="focus-ring-app flex items-center rounded-full"
           aria-label={`Участники доски, ${sorted.length}`}
         >
           <span className="flex items-center pr-1">
@@ -145,7 +145,7 @@ export function BoardMembersPanel({
               <span
                 key={m.userId}
                 className={cn(
-                  "relative rounded-full ring-2 ring-slate-950",
+                  "relative rounded-full ring-2 ring-[color:var(--bg-page)]",
                   i > 0 && "-ml-2"
                 )}
                 style={{ zIndex: preview.length - i }}
@@ -156,7 +156,7 @@ export function BoardMembersPanel({
             {overflow > 0 ? (
               <span
                 className={cn(
-                  "relative -ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-slate-100 ring-2 ring-slate-950"
+                  "relative -ml-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface-muted text-xs font-semibold text-app-primary ring-2 ring-[color:var(--bg-page)]"
                 )}
                 style={{ zIndex: 0 }}
               >
@@ -168,19 +168,19 @@ export function BoardMembersPanel({
         <InviteMemberButton
           boardId={boardId}
           canInvite={canInvite}
-          triggerClassName="-ml-2 h-8 w-8 shrink-0 rounded-full border-0 bg-slate-700 p-0 text-sm font-semibold leading-none text-slate-100 ring-2 ring-slate-950 hover:bg-slate-600"
+          triggerClassName="-ml-2 h-8 w-8 shrink-0 rounded-full border-0 bg-app-surface-muted p-0 text-sm font-semibold leading-none text-app-primary ring-2 ring-[color:var(--bg-page)] hover:bg-app-surface-subtle"
         />
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="pl-1.5 text-sm text-slate-400 underline-offset-2 outline-none ring-offset-2 ring-offset-slate-950 transition-colors hover:text-slate-200 hover:underline focus-visible:ring-2 focus-visible:ring-sky-500"
+          className="focus-ring-app rounded-sm pl-1.5 text-sm text-app-secondary underline-offset-2 transition-colors hover:text-app-primary hover:underline"
         >
           Участники
         </button>
       </div>
 
       <Modal open={open} title="Участники доски" onClose={() => setOpen(false)}>
-        <p className="mb-3 text-slate-400">
+        <p className="mb-3 text-app-secondary">
           На доске {sorted.length} {memberWord(sorted.length)}. Доступно всем, у кого есть право
           просмотра доски.
         </p>
@@ -188,22 +188,22 @@ export function BoardMembersPanel({
           {sorted.map((m) => (
             <li
               key={m.userId}
-              className="flex items-center gap-3 rounded-md border border-slate-800/80 bg-slate-900/40 px-3 py-2"
+              className="flex items-center gap-3 rounded-md border border-app-default bg-app-surface-muted px-3 py-2"
             >
               <AvatarCircle label={m.displayName} src={m.avatarUrl} size="md" />
               <div className="min-w-0 flex flex-1 flex-col gap-0.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="truncate font-medium text-slate-100">{m.displayName}</span>
+                  <span className="truncate font-medium text-app-primary">{m.displayName}</span>
                   {m.isOwner ? (
-                    <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-400">
+                    <span className="shrink-0 rounded border border-[color:var(--warning-subtle-border)] bg-[color:var(--warning-subtle-bg)] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[color:var(--warning-subtle-text)]">
                       Владелец
                     </span>
                   ) : null}
                 </div>
-                <span className="truncate text-xs text-slate-500">{m.email}</span>
+                <span className="truncate text-xs text-app-tertiary">{m.email}</span>
                 {canManageRoles && !m.isOwner ? (
                   <label className="mt-1 flex flex-col gap-1">
-                    <span className="text-[10px] uppercase tracking-wide text-slate-500">Роль</span>
+                    <span className="text-[10px] uppercase tracking-wide text-app-tertiary">Роль</span>
                     <select
                       value={m.roleId}
                       disabled={pendingUserId === m.userId}
@@ -220,14 +220,14 @@ export function BoardMembersPanel({
                       ))}
                     </select>
                     {roleErrorUserId === m.userId && roleErrorMessage ? (
-                      <span className="text-xs text-rose-400">{roleErrorMessage}</span>
+                      <span className="text-xs text-app-validation-error">{roleErrorMessage}</span>
                     ) : null}
                   </label>
                 ) : (
-                  <span className="text-xs text-slate-400">
-                    Роль: <span className="text-slate-300">{m.roleName}</span>
+                  <span className="text-xs text-app-secondary">
+                    Роль: <span className="text-app-primary">{m.roleName}</span>
                     {m.roleKey ? (
-                      <span className="text-slate-600"> ({m.roleKey})</span>
+                      <span className="text-app-tertiary"> ({m.roleKey})</span>
                     ) : null}
                   </span>
                 )}
@@ -236,7 +236,7 @@ export function BoardMembersPanel({
           ))}
         </ul>
         {canInvite ? (
-          <p className="mt-4 border-t border-slate-800 pt-3 text-xs text-slate-500">
+          <p className="mt-4 border-t border-app-divider pt-3 text-xs text-app-tertiary">
             Чтобы пригласить нового участника по email, нажмите кнопку «+» в шапке доски.
           </p>
         ) : null}

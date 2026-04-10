@@ -45,7 +45,7 @@ function InviteMemberForm({
   return (
     <form action={formAction} className="space-y-3">
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-slate-400">Email</span>
+        <span className="text-xs text-app-secondary">Email</span>
         <input
           name="email"
           type="email"
@@ -56,10 +56,10 @@ function InviteMemberForm({
         />
       </label>
       {state.ok === false && state.message ? (
-        <p className="text-sm text-rose-400">{state.message}</p>
+        <p className="text-sm text-app-validation-error">{state.message}</p>
       ) : null}
       {state.ok ? (
-        <p className="text-sm text-emerald-400">Приглашение создано.</p>
+        <p className="text-sm text-[color:var(--success-strong)]">Приглашение создано.</p>
       ) : null}
       <div className="flex justify-end gap-2 pt-2">
         <InviteSubmitButton />
@@ -89,7 +89,7 @@ export function InviteMemberButton({ boardId, canInvite, triggerClassName }: Inv
         variant="secondary"
         className={
           triggerClassName ??
-          "h-8 w-8 shrink-0 rounded-full border-0 bg-slate-700 p-0 text-sm font-semibold leading-none text-slate-100 ring-2 ring-slate-950 hover:bg-slate-600"
+          "h-8 w-8 shrink-0 rounded-full border-0 bg-app-surface-muted p-0 text-sm font-semibold leading-none text-app-primary ring-2 ring-[color:var(--bg-page)] hover:bg-app-surface-subtle"
         }
         aria-label="Пригласить по email"
         title="Пригласить по email"
