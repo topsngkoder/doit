@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { AddBoardColumnButton } from "./add-board-column-button";
 import { BoardColumnsDnD } from "./board-columns-dnd";
 import type { NewCardFieldDefinition, NewCardMemberOption } from "./create-card-modal";
 import type {
@@ -12,7 +11,6 @@ import type {
   CardContentPermissions
 } from "./column-types";
 import { BoardBackgroundFrame } from "./board-background-frame";
-import { BOARD_LAYOUT_TOKENS } from "./board-layout-geometry";
 
 export type { BoardColumnPermissions, BoardCardListItem, BoardLabelOption, CardContentPermissions };
 
@@ -64,6 +62,31 @@ export function BoardCanvas({
   cardsByColumnId
 }: BoardCanvasProps) {
   const columnsStageRef = React.useRef<HTMLDivElement | null>(null);
+  const columnsSig = React.useMemo(
+    () => columns.map((column) => `${column.id}:${column.position}`).join("|"),
+    [columns]
+  );
+
+  React.useEffect(() => {
+    const stage = columnsStageRef.current;
+    if (!stage) return;
+    let newColumnId: string | null = null;
+    try {
+      newColumnId = sessionStorage.getItem(`board:new-column:${boardId}`);
+    } catch {
+      return;
+    }
+    if (!newColumnId) return;
+    const escapedColumnId = typeof CSS !== "undefined" && typeof CSS.escape === "function" ? CSS.escape(newColumnId) : newColumnId;
+    const target = stage.querySelector<HTMLElement>(`[data-board-column-id="${escapedColumnId}"]`);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+    try {
+      sessionStorage.removeItem(`board:new-column:${boardId}`);
+    } catch {
+      // ignore
+    }
+  }, [boardId, columnsSig]);
 
   return (
     <BoardBackgroundFrame
@@ -71,13 +94,6 @@ export function BoardCanvas({
       backgroundImagePath={board.backgroundImagePath}
       className="flex h-full min-h-[320px] flex-1 flex-col p-4"
     >
-      <div className="shrink-0" style={{ height: BOARD_LAYOUT_TOKENS.controlRowHeight }}>
-        <div className="flex h-full min-w-0 items-center gap-2">
-          {columnPermissions.canCreate ? (
-            <AddBoardColumnButton boardId={boardId} canCreate={columnPermissions.canCreate} />
-          ) : null}
-        </div>
-      </div>
       <div
         ref={columnsStageRef}
         className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden"

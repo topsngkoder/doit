@@ -3,16 +3,17 @@
 import * as React from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
-import { Modal } from "@/components/ui/modal";
 import {
   createBoardColumnAction,
   type ColumnMutationResult
 } from "./actions";
 import { COLUMN_TYPES, columnTypeLabel } from "./column-types";
 
-type AddBoardColumnButtonProps = {
+type BoardColumnCreateFormProps = {
   boardId: string;
-  canCreate: boolean;
+  sourceColumnId: string;
+  sourceColumnName: string;
+  onSuccess: (newColumnId?: string) => void;
 };
 
 const initialState: ColumnMutationResult = { ok: false, message: "" };
@@ -26,24 +27,27 @@ function SubmitButton() {
   );
 }
 
-function CreateColumnForm({
+export function BoardColumnCreateForm({
   boardId,
+  sourceColumnId,
+  sourceColumnName,
   onSuccess
-}: {
-  boardId: string;
-  onSuccess: () => void;
-}) {
+}: BoardColumnCreateFormProps) {
   const bound = createBoardColumnAction.bind(null, boardId);
   const [state, formAction] = React.useActionState(bound, initialState);
 
   React.useEffect(() => {
     if (state.ok) {
-      onSuccess();
+      onSuccess(state.newColumnId);
     }
-  }, [state.ok, onSuccess]);
+  }, [state.ok, state.newColumnId, onSuccess]);
 
   return (
     <form action={formAction} className="space-y-3">
+      <input type="hidden" name="source_column_id" value={sourceColumnId} />
+      <p className="text-xs text-app-tertiary">
+        Новая колонка будет добавлена сразу после колонки "{sourceColumnName}".
+      </p>
       <label className="flex flex-col gap-1">
         <span className="text-xs text-app-tertiary">Название</span>
         <input
@@ -80,38 +84,5 @@ function CreateColumnForm({
         <SubmitButton />
       </div>
     </form>
-  );
-}
-
-export function AddBoardColumnButton({ boardId, canCreate }: AddBoardColumnButtonProps) {
-  const [open, setOpen] = React.useState(false);
-  const [formKey, setFormKey] = React.useState(0);
-
-  const onSuccess = React.useCallback(() => {
-    setOpen(false);
-    setFormKey((k) => k + 1);
-  }, []);
-
-  if (!canCreate) {
-    return null;
-  }
-
-  return (
-    <>
-      <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(true)}>
-        + Колонка
-      </Button>
-      <Modal open={open} title="Новая колонка" onClose={() => setOpen(false)}>
-        <p className="mb-4 text-xs text-app-tertiary">
-          Колонка добавляется в конец единого горизонтального ряда.
-        </p>
-        <CreateColumnForm key={formKey} boardId={boardId} onSuccess={onSuccess} />
-        <div className="mt-3 flex justify-end border-t border-app-divider pt-3">
-          <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
-            Отмена
-          </Button>
-        </div>
-      </Modal>
-    </>
   );
 }

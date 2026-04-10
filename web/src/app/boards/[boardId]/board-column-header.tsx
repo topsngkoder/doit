@@ -10,6 +10,7 @@ import {
   updateBoardColumnAction,
   type ColumnMutationResult
 } from "./actions";
+import { BoardColumnCreateForm } from "./board-column-create-form";
 import { COLUMN_TYPES, columnTypeLabel } from "./column-types";
 
 type BoardColumnHeaderProps = {
@@ -17,9 +18,12 @@ type BoardColumnHeaderProps = {
   columnId: string;
   name: string;
   columnType: string;
+  columnNameForCreateHint?: string;
   cardCount: number;
   columnIndex: number;
   columnCount: number;
+  isLastColumn: boolean;
+  canCreate: boolean;
   canRename: boolean;
   canReorder: boolean;
   canDelete: boolean;
@@ -107,13 +111,18 @@ export function BoardColumnHeader({
   columnId,
   name,
   columnType,
+  columnNameForCreateHint,
   cardCount,
+  columnCount,
+  isLastColumn,
+  canCreate,
   canRename,
   canReorder,
   canDelete,
   columnDrag = null
 }: BoardColumnHeaderProps) {
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [createOpen, setCreateOpen] = React.useState(false);
   const [editOpen, setEditOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [asyncError, setAsyncError] = React.useState<string | null>(null);
@@ -148,8 +157,10 @@ export function BoardColumnHeader({
     }
   };
 
-  const showMenu = canRename || canDelete;
+  const showMenu = canCreate || canRename || canDelete;
+  const createHintColumnName = columnNameForCreateHint ?? name;
   const editFormKey = `${columnId}-${name}-${columnType}`;
+  const isOnlyColumnOnBoard = columnCount === 1;
 
   return (
     <div className="flex flex-col gap-1">
@@ -192,13 +203,26 @@ export function BoardColumnHeader({
                   className="h-7 w-7 p-0 text-app-tertiary hover:text-app-primary"
                   aria-expanded={menuOpen}
                   aria-haspopup="true"
-                  title="Действия с колонкой"
+                  title={`Действия с колонкой «${createHintColumnName}»`}
                   onClick={() => setMenuOpen((o) => !o)}
                 >
                   ⋮
                 </Button>
                 {menuOpen ? (
                   <div className="popup-panel absolute right-0 z-20 mt-1 min-w-[180px] py-1 text-xs shadow-[var(--shadow-card)]">
+                    {canCreate ? (
+                      <button
+                        type="button"
+                        className="flex w-full px-3 py-2 text-left text-app-secondary hover:bg-app-surface-muted hover:text-app-primary"
+                        onClick={() => {
+                          closeMenu();
+                          setAsyncError(null);
+                          setCreateOpen(true);
+                        }}
+                      >
+                        Добавить колонку
+                      </button>
+                    ) : null}
                     {canRename ? (
                       <button
                         type="button"
@@ -213,18 +237,30 @@ export function BoardColumnHeader({
                       </button>
                     ) : null}
                     {canDelete ? (
-                      <button
-                        type="button"
-                        className="flex w-full px-3 py-2 text-left hover:bg-app-surface-muted"
-                        style={{ color: "var(--danger-subtle-text)" }}
-                        onClick={() => {
-                          closeMenu();
-                          setAsyncError(null);
-                          setDeleteOpen(true);
-                        }}
-                      >
-                        Удалить колонку…
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          disabled={isOnlyColumnOnBoard}
+                          aria-disabled={isOnlyColumnOnBoard}
+                          className={`flex w-full px-3 py-2 text-left ${
+                            isOnlyColumnOnBoard ? "cursor-not-allowed opacity-60" : "hover:bg-app-surface-muted"
+                          }`}
+                          style={{ color: "var(--danger-subtle-text)" }}
+                          onClick={() => {
+                            if (isOnlyColumnOnBoard) return;
+                            closeMenu();
+                            setAsyncError(null);
+                            setDeleteOpen(true);
+                          }}
+                        >
+                          Удалить колонку…
+                        </button>
+                        {isOnlyColumnOnBoard ? (
+                          <p className="px-3 pb-2 text-[11px] leading-4 text-app-tertiary" aria-live="polite">
+                            Последнюю колонку на доске удалить нельзя.
+                          </p>
+                        ) : null}
+                      </>
                     ) : null}
                   </div>
                 ) : null}
@@ -234,6 +270,29 @@ export function BoardColumnHeader({
         ) : null}
       </div>
       {asyncError ? <p className="text-xs text-app-validation-error">{asyncError}</p> : null}
+
+      <Modal open={createOpen} title="Новая колонка" onClose={() => setCreateOpen(false)}>
+        <BoardColumnCreateForm
+          boardId={boardId}
+          sourceColumnId={columnId}
+          sourceColumnName={createHintColumnName}
+          onSuccess={(newColumnId) => {
+            if (newColumnId) {
+              try {
+                sessionStorage.setItem(`board:new-column:${boardId}`, newColumnId);
+              } catch {
+                // ignore
+              }
+            }
+            setCreateOpen(false);
+          }}
+        />
+        <div className="mt-3 flex justify-end border-t border-app-divider pt-3">
+          <Button type="button" variant="ghost" size="sm" onClick={() => setCreateOpen(false)}>
+            Отмена
+          </Button>
+        </div>
+      </Modal>
 
       <Modal open={editOpen} title="Колонка" onClose={() => setEditOpen(false)}>
         <EditColumnForm

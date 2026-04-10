@@ -1271,7 +1271,9 @@ export async function updateBoardMemberRoleAction(
   return { ok: true };
 }
 
-export type ColumnMutationResult = { ok: true } | { ok: false; message: string };
+export type ColumnMutationResult =
+  | { ok: true; newColumnId?: string }
+  | { ok: false; message: string };
 
 function isColumnType(v: string): v is ColumnType {
   return (COLUMN_TYPES as readonly string[]).includes(v);
@@ -1284,8 +1286,10 @@ export async function createBoardColumnAction(
 ): Promise<ColumnMutationResult> {
   const nameRaw = formData.get("name");
   const typeRaw = formData.get("column_type");
+  const sourceColumnIdRaw = formData.get("source_column_id");
   const name = typeof nameRaw === "string" ? nameRaw.trim() : "";
   const columnType = typeof typeRaw === "string" ? typeRaw.trim() : "";
+  const sourceColumnId = typeof sourceColumnIdRaw === "string" ? sourceColumnIdRaw.trim() : "";
 
   if (!name) {
     return { ok: false, message: "Укажите название колонки." };
@@ -1295,6 +1299,9 @@ export async function createBoardColumnAction(
   }
   if (!isColumnType(columnType)) {
     return { ok: false, message: "Выберите тип колонки." };
+  }
+  if (!sourceColumnId) {
+    return { ok: false, message: "Колонка не найдена на этой доске." };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -1307,36 +1314,29 @@ export async function createBoardColumnAction(
     return { ok: false, message: "Нужна авторизация." };
   }
 
-  const { data: maxRow, error: maxError } = await supabase
-    .from("board_columns")
-    .select("position")
-    .eq("board_id", boardId)
-    .order("position", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (maxError) {
-    return { ok: false, message: maxError.message };
-  }
-
-  const nextPosition = maxRow?.position != null ? Number(maxRow.position) + 1 : 0;
-
-  const { error } = await supabase.from("board_columns").insert({
-    board_id: boardId,
-    name,
-    column_type: columnType,
-    position: nextPosition
+  const { data, error } = await supabase.rpc("create_board_column_after", {
+    p_board_id: boardId,
+    p_source_column_id: sourceColumnId,
+    p_name: name,
+    p_column_type: columnType
   });
 
   if (error) {
     if (error.code === "42501") {
       return { ok: false, message: "Нет права создавать колонки на этой доске." };
     }
+    if (
+      error.message.includes("Колонка не найдена на этой доске.") ||
+      error.message.toLowerCase().includes("source column")
+    ) {
+      return { ok: false, message: "Колонка не найдена на этой доске." };
+    }
     return { ok: false, message: error.message };
   }
 
   revalidatePath(`/boards/${boardId}`);
-  return { ok: true };
+  const newColumnId = typeof data === "string" && data.length > 0 ? data : undefined;
+  return { ok: true, newColumnId };
 }
 
 export async function updateBoardColumnAction(
@@ -1539,6 +1539,9 @@ export async function deleteBoardColumnAction(
   if (error) {
     if (error.code === "42501") {
       return { ok: false, message: "Нет права удалять колонки." };
+    }
+    if (error.message.includes("Нельзя удалить последнюю колонку на доске.")) {
+      return { ok: false, message: "Нельзя удалить последнюю колонку на доске." };
     }
     if (error.code === "23503") {
       return {

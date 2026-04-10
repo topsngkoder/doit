@@ -637,6 +637,7 @@ function SortableColumnShell({
     <div
       ref={setNodeRef}
       style={columnStyle}
+      data-board-column-id={col.id}
       className={COLUMN_SHELL_CLASS}
     >
       <BoardColumnHeader
@@ -644,9 +645,12 @@ function SortableColumnShell({
         columnId={col.id}
         name={col.name}
         columnType={col.columnType}
+        columnNameForCreateHint={col.name}
         cardCount={cards.length}
         columnIndex={index}
         columnCount={columnCount}
+        isLastColumn={index === columnCount - 1}
+        canCreate={columnPermissions.canCreate}
         canRename={columnPermissions.canRename}
         canReorder={columnSortableEnabled}
         canDelete={columnPermissions.canDelete}
@@ -736,15 +740,18 @@ function StaticColumnShell({
   const cards = cardIds.map((id) => cardsById.get(id)).filter(Boolean) as BoardCardListItem[];
 
   return (
-    <div className={COLUMN_SHELL_CLASS}>
+    <div className={COLUMN_SHELL_CLASS} data-board-column-id={col.id}>
       <BoardColumnHeader
         boardId={boardId}
         columnId={col.id}
         name={col.name}
         columnType={col.columnType}
+        columnNameForCreateHint={col.name}
         cardCount={cards.length}
         columnIndex={index}
         columnCount={columnCount}
+        isLastColumn={index === columnCount - 1}
+        canCreate={columnPermissions.canCreate}
         canRename={columnPermissions.canRename}
         canReorder={false}
         canDelete={columnPermissions.canDelete}
@@ -838,6 +845,7 @@ function BoardGridStatic({
       {columnRows.map((col, index) => (
         <div
           key={col.id}
+          data-board-column-id={col.id}
           className={COLUMN_SHELL_CLASS}
         >
           <BoardColumnHeader
@@ -845,9 +853,12 @@ function BoardGridStatic({
             columnId={col.id}
             name={col.name}
             columnType={col.columnType}
+            columnNameForCreateHint={col.name}
             cardCount={(cardOrderByColumn[col.id] ?? []).length}
             columnIndex={index}
             columnCount={columnCount}
+            isLastColumn={index === columnCount - 1}
+            canCreate={columnPermissions.canCreate}
             canRename={columnPermissions.canRename}
             canReorder={false}
             canDelete={columnPermissions.canDelete}
