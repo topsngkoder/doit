@@ -87,7 +87,7 @@ export function BoardBackgroundFrame(props: {
 
   const style: CSSProperties = {};
   if (showImage) {
-    style.backgroundImage = `linear-gradient(rgba(2, 6, 23, 0.25), rgba(2, 6, 23, 0.25)), url("${signedUrl}")`;
+    style.backgroundImage = `linear-gradient(var(--board-image-veil), var(--board-image-veil)), url("${signedUrl}")`;
     style.backgroundSize = "cover";
     style.backgroundPosition = "center";
   }

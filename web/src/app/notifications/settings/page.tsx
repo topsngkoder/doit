@@ -57,9 +57,9 @@ export default async function NotificationSettingsPage() {
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-50">Настройки уведомлений</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-app-primary">Настройки уведомлений</h1>
           </div>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-app-secondary">
             Канал × событие (6 типов) · автосохранение без отдельной кнопки.
           </p>
         </div>
@@ -67,7 +67,7 @@ export default async function NotificationSettingsPage() {
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <Link
             href="/notifications"
-            className="rounded-md px-3 py-1.5 text-slate-300 hover:bg-slate-800 hover:text-slate-50"
+            className="focus-ring-app rounded-md px-3 py-1.5 text-app-link hover:bg-app-surface-muted hover:text-[color:var(--text-link-hover)]"
           >
             ← Уведомления
           </Link>

@@ -119,6 +119,10 @@
   --notification-unread-badge-text: var(--info-subtle-text);
   --notification-read-badge-bg: var(--bg-surface-subtle);
   --notification-read-badge-text: var(--text-tertiary);
+
+  /* Board image veil (dark/light) */
+  --board-image-veil: rgba(2, 6, 23, 0.25);
+  --board-column-bg: rgba(9, 9, 11, 0.7);
 }
 
 html[data-theme="light"] {
@@ -218,6 +222,9 @@ html[data-theme="light"] {
   --notification-unread-badge-text: #1e40af;
   --notification-read-badge-bg: #eef2f7;
   --notification-read-badge-text: #475569;
+
+  --board-image-veil: rgba(255, 255, 255, 0.18);
+  --board-column-bg: rgba(255, 255, 255, 0.88);
 }
 
 @tailwind base;

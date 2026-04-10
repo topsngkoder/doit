@@ -94,23 +94,39 @@ export function NotificationSettingsClient({
       className="space-y-5"
       data-browser-notification-permission={browserPermissionDataAttribute(browserNotificationPermission)}
     >
-      <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-        <h2 className="text-sm font-semibold text-slate-100">Уведомления в браузере</h2>
-        <p className="mt-1 text-xs text-slate-500">
+      <div className="surface-card p-4">
+        <h2 className="text-sm font-semibold text-app-primary">Уведомления в браузере</h2>
+        <p className="mt-1 text-xs text-app-tertiary">
           Системные уведомления ОС при открытом приложении. Не влияют на таблицу ниже и не включают email.
         </p>
         <div className="mt-3">
           {browserNotificationPermission === null ? (
-            <p className="text-xs text-slate-400">Проверяем доступ к уведомлениям…</p>
+            <p className="text-xs text-app-secondary">Проверяем доступ к уведомлениям…</p>
           ) : browserNotificationPermission.kind === "unsupported" ? (
-            <p className="text-xs text-slate-300">
+            <p className="text-xs text-app-secondary">
               В этом браузере недоступны системные уведомления (нет API или открыт небезопасный адрес). Внутренний центр
               уведомлений по-прежнему работает.
             </p>
           ) : browserNotificationPermission.permission === "granted" ? (
-            <p className="text-xs font-medium text-emerald-200/90">Браузерные уведомления включены</p>
+            <p
+              className="rounded-md border px-2 py-1 text-xs font-medium"
+              style={{
+                backgroundColor: "var(--success-subtle-bg)",
+                borderColor: "var(--success-subtle-border)",
+                color: "var(--success-subtle-text)"
+              }}
+            >
+              Браузерные уведомления включены
+            </p>
           ) : browserNotificationPermission.permission === "denied" ? (
-            <p className="text-xs text-amber-100/90">
+            <p
+              className="rounded-md border px-2 py-1 text-xs"
+              style={{
+                backgroundColor: "var(--warning-subtle-bg)",
+                borderColor: "var(--warning-subtle-border)",
+                color: "var(--warning-subtle-text)"
+              }}
+            >
               Браузер запретил уведомления. Разрешите их вручную в настройках браузера и обновите страницу.
             </p>
           ) : (
@@ -126,8 +142,8 @@ export function NotificationSettingsClient({
         </div>
       </div>
 
-      <div className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
-        <div className="rounded-md border border-slate-800 bg-slate-950/40 px-3 py-2 text-xs text-slate-300">
+      <div className="surface-card p-4">
+        <div className="rounded-md border border-app-divider bg-app-surface-muted px-3 py-2 text-xs text-app-secondary">
           Вы не получаете уведомления, где являетесь автором действий.
         </div>
 
@@ -135,16 +151,31 @@ export function NotificationSettingsClient({
           <div
             className={cn(
               "mt-3 rounded-md px-3 py-2 text-xs",
-              lastMessage === "Сохранено." ? "bg-emerald-500/10 text-emerald-200" : "bg-rose-500/10 text-rose-200"
+              lastMessage === "Сохранено."
+                ? "border"
+                : "border"
             )}
+            style={
+              lastMessage === "Сохранено."
+                ? {
+                    backgroundColor: "var(--success-subtle-bg)",
+                    borderColor: "var(--success-subtle-border)",
+                    color: "var(--success-subtle-text)"
+                  }
+                : {
+                    backgroundColor: "var(--danger-subtle-bg)",
+                    borderColor: "var(--danger-subtle-border)",
+                    color: "var(--danger-subtle-text)"
+                  }
+            }
           >
             {lastMessage}
           </div>
         ) : null}
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-slate-800 bg-slate-950/60">
-        <div className="grid grid-cols-[1fr_120px_140px] gap-0 border-b border-slate-800 px-4 py-3 text-xs font-semibold text-slate-200">
+      <div className="surface-card overflow-hidden">
+        <div className="grid grid-cols-[1fr_120px_140px] gap-0 border-b border-app-divider px-4 py-3 text-xs font-semibold text-app-secondary">
           <div>Тип уведомления</div>
           {NOTIFICATION_CHANNELS.map((channel) => (
             <div key={channel} className="text-center">
@@ -153,16 +184,16 @@ export function NotificationSettingsClient({
           ))}
         </div>
 
-        <div className="divide-y divide-slate-800">
+        <div className="divide-y divide-[color:var(--border-divider)]">
           {NOTIFICATION_EVENT_TYPES.map((eventType) => {
             return (
               <div
                 key={eventType}
                 className="grid grid-cols-[1fr_120px_140px] items-center gap-0 px-4 py-3 text-sm"
               >
-                <div className="min-w-0 pr-3 text-slate-100">
+                <div className="min-w-0 pr-3 text-app-primary">
                   <div className="truncate">{NOTIFICATION_EVENT_TYPE_LABEL[eventType]}</div>
-                  <div className="mt-0.5 text-xs text-slate-500">{eventType}</div>
+                  <div className="mt-0.5 text-xs text-app-tertiary">{eventType}</div>
                 </div>
 
                 {NOTIFICATION_CHANNELS.map((channel) => {
@@ -171,11 +202,7 @@ export function NotificationSettingsClient({
                     <div key={channel} className="flex justify-center">
                       <input
                         type="checkbox"
-                        className={cn(
-                          "h-4 w-4 cursor-pointer rounded border-slate-600 bg-slate-900",
-                          "text-sky-500 accent-sky-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500/60",
-                          "disabled:cursor-not-allowed disabled:opacity-60"
-                        )}
+                        className="checkbox-app"
                         checked={!!prefs[buildKey(eventType, channel)]}
                         disabled={isPending}
                         aria-label={label}
@@ -190,7 +217,7 @@ export function NotificationSettingsClient({
         </div>
       </div>
 
-      <div className="text-xs text-slate-500">
+      <div className="text-xs text-app-tertiary">
         Автосохранение включено{isPending ? " (сохранение…)" : ""}.
       </div>
     </section>

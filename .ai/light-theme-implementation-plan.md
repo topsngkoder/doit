@@ -18,6 +18,8 @@
 - **2026-04-10** — **T14 DONE**: страница досок §8.4 — секция создания/списка: `surface-card`, заголовок и основной текст `text-app-primary`, подписи `text-app-tertiary`, разделитель `border-app-divider`, пустое состояние `text-app-secondary`. `boards-default-selector.tsx`: список с `border-app-default`, `divide-[color:var(--border-divider)]` (#E5EAF1 в light), ссылки на доски как §8.4 через `text-app-link` + `hover:text-[color:var(--text-link-hover)]`; подпись «По умолчанию» `text-app-secondary`; модалки — типографика на токенах. В `globals.css`: утилита `.checkbox-app` (§7.3 — `accent-color` + focus ring + disabled 60%). Миграции БД не требовались.
 - **2026-04-10** — **T15 DONE**: центр уведомлений §8.5 — контейнер списка `surface-card` (белая surface + граница `#D7DFE8` в light через `--border-default`). Непрочитанные строки: `.notification-item-unread` (`--info-subtle-*`); прочитанные: токены `--notification-read-row-*` (light: фон `#FFFFFF`, граница `#E5EAF1`). Бейджи: `.notification-badge-unread` / `.notification-badge-read` (в light — `#DBEAFE` / `#1E40AF` и `#EEF2F7` / `#475569` по спецификации). Шапка страницы и пустое состояние на `text-app-*`; ссылки «Настройки» / «Открыть» — вторичный hit и `text-app-link` + hover. Миграции БД не требовались.
 - **2026-04-10** — **T16 DONE**: `notifications/settings/page.tsx` и `notification-settings-client.tsx` переведены на семантические токены §8.5/§9: заголовок/описание/ссылка «← Уведомления» на `text-app-*` + `focus-ring-app`; карточки настроек и таблица на `surface-card`, разделители `border-app-divider` / `--border-divider`; status-блоки браузерных уведомлений и автосохранения через `--success|warning|danger-subtle-*`; checkbox-контролы таблицы переведены на `.checkbox-app` (§7.3) с токенным accent/focus/disabled. Миграции БД не требовались.
+- **2026-04-10** — **T17 DONE**: `board-background-frame.tsx` — вуаль над фоновым изображением доски переведена на токен `--board-image-veil` внутри `linear-gradient(...)`, без изменений signed URL/caching логики. В `globals.css`: `:root` (dark) `--board-image-veil: rgba(2, 6, 23, 0.25)` (эквивалент текущего поведения), `html[data-theme="light"]` — `rgba(255, 255, 255, 0.18)` строго по §10. Пользовательский цвет/изображение доски не подменяются темой. Миграции БД не требовались.
+- **2026-04-10** — **T18 DONE**: board canvas/columns/cards переведены на семантические токены (§11): в `globals.css` добавлен `--board-column-bg` (dark: полупрозрачный тёмный, light: `rgba(255,255,255,0.88)`), в `board-columns-dnd.tsx` колонки стали `border-app-default` + `shadow-[var(--shadow-card)]` + `backdrop-blur`, карточки — `bg-app-surface` с границей/hover/focus по `--border-*`/`--focus-ring`, пустые состояния и DnD drop-zone на `border-app-divider`/`border-app-strong`. Кнопка `+ Карточка` (`create-card-modal.tsx`) переведена на токены (`bg-app-surface-muted`, `border-app-strong`, hover/focus). `board-column-header.tsx` и `add-board-column-button.tsx` — текст/ошибки/меню/разделители на `text-app-*`, `popup-panel`, `border-app-divider`. `page.tsx` заголовок доски — `text-app-primary`. Миграции БД не требовались.
 
 ## Назначение
 Этот документ предназначен для AI-агента, который будет внедрять требования из `.ai/light-theme-specification.md`.
@@ -566,6 +568,26 @@
 | Автосохранение и ошибки | `notification-settings-client.tsx` — сообщения результата на `--success-subtle-*` / `--danger-subtle-*` |
 | Checkbox-like controls | `notification-settings-client.tsx` — `input[type="checkbox"]` → `.checkbox-app` |
 
+## Результат T17 — вуаль board image
+
+| Что | Где |
+| --- | --- |
+| Токен вуали | `globals.css` — `--board-image-veil` в `:root` и `html[data-theme="light"]` |
+| Светлая тема | `--board-image-veil: rgba(255, 255, 255, 0.18)` |
+| Тёмная тема | `--board-image-veil: rgba(2, 6, 23, 0.25)` (сохранение текущей модели) |
+| Применение к фону доски | `board-background-frame.tsx` — `linear-gradient(var(--board-image-veil), var(--board-image-veil)), url(...)` |
+| Инварианты | Signed URL / кеш / выбор пользовательского фона не изменены |
+
+## Результат T18 — канва, колонки, карточки
+
+| Что | Где |
+| --- | --- |
+| Подложка колонок §11 | `globals.css` — `--board-column-bg`; `board-columns-dnd.tsx` — колонки на `bg: var(--board-column-bg)`, `border-app-default`, `shadow-[var(--shadow-card)]` |
+| Карточки §11 | `board-columns-dnd.tsx` — карточки на `bg-app-surface`, границы `border-app-default` + hover `border-app-strong`, фокус `--focus-ring` |
+| Пустые состояния и drop-zone | `board-columns-dnd.tsx` — dashed/empty блоки на `border-app-divider` / `border-app-strong`, без `slate-*` |
+| `+ Карточка` | `create-card-modal.tsx` — токенные цвета/границы/hover/focus (`bg-app-surface-muted`, `border-app-strong`, `focus-ring-app`) |
+| Заголовки/меню колонок | `board-column-header.tsx`, `add-board-column-button.tsx` — `text-app-*`, `popup-panel`, `border-app-divider`; ошибки `text-app-validation-error` |
+
 ---
 
 ## Трекер задач
@@ -588,8 +610,8 @@
 | T14 | DONE | Перевести страницу досок и selector default board | `boards/page.tsx`, `boards-default-selector.tsx` | T06, T07, T08 | Белые section cards, светлые разделители, ссылки по спецификации |
 | T15 | DONE | Перевести центр уведомлений | `notifications/page.tsx`, `globals.css` | T06, T08 | Непрочитанные и прочитанные уведомления соответствуют спецификации |
 | T16 | DONE | Перевести настройки уведомлений и checkbox-like controls | `notifications/settings/*` | T06, T07, T08 | Табличные и карточные блоки работают в обеих темах |
-| T17 | TODO | Реализовать светлую вуаль над board image и сохранить пользовательские фоновые исключения | `board-background-frame.tsx` | T04, T05 | Изображение/цвет доски не ломаются, светлая вуаль есть только в `light` |
-| T18 | TODO | Перевести board canvas, колонки, карточки и `+ Карточка` | board UI файлы в `[boardId]` | T06, T08, T17 | Колонки и карточки читаемы на любом фоне |
+| T17 | DONE | Реализовать светлую вуаль над board image и сохранить пользовательские фоновые исключения | `board-background-frame.tsx` | T04, T05 | Изображение/цвет доски не ломаются, светлая вуаль есть только в `light` |
+| T18 | DONE | Перевести board canvas, колонки, карточки и `+ Карточка` | board UI файлы в `[boardId]` | T06, T08, T17 | Колонки и карточки читаемы на любом фоне |
 | T19 | TODO | Перевести цветные label/select chips по правилу `16% color + 84% white` | board/card/label/select related files | T18 | Цветные чипы соответствуют спецификации и не теряют пользовательский цвет |
 | T20 | TODO | Перевести card modal и связанные popup-поверхности на светлый визуальный язык | `edit-card-modal.tsx`, `card-comments-sidebar.tsx`, `create-card-modal.tsx`, др. board popups | T08, T18, T19 | Card modal сохраняет layout, но полностью светлая визуально |
 | T21 | TODO | Выровнять focus/hover/disabled states по всей затронутой UI-зоне | все затронутые UI и screen файлы | T06-T20 | Focus явно виден, disabled читаем, hover мягкий и заметный |
