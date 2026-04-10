@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import {
@@ -34,7 +34,7 @@ function CreateColumnForm({
   onSuccess: () => void;
 }) {
   const bound = createBoardColumnAction.bind(null, boardId);
-  const [state, formAction] = useFormState(bound, initialState);
+  const [state, formAction] = React.useActionState(bound, initialState);
 
   React.useEffect(() => {
     if (state.ok) {
