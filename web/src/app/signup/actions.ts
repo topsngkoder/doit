@@ -14,6 +14,8 @@ export type SignUpInput = {
 
 export type SignUpResult = { ok: true; needsEmailConfirmation: true } | { ok: false; message: string };
 
+const EMAIL_CONFIRMATION_REDIRECT_URL = "https://doit-xi-inky.vercel.app";
+
 function normalizeRequired(raw: string): string {
   return raw.trim();
 }
@@ -72,7 +74,10 @@ export async function signUpAction(input: SignUpInput): Promise<SignUpResult> {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: userData }
+    options: {
+      data: userData,
+      emailRedirectTo: EMAIL_CONFIRMATION_REDIRECT_URL
+    }
   });
 
   if (error) {
