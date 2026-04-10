@@ -16,6 +16,7 @@ import {
   useSensors,
   type DragCancelEvent,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
   type UniqueIdentifier
 } from "@dnd-kit/core";
@@ -28,6 +29,7 @@ import {
   verticalListSortingStrategy
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { BoardColumnHeader } from "./board-column-header";
 import {
@@ -84,11 +86,42 @@ type BoardLocalState = {
   cardOrderByColumn: Record<string, string[]>;
 };
 
+type CardSlotPosition = { columnId: string; index: number };
+
 type CardDragOverlayState = {
   activeCardId: string;
   card: BoardCardListItem;
   overlaySize: { width: number; height: number };
+  sourceColumnId: string;
+  sourceIndex: number;
+  currentSlot: CardSlotPosition;
+  lastValidSlot: CardSlotPosition;
 };
+
+type CardDisplayRow = { kind: "card"; id: string } | { kind: "slot" };
+
+const BOARD_CARD_SLOT_LIST_KEY = "__board_card_slot__";
+
+function buildCardDisplayFlowForColumn(
+  columnId: string,
+  cardOrderByColumn: Record<string, string[]>,
+  activeCardId: string,
+  slot: CardSlotPosition
+): CardDisplayRow[] {
+  const ids = cardOrderByColumn[columnId] ?? [];
+  const stripped = ids.filter((id) => id !== activeCardId);
+  if (slot.columnId !== columnId) {
+    return stripped.map((id) => ({ kind: "card" as const, id }));
+  }
+  const insertAt = Math.max(0, Math.min(slot.index, stripped.length));
+  const out: CardDisplayRow[] = [];
+  for (let j = 0; j < stripped.length; j++) {
+    if (j === insertAt) out.push({ kind: "slot" });
+    out.push({ kind: "card", id: stripped[j]! });
+  }
+  if (insertAt === stripped.length) out.push({ kind: "slot" });
+  return out;
+}
 
 type CardLayoutBroadcastPayload = {
   v: 1;
@@ -267,6 +300,45 @@ function EmptyColumnDrop({ columnId, emphasized }: { columnId: string; emphasize
         isOver ? { boxShadow: "inset 0 0 0 var(--focus-ring-width) var(--focus-ring)" } : undefined
       }
     />
+  );
+}
+
+/** Slot вставки в вертикальном списке карточек колонки: полная ширина дорожки, фиксированная высота; межкарточный интервал — `gap-2` у контейнера списка. */
+function BoardCardInsertSlot({
+  heightPx,
+  className
+}: {
+  heightPx: number;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "w-full min-w-0 max-w-full shrink-0 rounded-[var(--radius-control)] border border-dashed border-app-divider bg-app-surface-muted/25",
+        className
+      )}
+      style={{ height: heightPx, minHeight: heightPx }}
+      aria-hidden
+    />
+  );
+}
+
+/** Пустая колонка во время card-drag: тот же id `empty-${columnId}`, что у `EmptyColumnDrop`, но высота = slot карточки (FDND3.4). */
+function EmptyColumnCardDropSlot({ columnId, heightPx }: { columnId: string; heightPx: number }) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: `empty-${columnId}`,
+    data: { type: "empty-column" as const, columnId }
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      className="w-full min-w-0 shrink-0 rounded-[var(--radius-control)]"
+      style={
+        isOver ? { boxShadow: "inset 0 0 0 var(--focus-ring-width) var(--focus-ring)" } : undefined
+      }
+    >
+      <BoardCardInsertSlot heightPx={heightPx} />
+    </div>
   );
 }
 
@@ -574,7 +646,11 @@ function SortableBoardCard({
   onOpen,
   enableDrag,
   shouldSuppressCardModalOpenClick,
-  registerCardNode
+  registerCardNode,
+  /** FDND3.1: при активном float-drag контент карточки только в overlay; в списке — зазор этой высоты. */
+  listDragPlaceholderHeightPx,
+  /** FDND3.3: активная карточка вынесена из потока списка; `useSortable` остаётся на скрытом узле вне визуального порядка. */
+  floatingSourceAnchor
 }: {
   card: BoardCardListItem;
   currentUserId: string;
@@ -588,6 +664,8 @@ function SortableBoardCard({
   enableDrag: boolean;
   shouldSuppressCardModalOpenClick: () => boolean;
   registerCardNode?: (cardId: string, node: HTMLDivElement | null) => void;
+  listDragPlaceholderHeightPx?: number;
+  floatingSourceAnchor?: boolean;
 }) {
   const {
     attributes,
@@ -602,11 +680,47 @@ function SortableBoardCard({
     disabled: !enableDrag
   });
 
-  // Активная карточка рендерится в `DragOverlay`; в списке остаётся только невидимый якорь с прежней геометрией (место до slot в FDND3).
+  const handleNodeRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      setNodeRef(node);
+      registerCardNode?.(card.id, node);
+    },
+    [card.id, registerCardNode, setNodeRef]
+  );
+
+  if (floatingSourceAnchor) {
+    return (
+      <div
+        ref={handleNodeRef}
+        style={{
+          position: "fixed",
+          left: -9999,
+          top: 0,
+          width: 1,
+          height: 1,
+          overflow: "hidden",
+          opacity: 0,
+          pointerEvents: "none",
+          transition,
+          transform: "none"
+        }}
+        aria-hidden
+      />
+    );
+  }
+
+  // Активная карточка рендерится в `DragOverlay`; в списке — только sortable-оболочка и зазор (FDND3.1), без второго `BoardCardRow`.
   // Соседям по вертикали по-прежнему обнуляем translateX — иначе transform сортируемого списка «ломает» горизонтальную сетку колонки.
   const isFloatingCardDrag = enableDrag && isDragging;
+  const showListPlaceholder =
+    isFloatingCardDrag && listDragPlaceholderHeightPx != null && listDragPlaceholderHeightPx > 0;
   const style: CSSProperties =
-    isFloatingCardDrag ?
+    showListPlaceholder ?
+      {
+        transition,
+        pointerEvents: "none"
+      }
+    : isFloatingCardDrag ?
       {
         opacity: 0,
         transition,
@@ -619,14 +733,6 @@ function SortableBoardCard({
         opacity: 1
       };
 
-  const handleNodeRef = React.useCallback(
-    (node: HTMLDivElement | null) => {
-      setNodeRef(node);
-      registerCardNode?.(card.id, node);
-    },
-    [card.id, registerCardNode, setNodeRef]
-  );
-
   return (
     <div
       ref={handleNodeRef}
@@ -634,22 +740,25 @@ function SortableBoardCard({
       role="listitem"
       className="w-full min-w-0 max-w-full shrink-0"
     >
-      <BoardCardRow
-        card={card}
-        currentUserId={currentUserId}
-        cardContentPermissions={cardContentPermissions}
-        boardLabels={boardLabels}
-        previewItems={previewItems}
-        fieldDefinitions={fieldDefinitions}
-        memberNamesById={memberNamesById}
-        memberAvatarsById={memberAvatarsById}
-        onOpen={onOpen}
-        sortableDragSurface={
-          enableDrag ? { attributes, listeners, setActivatorNodeRef } : undefined
-        }
-        isSortableDragging={enableDrag && isDragging}
-        shouldSuppressCardModalOpenClick={shouldSuppressCardModalOpenClick}
-      />
+      {showListPlaceholder ?
+        <BoardCardInsertSlot heightPx={listDragPlaceholderHeightPx} />
+      : <BoardCardRow
+          card={card}
+          currentUserId={currentUserId}
+          cardContentPermissions={cardContentPermissions}
+          boardLabels={boardLabels}
+          previewItems={previewItems}
+          fieldDefinitions={fieldDefinitions}
+          memberNamesById={memberNamesById}
+          memberAvatarsById={memberAvatarsById}
+          onOpen={onOpen}
+          sortableDragSurface={
+            enableDrag ? { attributes, listeners, setActivatorNodeRef } : undefined
+          }
+          isSortableDragging={enableDrag && isDragging}
+          shouldSuppressCardModalOpenClick={shouldSuppressCardModalOpenClick}
+        />
+      }
     </div>
   );
 }
@@ -695,7 +804,9 @@ function SortableColumnShell({
   columnSortableEnabled,
   onOpenCard,
   shouldSuppressCardModalOpenClick,
-  registerCardNode
+  registerCardNode,
+  cardDragOverlay,
+  cardOrderByColumn
 }: {
   boardId: string;
   currentUserId: string;
@@ -718,6 +829,8 @@ function SortableColumnShell({
   onOpenCard: (card: BoardCardListItem) => void;
   shouldSuppressCardModalOpenClick: () => boolean;
   registerCardNode?: (cardId: string, node: HTMLDivElement | null) => void;
+  cardDragOverlay: CardDragOverlayState | null;
+  cardOrderByColumn: Record<string, string[]>;
 }) {
   const colDragId = columnDndId(col.id);
   const {
@@ -747,6 +860,43 @@ function SortableColumnShell({
 
   const cards = cardIds.map((id) => cardsById.get(id)).filter(Boolean) as BoardCardListItem[];
 
+  const useSlotProjection = canMoveCards && cardDragOverlay != null;
+  const displayFlow =
+    useSlotProjection && cardDragOverlay ?
+      buildCardDisplayFlowForColumn(
+        col.id,
+        cardOrderByColumn,
+        cardDragOverlay.activeCardId,
+        cardDragOverlay.lastValidSlot
+      )
+    : null;
+  const floatingAnchorCard =
+    useSlotProjection && cardDragOverlay && col.id === cardDragOverlay.sourceColumnId ?
+      (cardsById.get(cardDragOverlay.activeCardId) ?? null)
+    : null;
+  const isPersistedEmptyColumn = cards.length === 0;
+  const showEmptyColumnHint =
+    displayFlow != null ?
+      displayFlow.length === 0 && !(cardDragOverlay && isPersistedEmptyColumn)
+    : cards.length === 0;
+
+  const sortableCardProps = {
+    currentUserId,
+    cardContentPermissions,
+    boardLabels,
+    previewItems,
+    fieldDefinitions,
+    memberNamesById,
+    memberAvatarsById,
+    onOpen: onOpenCard,
+    enableDrag: canMoveCards,
+    shouldSuppressCardModalOpenClick,
+    registerCardNode
+  } as const;
+
+  const showBottomEmptyColumnDrop =
+    canMoveCards && !(cardDragOverlay && isPersistedEmptyColumn);
+
   return (
     <div
       ref={setNodeRef}
@@ -772,31 +922,61 @@ function SortableColumnShell({
       />
       <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {floatingAnchorCard ?
+            <SortableBoardCard
+              key={floatingAnchorCard.id}
+              card={floatingAnchorCard}
+              {...sortableCardProps}
+              floatingSourceAnchor
+            />
+          : null}
           <div className="board-column-cards-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1" role="list">
-            {cards.map((card) => (
-              <SortableBoardCard
-                key={card.id}
-                card={card}
-                currentUserId={currentUserId}
-                cardContentPermissions={cardContentPermissions}
-                boardLabels={boardLabels}
-                previewItems={previewItems}
-                fieldDefinitions={fieldDefinitions}
-                memberNamesById={memberNamesById}
-                memberAvatarsById={memberAvatarsById}
-                onOpen={onOpenCard}
-                enableDrag={canMoveCards}
-                shouldSuppressCardModalOpenClick={shouldSuppressCardModalOpenClick}
-                registerCardNode={registerCardNode}
-              />
-            ))}
-            {cards.length === 0 ?
+            {displayFlow != null && cardDragOverlay ?
+              <>
+                {displayFlow.map((row) => {
+                  if (row.kind === "slot") {
+                    return (
+                      <div key={BOARD_CARD_SLOT_LIST_KEY} role="listitem">
+                        {isPersistedEmptyColumn ?
+                          <EmptyColumnCardDropSlot
+                            columnId={col.id}
+                            heightPx={cardDragOverlay.overlaySize.height}
+                          />
+                        : <BoardCardInsertSlot heightPx={cardDragOverlay.overlaySize.height} />}
+                      </div>
+                    );
+                  }
+                  const c = cardsById.get(row.id);
+                  return c ? <SortableBoardCard key={row.id} card={c} {...sortableCardProps} /> : null;
+                })}
+                {isPersistedEmptyColumn && displayFlow.length === 0 ?
+                  <div role="listitem">
+                    <EmptyColumnCardDropSlot
+                      columnId={col.id}
+                      heightPx={cardDragOverlay.overlaySize.height}
+                    />
+                  </div>
+                : null}
+              </>
+            : cards.map((card) => (
+                <SortableBoardCard
+                  key={card.id}
+                  card={card}
+                  {...sortableCardProps}
+                  listDragPlaceholderHeightPx={
+                    cardDragOverlay?.activeCardId === card.id ?
+                      cardDragOverlay.overlaySize.height
+                    : undefined
+                  }
+                />
+              ))}
+            {showEmptyColumnHint ?
               <div className="flex min-h-24 items-center justify-center rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
                 Пока нет карточек
               </div>
             : null}
           </div>
-          {canMoveCards ?
+          {showBottomEmptyColumnDrop ?
             <EmptyColumnDrop columnId={col.id} emphasized={cards.length === 0} />
           : null}
         </div>
@@ -834,7 +1014,9 @@ function StaticColumnShell({
   memberAvatarsById,
   onOpenCard,
   shouldSuppressCardModalOpenClick,
-  registerCardNode
+  registerCardNode,
+  cardDragOverlay,
+  cardOrderByColumn
 }: {
   boardId: string;
   currentUserId: string;
@@ -856,8 +1038,47 @@ function StaticColumnShell({
   onOpenCard: (card: BoardCardListItem) => void;
   shouldSuppressCardModalOpenClick: () => boolean;
   registerCardNode?: (cardId: string, node: HTMLDivElement | null) => void;
+  cardDragOverlay: CardDragOverlayState | null;
+  cardOrderByColumn: Record<string, string[]>;
 }) {
   const cards = cardIds.map((id) => cardsById.get(id)).filter(Boolean) as BoardCardListItem[];
+
+  const useSlotProjection = canMoveCards && cardDragOverlay != null;
+  const displayFlow =
+    useSlotProjection && cardDragOverlay ?
+      buildCardDisplayFlowForColumn(
+        col.id,
+        cardOrderByColumn,
+        cardDragOverlay.activeCardId,
+        cardDragOverlay.lastValidSlot
+      )
+    : null;
+  const floatingAnchorCard =
+    useSlotProjection && cardDragOverlay && col.id === cardDragOverlay.sourceColumnId ?
+      (cardsById.get(cardDragOverlay.activeCardId) ?? null)
+    : null;
+  const isPersistedEmptyColumn = cards.length === 0;
+  const showEmptyColumnHint =
+    displayFlow != null ?
+      displayFlow.length === 0 && !(cardDragOverlay && isPersistedEmptyColumn)
+    : cards.length === 0;
+
+  const sortableCardProps = {
+    currentUserId,
+    cardContentPermissions,
+    boardLabels,
+    previewItems,
+    fieldDefinitions,
+    memberNamesById,
+    memberAvatarsById,
+    onOpen: onOpenCard,
+    enableDrag: canMoveCards,
+    shouldSuppressCardModalOpenClick,
+    registerCardNode
+  } as const;
+
+  const showBottomEmptyColumnDrop =
+    canMoveCards && !(cardDragOverlay && isPersistedEmptyColumn);
 
   return (
     <div className={COLUMN_SHELL_CLASS} data-board-column-id={col.id}>
@@ -879,31 +1100,61 @@ function StaticColumnShell({
       />
       <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {floatingAnchorCard ?
+            <SortableBoardCard
+              key={floatingAnchorCard.id}
+              card={floatingAnchorCard}
+              {...sortableCardProps}
+              floatingSourceAnchor
+            />
+          : null}
           <div className="board-column-cards-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden pr-1" role="list">
-            {cards.map((card) => (
-              <SortableBoardCard
-                key={card.id}
-                card={card}
-                currentUserId={currentUserId}
-                cardContentPermissions={cardContentPermissions}
-                boardLabels={boardLabels}
-                previewItems={previewItems}
-                fieldDefinitions={fieldDefinitions}
-                memberNamesById={memberNamesById}
-                memberAvatarsById={memberAvatarsById}
-                onOpen={onOpenCard}
-                enableDrag={canMoveCards}
-                shouldSuppressCardModalOpenClick={shouldSuppressCardModalOpenClick}
-                registerCardNode={registerCardNode}
-              />
-            ))}
-            {cards.length === 0 ?
+            {displayFlow != null && cardDragOverlay ?
+              <>
+                {displayFlow.map((row) => {
+                  if (row.kind === "slot") {
+                    return (
+                      <div key={BOARD_CARD_SLOT_LIST_KEY} role="listitem">
+                        {isPersistedEmptyColumn ?
+                          <EmptyColumnCardDropSlot
+                            columnId={col.id}
+                            heightPx={cardDragOverlay.overlaySize.height}
+                          />
+                        : <BoardCardInsertSlot heightPx={cardDragOverlay.overlaySize.height} />}
+                      </div>
+                    );
+                  }
+                  const c = cardsById.get(row.id);
+                  return c ? <SortableBoardCard key={row.id} card={c} {...sortableCardProps} /> : null;
+                })}
+                {isPersistedEmptyColumn && displayFlow.length === 0 ?
+                  <div role="listitem">
+                    <EmptyColumnCardDropSlot
+                      columnId={col.id}
+                      heightPx={cardDragOverlay.overlaySize.height}
+                    />
+                  </div>
+                : null}
+              </>
+            : cards.map((card) => (
+                <SortableBoardCard
+                  key={card.id}
+                  card={card}
+                  {...sortableCardProps}
+                  listDragPlaceholderHeightPx={
+                    cardDragOverlay?.activeCardId === card.id ?
+                      cardDragOverlay.overlaySize.height
+                    : undefined
+                  }
+                />
+              ))}
+            {showEmptyColumnHint ?
               <div className="flex min-h-24 items-center justify-center rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
                 Пока нет карточек
               </div>
             : null}
           </div>
-          {canMoveCards ?
+          {showBottomEmptyColumnDrop ?
             <EmptyColumnDrop columnId={col.id} emphasized={cards.length === 0} />
           : null}
         </div>
@@ -1065,6 +1316,8 @@ export function BoardColumnsDnD({
   const [realtimeStatus, setRealtimeStatus] = React.useState<string>("connecting");
   const [realtimeError, setRealtimeError] = React.useState<string | null>(null);
   const [cardDragOverlay, setCardDragOverlay] = React.useState<CardDragOverlayState | null>(null);
+  const localRef = React.useRef(local);
+  localRef.current = local;
   const pendingColumnSignatureRef = React.useRef<string | null>(null);
   const pendingCardSignatureRef = React.useRef<string | null>(null);
   const refreshTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1789,15 +2042,50 @@ export function BoardColumnsDnD({
       return;
     }
 
+    const sourceColumnId = findColumnForCard(local.cardOrderByColumn, activeCardId);
+    if (!sourceColumnId || !visibleColumnIdsSet.has(sourceColumnId)) {
+      setCardDragOverlay(null);
+      return;
+    }
+    const sourceIndex = local.cardOrderByColumn[sourceColumnId]?.indexOf(activeCardId) ?? -1;
+    if (sourceIndex < 0) {
+      setCardDragOverlay(null);
+      return;
+    }
+
+    const initialSlot: CardSlotPosition = { columnId: sourceColumnId, index: sourceIndex };
     setCardDragOverlay({
       activeCardId,
       card: activeCard,
       overlaySize: {
         width: rect.width,
         height: rect.height
-      }
+      },
+      sourceColumnId,
+      sourceIndex,
+      currentSlot: initialSlot,
+      lastValidSlot: initialSlot
     });
-  }, [local.cardsById]);
+  }, [local.cardsById, local.cardOrderByColumn, visibleColumnIdsSet]);
+
+  const handleDragOver = React.useCallback(
+    (event: DragOverEvent) => {
+      if (isColumnDndId(event.active.id)) return;
+      const { over } = event;
+      setCardDragOverlay((prev) => {
+        if (!prev) return prev;
+        if (!over) return prev;
+        const t = resolveCardDropTarget(
+          over.id,
+          localRef.current.cardOrderByColumn,
+          visibleColumnIdsSet
+        );
+        if (!t) return prev;
+        return { ...prev, currentSlot: t, lastValidSlot: t };
+      });
+    },
+    [visibleColumnIdsSet]
+  );
 
   const handleDragCancel = (event: DragCancelEvent) => {
     dragInProgressRef.current = false;
@@ -2067,6 +2355,8 @@ export function BoardColumnsDnD({
               onOpenCard={(c) => setEditingCardId(c.id)}
               shouldSuppressCardModalOpenClick={shouldSuppressCardModalOpenClick}
               registerCardNode={registerCardNode}
+              cardDragOverlay={cardDragOverlay}
+              cardOrderByColumn={local.cardOrderByColumn}
             />
           ))}
         </div>
@@ -2095,6 +2385,8 @@ export function BoardColumnsDnD({
             onOpenCard={(c) => setEditingCardId(c.id)}
             shouldSuppressCardModalOpenClick={shouldSuppressCardModalOpenClick}
             registerCardNode={registerCardNode}
+            cardDragOverlay={cardDragOverlay}
+            cardOrderByColumn={local.cardOrderByColumn}
           />
         ))}
       </div>;
@@ -2129,6 +2421,7 @@ export function BoardColumnsDnD({
           sensors={sensors}
           collisionDetection={closestCorners}
           onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
           onDragCancel={handleDragCancel}
           onDragEnd={handleDragEnd}
         >

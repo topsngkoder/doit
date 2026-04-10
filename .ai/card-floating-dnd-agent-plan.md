@@ -100,6 +100,10 @@
 | 2026-04-10 | FDND2.3-hotfix | Исправлена сборка после шага FDND2.3: `handleDragStart` был объявлен как обычная функция с хвостом `, [local.cardsById]`, из-за чего Next.js падал с `Expected ',', got '.'`. Обработчик обёрнут в `React.useCallback(..., [local.cardsById])`; линтер по `board-columns-dnd.tsx` снова чистый. |
 | 2026-04-10 | FDND2.4 | В `SortableBoardCard` убран inline-drag визуал: при активном перетаскивании карточки (`enableDrag && isDragging`) слот-обёртка в списке с `opacity: 0` и `pointerEvents: none` без transform/zIndex/полупрозрачности; визуал только в `DragOverlay`. Для остальных элементов списка сохранён `transform` с `x: 0` против смещения по горизонтали. `tsc --noEmit` в `web` — ок. Миграции БД не требовались. |
 | 2026-04-10 | docs | Зафиксировано продуктовое уточнение: на мобильной версии карточка открепляется после длинного нажатия; с момента начала drag поведение как на десктопе. Добавлено §5.1.1 в `card-floating-dnd-specification.md`, пункт в §0 и уточнение к `TouchSensor` в §1.1 плана. |
+| 2026-04-10 | FDND3.1 | В `SortableBoardCard` при активном float-drag (`DragOverlay`) вместо невидимого `BoardCardRow` рендерится только зазор фиксированной высоты (`listDragPlaceholderHeightPx` из `cardDragOverlay.overlaySize`), без дублирования контента карточки в списке. Проп `cardDragOverlay` проведён в `SortableColumnShell` и `StaticColumnShell`. Fallback: если высота недоступна — прежний `opacity: 0` + `BoardCardRow`. `tsc --noEmit` в `web` — ок. Миграции БД не требовались. |
+| 2026-04-10 | FDND3.2 | В `board-columns-dnd.tsx` введён общий компонент `BoardCardInsertSlot`: `heightPx` из снимка overlay, ширина как у карточки в колонке (`w-full min-w-0 max-w-full shrink-0`), вертикальные промежутки — за счёт `gap-2` у `.board-column-cards-scroll`. `SortableBoardCard` использует его вместо инлайн-div. Импорт `cn` из `@/lib/utils`. `tsc --noEmit` в `web` — ок. Миграции БД не требовались. |
+| 2026-04-10 | FDND3.3 | Расширен `CardDragOverlayState`: `sourceColumnId`, `sourceIndex`, `currentSlot`/`lastValidSlot`. Добавлены `buildCardDisplayFlowForColumn`, `onDragOver` → `resolveCardDropTarget` + обновление `lastValidSlot`. Во время drag список рендерится по производному flow (stripped `activeCardId` + один `BoardCardInsertSlot`); для `useSortable` активной карточки — `floatingSourceAnchor` (фиксированный скрытый узел). Fallback без сессии — прежний путь с `listDragPlaceholderHeightPx`. Пустое состояние колонки учитывает `displayFlow.length === 0`. `tsc --noEmit` в `web` — ок. Миграции БД не требовались. |
+| 2026-04-10 | FDND3.4 | Для колонок без карточек (`cards.length === 0`) во время card-drag: droppable `empty-${columnId}` перенесён на `EmptyColumnCardDropSlot` (обёртка `BoardCardInsertSlot` с той же высотой, что overlay). Нижний `EmptyColumnDrop` в этот момент не рендерится — без дублирования id. Если slot в другой колонке — в пустой колонке показывается один полноразмерный droppable-slot; подсказка «Пока нет карточек» в этом режиме скрыта. Непустые колонки: slot в списке без `empty-`, нижняя полоса `EmptyColumnDrop` как раньше. `tsc --noEmit` в `web` — ок. Миграции БД не требовались. |
 
 ### EPIC FDND1 - Зафиксировать целевой drag-session contract
 - [x] **FDND1.1 (done)** Документировать текущую точку расхождения с overlay-моделью
@@ -204,25 +208,29 @@
   - Сделано: для **активной** перетаскиваемой карточки inline `transform`/полупрозрачность не применяются — только невидимый якорь; `x: 0` остаётся для **прочих** sortable-карточек в колонке во время чужого reorder-preview (см. комментарий в коде).
 
 ### EPIC FDND3 - Скрыть исходную карточку и ввести единый slot вставки
-- [ ] **FDND3.1 (todo)** Скрыть исходную карточку как обычный элемент списка на время drag
+- [x] **FDND3.1 (done)** Скрыть исходную карточку как обычный элемент списка на время drag
   - активная карточка не должна визуально рендериться на старом месте;
   - в списке остаётся только slot, если он указывает на исходную позицию;
   - **DoD**: на доске никогда нет двух видимых экземпляров одной карточки.
-- [ ] **FDND3.2 (todo)** Создать компонент slot вставки
+  - Сделано: на исходном месте — placeholder той же высоты, что overlay; `BoardCardRow` в этой ячейке не рендерится на время drag (контент только в `DragOverlay`).
+- [x] **FDND3.2 (done)** Создать компонент slot вставки
   - отдельный placeholder-компонент для всех колонок;
   - высота = зафиксированная высота активной карточки;
   - ширина = обычная ширина карточки текущей колонки;
   - вертикальные отступы = обычный межкарточный gap;
   - **DoD**: slot визуально занимает то место, куда реально встанет карточка.
-- [ ] **FDND3.3 (todo)** Сделать slot единственным источником будущей позиции
+  - Сделано: `BoardCardInsertSlot` в `board-columns-dnd.tsx` с пропом `heightPx` и опциональным `className`; стили совпадают с прежним dashed-placeholder; подключён в активной ветке `SortableBoardCard`.
+- [x] **FDND3.3 (done)** Сделать slot единственным источником будущей позиции
   - в каждый момент drag существует ровно один slot;
   - slot с начала drag стоит на исходной позиции;
   - при смене позиции slot немедленно переезжает;
   - **DoD**: нет двойных placeholder-элементов и нет фантомных пустот.
-- [ ] **FDND3.4 (todo)** Выровнять сценарий пустой колонки
+  - Сделано: один slot по `lastValidSlot` в `buildCardDisplayFlowForColumn`; старт = `sourceIndex`/`sourceColumnId`; обновление через `onDragOver` и `resolveCardDropTarget` (без FDND4.2 — грубее, чем верх/низ половины карточки). Активная карточка в потоке списка не дублируется — только anchor + overlay.
+- [x] **FDND3.4 (done)** Выровнять сценарий пустой колонки
   - пустая колонка должна показывать полноценный slot карточечного размера;
   - старый `EmptyColumnDrop` либо переиспользовать, либо заменить новой общей моделью;
   - **DoD**: пустая колонка ведёт себя как обычная валидная цель вставки, а не как отдельный особый режим с урезанным placeholder.
+  - Сделано: `EmptyColumnCardDropSlot` + скрытие нижнего `EmptyColumnDrop` при активном card-drag для пустых колонок; подсказка «Пока нет карточек» не перекрывает зону drop в этом режиме.
 
 ### EPIC FDND4 - Реализовать вычисление slot позиции во время drag
 - [ ] **FDND4.1 (todo)** Перенести вычисление card target из `onDragEnd` в активную фазу drag
