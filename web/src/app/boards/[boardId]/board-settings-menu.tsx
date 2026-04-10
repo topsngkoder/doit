@@ -34,6 +34,7 @@ export function BoardSettingsMenu({
   const [menuOpen, setMenuOpen] = React.useState(false);
   const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuRootRef = React.useRef<HTMLDivElement>(null);
+  const suppressOpenUntilRef = React.useRef(0);
   const hasAnySettings =
     canManageBoardLabels || canManageCardFields || canManageCardPreview || canChangeBoardBackground;
 
@@ -44,6 +45,7 @@ export function BoardSettingsMenu({
   }, []);
 
   const openMenu = React.useCallback(() => {
+    if (Date.now() < suppressOpenUntilRef.current) return;
     clearCloseTimer();
     setMenuOpen(true);
   }, [clearCloseTimer]);
@@ -54,6 +56,13 @@ export function BoardSettingsMenu({
       setMenuOpen(false);
       closeTimerRef.current = null;
     }, 120);
+  }, [clearCloseTimer]);
+
+  const closeMenuFromAction = React.useCallback(() => {
+    // После клика по пункту не даем hover/focus мгновенно переоткрыть меню.
+    suppressOpenUntilRef.current = Date.now() + 250;
+    clearCloseTimer();
+    setMenuOpen(false);
   }, [clearCloseTimer]);
 
   React.useEffect(() => {
@@ -69,6 +78,7 @@ export function BoardSettingsMenu({
       if (!target) return;
       if (menuRootRef.current && !menuRootRef.current.contains(target)) {
         clearCloseTimer();
+        suppressOpenUntilRef.current = Date.now() + 150;
         setMenuOpen(false);
       }
     };
@@ -115,7 +125,7 @@ export function BoardSettingsMenu({
               labels={boardLabels}
               triggerVariant="ghost"
               triggerClassName="w-full justify-start whitespace-nowrap cursor-pointer hover:bg-app-surface-muted"
-              onTriggerClick={() => setMenuOpen(false)}
+              onTriggerClick={closeMenuFromAction}
             />
           </div>
           <div className={itemRevealClass()} style={{ transitionDelay: menuOpen ? "45ms" : "0ms" }}>
@@ -125,7 +135,7 @@ export function BoardSettingsMenu({
               fieldDefinitions={fieldDefinitions}
               triggerVariant="ghost"
               triggerClassName="w-full justify-start whitespace-nowrap cursor-pointer hover:bg-app-surface-muted"
-              onTriggerClick={() => setMenuOpen(false)}
+              onTriggerClick={closeMenuFromAction}
             />
           </div>
           <div className={itemRevealClass()} style={{ transitionDelay: menuOpen ? "90ms" : "0ms" }}>
@@ -136,7 +146,7 @@ export function BoardSettingsMenu({
               fieldDefinitions={fieldDefinitions}
               triggerVariant="ghost"
               triggerClassName="w-full justify-start whitespace-nowrap cursor-pointer hover:bg-app-surface-muted"
-              onTriggerClick={() => setMenuOpen(false)}
+              onTriggerClick={closeMenuFromAction}
             />
           </div>
           <div className={itemRevealClass()} style={{ transitionDelay: menuOpen ? "135ms" : "0ms" }}>
@@ -146,7 +156,7 @@ export function BoardSettingsMenu({
               hasBackgroundImage={hasBackgroundImage}
               triggerVariant="ghost"
               triggerClassName="w-full justify-start whitespace-nowrap cursor-pointer hover:bg-app-surface-muted"
-              onTriggerClick={() => setMenuOpen(false)}
+              onTriggerClick={closeMenuFromAction}
             />
           </div>
         </div>

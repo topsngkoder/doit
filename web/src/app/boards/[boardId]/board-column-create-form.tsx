@@ -37,10 +37,11 @@ export function BoardColumnCreateForm({
   const [state, formAction] = React.useActionState(bound, initialState);
 
   React.useEffect(() => {
-    if (state.ok) {
-      onSuccess(state.newColumnId);
+    if (!state.ok) {
+      return;
     }
-  }, [state.ok, state.newColumnId, onSuccess]);
+    onSuccess(state.newColumnId);
+  }, [state, onSuccess]);
 
   return (
     <form action={formAction} className="space-y-3">
