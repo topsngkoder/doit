@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
 import {
   DndContext,
+  DragOverlay,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
@@ -81,6 +82,12 @@ type BoardLocalState = {
   columnItems: ColumnRow[];
   cardsById: Map<string, BoardCardListItem>;
   cardOrderByColumn: Record<string, string[]>;
+};
+
+type CardDragOverlayState = {
+  activeCardId: string;
+  card: BoardCardListItem;
+  overlaySize: { width: number; height: number };
 };
 
 type CardLayoutBroadcastPayload = {
@@ -277,7 +284,8 @@ function BoardCardRow({
   /** Только визуальный parity с drag-surface до mount `@dnd-kit` (см. `BoardGridStatic`, план DND7.1). Без listeners/attributes. */
   visualMoveSurface = false,
   isSortableDragging = false,
-  shouldSuppressCardModalOpenClick
+  shouldSuppressCardModalOpenClick,
+  disableOpen = false
 }: {
   card: BoardCardListItem;
   currentUserId: string;
@@ -297,8 +305,10 @@ function BoardCardRow({
   isSortableDragging?: boolean;
   /** Подавление открытия после завершённого drag карточки (хвостовой `click`). */
   shouldSuppressCardModalOpenClick?: () => boolean;
+  /** Overlay использует тот же визуальный компонент, но без открытия модалки. */
+  disableOpen?: boolean;
 }) {
-  const canOpen = canOpenCardModal(cardContentPermissions, card, currentUserId);
+  const canOpen = !disableOpen && canOpenCardModal(cardContentPermissions, card, currentUserId);
   // Матрица move × open (`canMoveCards` → sortableDragSurface или visualMoveSurface до mount, `canOpenCardModal` → canOpen), план DND3.x / DND6.x / DND7.1:
   // — sortableDragSurface && !canOpen: только drag, без открытия (DND3.2); tabIndex снят с последовательного фокуса (DND6.1).
   // — !sortableDragSurface && canOpen: клик/Enter/Space по всей поверхности, без drag listeners (DND3.3).
@@ -563,7 +573,8 @@ function SortableBoardCard({
   memberAvatarsById,
   onOpen,
   enableDrag,
-  shouldSuppressCardModalOpenClick
+  shouldSuppressCardModalOpenClick,
+  registerCardNode
 }: {
   card: BoardCardListItem;
   currentUserId: string;
@@ -576,6 +587,7 @@ function SortableBoardCard({
   onOpen: (card: BoardCardListItem) => void;
   enableDrag: boolean;
   shouldSuppressCardModalOpenClick: () => boolean;
+  registerCardNode?: (cardId: string, node: HTMLDivElement | null) => void;
 }) {
   const {
     attributes,
@@ -590,19 +602,34 @@ function SortableBoardCard({
     disabled: !enableDrag
   });
 
-  // Без DragOverlay активный элемент получает transform из useDraggable по обеим осям — карточка «уезжает» вправо/влево
-  // и ломает горизонтальную сетку колонки. Вертикальный список: только translateY (стратегия уже даёт x:0 для соседей).
-  const style: CSSProperties = {
-    transform:
-      transform ? CSS.Transform.toString({ ...transform, x: 0 }) : undefined,
-    transition,
-    opacity: isDragging ? 0.82 : 1,
-    zIndex: isDragging ? 20 : undefined
-  };
+  // Активная карточка рендерится в `DragOverlay`; в списке остаётся только невидимый якорь с прежней геометрией (место до slot в FDND3).
+  // Соседям по вертикали по-прежнему обнуляем translateX — иначе transform сортируемого списка «ломает» горизонтальную сетку колонки.
+  const isFloatingCardDrag = enableDrag && isDragging;
+  const style: CSSProperties =
+    isFloatingCardDrag ?
+      {
+        opacity: 0,
+        transition,
+        pointerEvents: "none"
+      }
+    : {
+        transform:
+          transform ? CSS.Transform.toString({ ...transform, x: 0 }) : undefined,
+        transition,
+        opacity: 1
+      };
+
+  const handleNodeRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      setNodeRef(node);
+      registerCardNode?.(card.id, node);
+    },
+    [card.id, registerCardNode, setNodeRef]
+  );
 
   return (
     <div
-      ref={setNodeRef}
+      ref={handleNodeRef}
       style={style}
       role="listitem"
       className="w-full min-w-0 max-w-full shrink-0"
@@ -620,7 +647,7 @@ function SortableBoardCard({
         sortableDragSurface={
           enableDrag ? { attributes, listeners, setActivatorNodeRef } : undefined
         }
-        isSortableDragging={isDragging}
+        isSortableDragging={enableDrag && isDragging}
         shouldSuppressCardModalOpenClick={shouldSuppressCardModalOpenClick}
       />
     </div>
@@ -667,7 +694,8 @@ function SortableColumnShell({
   memberAvatarsById,
   columnSortableEnabled,
   onOpenCard,
-  shouldSuppressCardModalOpenClick
+  shouldSuppressCardModalOpenClick,
+  registerCardNode
 }: {
   boardId: string;
   currentUserId: string;
@@ -689,6 +717,7 @@ function SortableColumnShell({
   columnSortableEnabled: boolean;
   onOpenCard: (card: BoardCardListItem) => void;
   shouldSuppressCardModalOpenClick: () => boolean;
+  registerCardNode?: (cardId: string, node: HTMLDivElement | null) => void;
 }) {
   const colDragId = columnDndId(col.id);
   const {
@@ -758,6 +787,7 @@ function SortableColumnShell({
                 onOpen={onOpenCard}
                 enableDrag={canMoveCards}
                 shouldSuppressCardModalOpenClick={shouldSuppressCardModalOpenClick}
+                registerCardNode={registerCardNode}
               />
             ))}
             {cards.length === 0 ?
@@ -803,7 +833,8 @@ function StaticColumnShell({
   memberNamesById,
   memberAvatarsById,
   onOpenCard,
-  shouldSuppressCardModalOpenClick
+  shouldSuppressCardModalOpenClick,
+  registerCardNode
 }: {
   boardId: string;
   currentUserId: string;
@@ -824,6 +855,7 @@ function StaticColumnShell({
   memberAvatarsById: Map<string, string | null>;
   onOpenCard: (card: BoardCardListItem) => void;
   shouldSuppressCardModalOpenClick: () => boolean;
+  registerCardNode?: (cardId: string, node: HTMLDivElement | null) => void;
 }) {
   const cards = cardIds.map((id) => cardsById.get(id)).filter(Boolean) as BoardCardListItem[];
 
@@ -862,6 +894,7 @@ function StaticColumnShell({
                 onOpen={onOpenCard}
                 enableDrag={canMoveCards}
                 shouldSuppressCardModalOpenClick={shouldSuppressCardModalOpenClick}
+                registerCardNode={registerCardNode}
               />
             ))}
             {cards.length === 0 ?
@@ -1031,10 +1064,12 @@ export function BoardColumnsDnD({
   const [dndMounted, setDndMounted] = React.useState(false);
   const [realtimeStatus, setRealtimeStatus] = React.useState<string>("connecting");
   const [realtimeError, setRealtimeError] = React.useState<string | null>(null);
+  const [cardDragOverlay, setCardDragOverlay] = React.useState<CardDragOverlayState | null>(null);
   const pendingColumnSignatureRef = React.useRef<string | null>(null);
   const pendingCardSignatureRef = React.useRef<string | null>(null);
   const refreshTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const dragInProgressRef = React.useRef(false);
+  const cardNodeByIdRef = React.useRef(new Map<string, HTMLDivElement>());
   /**
    * После drop/cancel drag карточки браузер (мышь или touch) может сгенерировать «хвостовой» click
    * на элемент под курсором — не открываем модалку, пока живёт это окно.
@@ -1100,6 +1135,14 @@ export function BoardColumnsDnD({
 
   const shouldSuppressCardModalOpenClick = React.useCallback(() => {
     return Date.now() < suppressCardModalOpenUntilMsRef.current;
+  }, []);
+
+  const registerCardNode = React.useCallback((cardId: string, node: HTMLDivElement | null) => {
+    if (node) {
+      cardNodeByIdRef.current.set(cardId, node);
+      return;
+    }
+    cardNodeByIdRef.current.delete(cardId);
   }, []);
 
   React.useEffect(() => {
@@ -1730,12 +1773,35 @@ export function BoardColumnsDnD({
     () => local.columnItems.filter((column) => visibleColumnIdsSet.has(column.id)),
     [local.columnItems, visibleColumnIdsSet]
   );
-  const handleDragStart = (_event: DragStartEvent) => {
+  const handleDragStart = React.useCallback((event: DragStartEvent) => {
     dragInProgressRef.current = true;
-  };
+    if (isColumnDndId(event.active.id)) {
+      setCardDragOverlay(null);
+      return;
+    }
+
+    const activeCardId = String(event.active.id);
+    const activeCard = local.cardsById.get(activeCardId) ?? null;
+    const cardNode = cardNodeByIdRef.current.get(activeCardId) ?? null;
+    const rect = cardNode?.getBoundingClientRect();
+    if (!activeCard || !rect || rect.width <= 0 || rect.height <= 0) {
+      setCardDragOverlay(null);
+      return;
+    }
+
+    setCardDragOverlay({
+      activeCardId,
+      card: activeCard,
+      overlaySize: {
+        width: rect.width,
+        height: rect.height
+      }
+    });
+  }, [local.cardsById]);
 
   const handleDragCancel = (event: DragCancelEvent) => {
     dragInProgressRef.current = false;
+    setCardDragOverlay(null);
     if (!isColumnDndId(event.active.id)) {
       suppressCardModalOpenUntilMsRef.current = Date.now() + CARD_DRAG_SUPPRESS_MODAL_OPEN_MS;
     }
@@ -1747,6 +1813,7 @@ export function BoardColumnsDnD({
 
   const handleDragEnd = async (event: DragEndEvent) => {
     dragInProgressRef.current = false;
+    setCardDragOverlay(null);
     const { active, over } = event;
     if (!isColumnDndId(active.id)) {
       suppressCardModalOpenUntilMsRef.current = Date.now() + CARD_DRAG_SUPPRESS_MODAL_OPEN_MS;
@@ -1999,6 +2066,7 @@ export function BoardColumnsDnD({
               columnSortableEnabled
               onOpenCard={(c) => setEditingCardId(c.id)}
               shouldSuppressCardModalOpenClick={shouldSuppressCardModalOpenClick}
+              registerCardNode={registerCardNode}
             />
           ))}
         </div>
@@ -2026,6 +2094,7 @@ export function BoardColumnsDnD({
             memberAvatarsById={memberAvatarsById}
             onOpenCard={(c) => setEditingCardId(c.id)}
             shouldSuppressCardModalOpenClick={shouldSuppressCardModalOpenClick}
+            registerCardNode={registerCardNode}
           />
         ))}
       </div>;
@@ -2064,6 +2133,29 @@ export function BoardColumnsDnD({
           onDragEnd={handleDragEnd}
         >
           {columnRow}
+          <DragOverlay>
+            {cardDragOverlay ?
+              <div
+                style={{
+                  width: cardDragOverlay.overlaySize.width,
+                  height: cardDragOverlay.overlaySize.height
+                }}
+              >
+                <BoardCardRow
+                  card={cardDragOverlay.card}
+                  currentUserId={currentUserId}
+                  cardContentPermissions={cardContentPermissions}
+                  boardLabels={boardLabels}
+                  previewItems={previewItems}
+                  fieldDefinitions={fieldDefinitions}
+                  memberNamesById={memberNamesById}
+                  memberAvatarsById={memberAvatarsById}
+                  onOpen={() => {}}
+                  disableOpen
+                />
+              </div>
+            : null}
+          </DragOverlay>
         </DndContext>
       </div>
     </div>

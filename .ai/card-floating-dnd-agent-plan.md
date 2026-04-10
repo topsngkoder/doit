@@ -20,6 +20,7 @@
 - После cancel карточка возвращается в исходную позицию, overlay и slot исчезают, модалка не открывается.
 - Автоскролл колонок/доски не добавляется.
 - Матрица прав и правила full-surface drag из `.ai/done/card-full-surface-dnd-agent-plan.md` сохраняются без расширения.
+- **Мобильная версия:** фактическое начало drag карточки — после **длинного нажатия** (активация touch-drag). **После отрыва карточки** поведение **то же**, что на десктопе: плавающий overlay, один slot, live-layout, drop/cancel — без отдельной «мобильной» ветки после старта сеанса (см. §5.1.1 в `.ai/card-floating-dnd-specification.md`).
 
 ## 1) Текущий технический контекст проекта
 
@@ -30,7 +31,7 @@
   - `BoardCardRow` уже является общим визуальным телом карточки;
   - есть full-surface drag activator, anti-click после drag, touch sensor, матрица `move x open`;
   - `PointerSensor` настроен как `distance: 8`;
-  - `TouchSensor` настроен как `delay: 250`, `tolerance: 8`;
+  - `TouchSensor` настроен как `delay: 250`, `tolerance: 8` — это **long-press** для старта drag на тач; после активации карточный сеанс визуально и логически должен совпадать с десктопом (overlay, slot и далее по плану).
   - `DndContext` уже использует `closestCorners`;
   - есть `onDragStart`, `onDragCancel`, `onDragEnd`;
   - локальный optimistic state хранит `columnItems`, `cardsById`, `cardOrderByColumn`.
@@ -90,13 +91,28 @@
 | Дата | Задача | Что сделано |
 |------|--------|-------------|
 | 2026-04-10 | FDND0 | Подготовлен агентный план на основе `.ai/card-floating-dnd-specification.md`, текущей реализации `board-columns-dnd.tsx`, `page.tsx` и ранее принятого full-surface DnD плана. |
+| 2026-04-10 | FDND1.1 | Подтверждено по `web/src/app/boards/[boardId]/board-columns-dnd.tsx`, что карточка сейчас живёт как `useSortable`-элемент списка без `DragOverlay`: визуальный drag строится через `transform`, `opacity`, `zIndex`, а reorder карточек вычисляется только в `onDragEnd` через `resolveCardDropTarget(...)` и `applyCardReorder(...)`. |
+| 2026-04-10 | FDND1.2 | Зафиксирован единый контракт `CardDragSession` (см. ниже под FDND1.2): поля, семантика `currentSlot` / `lastValidSlot`, снимок карточки для overlay, инварианты старта/конца сеанса. |
+| 2026-04-10 | FDND1.3 | Принята модель: `cardOrderByColumn` — истина до drop; производный `displayCardFlow` (strip `activeCardId` + один slot по `lastValidSlot`); индекс slot при старте = `sourceIndex`. |
+| 2026-04-10 | FDND2.1 | Выбран `DragOverlay` из `@dnd-kit/core` как базовая технология overlay: текущий `board-columns-dnd.tsx` уже централизует карточный drag в одном `DndContext`, а значит можно вынести активную карточку в верхний слой без отдельного portal-стека и без расширения архитектуры за пределы файла. Кастомный portal/fixed-layer не нужен на этом шаге и остаётся только запасным вариантом, если дальше вскроется несовместимость по позиционированию или clipping. |
+| 2026-04-10 | FDND2.2 | В `web/src/app/boards/[boardId]/board-columns-dnd.tsx` добавлен реестр DOM-узлов карточек (`registerCardNode` + `cardNodeByIdRef`) и снимок размеров активной карточки на `handleDragStart`: для карточного drag один раз читается `getBoundingClientRect()` и в state сохраняется `{ activeCardId, overlaySize: { width, height } }`; на `dragCancel/dragEnd` снимок очищается. Линтер по файлу чистый. |
+| 2026-04-10 | FDND2.3 | В `web/src/app/boards/[boardId]/board-columns-dnd.tsx` подключён `DragOverlay`, который рендерит тот же `BoardCardRow`, что и список, а не отдельную "облегчённую" карточку. Для overlay добавлен state со snapshot активной карточки (`cardDragOverlay`) и минимальный флаг `disableOpen`, чтобы overlay не открывал модалку и не вносил продуктового расхождения по интеракциям. Линтер по файлу чистый. |
+| 2026-04-10 | FDND2.3-hotfix | Исправлена сборка после шага FDND2.3: `handleDragStart` был объявлен как обычная функция с хвостом `, [local.cardsById]`, из-за чего Next.js падал с `Expected ',', got '.'`. Обработчик обёрнут в `React.useCallback(..., [local.cardsById])`; линтер по `board-columns-dnd.tsx` снова чистый. |
+| 2026-04-10 | FDND2.4 | В `SortableBoardCard` убран inline-drag визуал: при активном перетаскивании карточки (`enableDrag && isDragging`) слот-обёртка в списке с `opacity: 0` и `pointerEvents: none` без transform/zIndex/полупрозрачности; визуал только в `DragOverlay`. Для остальных элементов списка сохранён `transform` с `x: 0` против смещения по горизонтали. `tsc --noEmit` в `web` — ок. Миграции БД не требовались. |
+| 2026-04-10 | docs | Зафиксировано продуктовое уточнение: на мобильной версии карточка открепляется после длинного нажатия; с момента начала drag поведение как на десктопе. Добавлено §5.1.1 в `card-floating-dnd-specification.md`, пункт в §0 и уточнение к `TouchSensor` в §1.1 плана. |
 
 ### EPIC FDND1 - Зафиксировать целевой drag-session contract
-- [ ] **FDND1.1 (todo)** Документировать текущую точку расхождения с overlay-моделью
+- [x] **FDND1.1 (done)** Документировать текущую точку расхождения с overlay-моделью
   - подтвердить по коду, что сейчас активная карточка остаётся `useSortable`-элементом списка;
   - зафиксировать текущие места, где используются `opacity`, `zIndex`, `transform.x = 0`;
   - **DoD**: агент чётко понимает, какие куски старой inline-drag модели должны быть удалены/заменены.
-- [ ] **FDND1.2 (todo)** Спроектировать состояние одного drag-сеанса карточки
+  - Подтверждено: `SortableBoardCard` использует `useSortable({ id: card.id })` и рендерит карточку прямо как list-item внутри колонки, то есть активная карточка не вынесена в отдельный overlay.
+  - Подтверждено: inline-drag стиль карточки сейчас строится через `transform ? CSS.Transform.toString({ ...transform, x: 0 }) : undefined`, `opacity: isDragging ? 0.82 : 1`, `zIndex: isDragging ? 20 : undefined`.
+  - Подтверждено: `BoardCardRow` получает `isSortableDragging={isDragging}`, то есть визуальное состояние drag завязано на тот же элемент списка, а не на отдельную drag-session проекцию.
+  - Подтверждено: отдельный floating-layer / `DragOverlay` в файле пока не используется.
+  - Подтверждено: фактическая будущая позиция карточки вычисляется только в `handleDragEnd(...)` через `resolveCardDropTarget(...)`, после чего сразу мутируется `local.cardOrderByColumn` через `applyCardReorder(...)`; активной live-модели slot во время drag пока нет.
+  - Вывод для следующих шагов: заменить нужно не только визуальный стиль активной карточки, но и сам flow `active card in list -> drop-time reorder`, иначе overlay-модель останется поверх старой inline-drag логики.
+- [x] **FDND1.2 (done)** Спроектировать состояние одного drag-сеанса карточки
   - минимально определить:
     - `activeCardId`;
     - `sourceColumnId`;
@@ -106,7 +122,27 @@
     - `lastValidSlot { columnId, index }`;
     - при необходимости `draggedCardSnapshot`;
   - **DoD**: у новой логики есть один явный state contract, не размазанный по нескольким неявным ref.
-- [ ] **FDND1.3 (todo)** Выбрать модель рендера списка во время активного drag
+
+  **Контракт `CardDragSession` (одна сущность на сеанс, например `useState<CardDragSession | null>`):**
+
+  | Поле | Тип | Смысл |
+  |------|-----|--------|
+  | `activeCardId` | `string` | Id перетаскиваемой карточки; совпадает с `active.id` dnd-kit для карточного drag. |
+  | `sourceColumnId` | `string` | Колонка, откуда начали drag (из `local.cardOrderByColumn` на момент `onDragStart`). |
+  | `sourceIndex` | `number` | Индекс карточки в `cardOrderByColumn[sourceColumnId]` на момент старта; для cancel и проверок. |
+  | `overlaySize` | `{ width: number; height: number }` | Внешние размеры карточки в px, снятые один раз при фактическом старте drag; до `onDragEnd` / `onDragCancel` не пересчитываются. |
+  | `currentSlot` | `{ columnId: string; index: number }` | «Текущая цель» в терминах **виртуального списка** (после вынимания `activeCardId` из всех колонок): индекс — позиция **единственного** slot среди id карточек. Обновляется только когда hit-testing даёт **валидную** цель в разрешённой колонке. |
+  | `lastValidSlot` | `{ columnId: string; index: number }` | Последняя валидная позиция slot за сеанс; при уходе указателя с валидной зоны **не сбрасывается**. Рендер slot и fallback при `over === null` на drop опираются на это поле (и при необходимости синхронизируются с `currentSlot` при каждом валидном обновлении). |
+  | `draggedCardSnapshot` | `BoardCardListItem` (рекомендовано) | Глубокая копия или стабильный снимок полей, нужных `BoardCardRow` в overlay, на момент старта; защита от гонок с realtime/polling, не подменять контент overlay из «живой» карты во время drag. |
+
+  **Инварианты:**
+  - Пока `CardDragSession != null`, drag карточки активен: колоночный reorder по-прежнему может жить отдельно, но **источник правды по карточному slot** — только поля сеанса (не разносить дублирующие копии по ref без явной необходимости).
+  - В момент старта: `currentSlot` и `lastValidSlot` оба = `{ columnId: sourceColumnId, index: sourceIndex }` в координатах **stripped**-списка (см. FDND1.3): индекс совпадает с исходным индексом карточки в `cardOrderByColumn[sourceColumnId]`.
+  - На `onDragEnd` (успех): финальный layout для persist строится из **`lastValidSlot`** (и при валидном `over` — должен совпадать с тем, что показывал slot).
+  - На `onDragCancel`: сеанс сбрасывается в `null`; `local.cardOrderByColumn` для карточки не менялся оптимистично во время drag (только проекция отображения — см. FDND1.3).
+
+  **Вне контракта (намеренно):** глобальный `dragInProgressRef` и очередь refresh можно оставить как сейчас, но **не** дублировать в них `activeCardId` / slot — только флаги UX и интеграции с роутером.
+- [x] **FDND1.3 (done)** Выбрать модель рендера списка во время активного drag
   - рекомендованный вариант:
     - `cardOrderByColumn` продолжает описывать только реальные карточки;
     - для рендера вводится отдельный вычисляемый `displayOrderWithSlot`;
@@ -115,24 +151,57 @@
   - альтернативы не принимать без явной причины;
   - **DoD**: агент заранее знает, где живёт "истина" по реальным карточкам, а где только временная drag-проекция.
 
+  **Истина vs проекция**
+
+  | Слой | Данные | Пока идёт карточный drag |
+  |------|--------|---------------------------|
+  | Истина (persist / optimistic до сервера) | `local.cardOrderByColumn` | **Не менять** до успешного `reorderBoardCardsAction` на drop. Список по-прежнему содержит `activeCardId` в исходной колонке на исходном месте — так проще cancel, realtime и сравнение сигнатур без «фантомного» удаления карточки. |
+  | Проекция только для UI | вычисляемый `displayCardFlow` (в коде можно назвать `displayOrderWithSlot` или маппинг в массив строк) | Строится из `cardOrderByColumn` + `CardDragSession`: пользователь видит список **без** `activeCardId` и с **ровно одним** placeholder slot. |
+
+  **Алгоритм производной (на каждый рендер при активном сеансе):**
+
+  1. Для каждой колонки `colId`: `stripped[colId] = cardOrderByColumn[colId].filter(id => id !== activeCardId)`.
+  2. Взять `slot = lastValidSlot` (для отрисовки slot; при обновлении из hit-test сначала обновляют `currentSlot`, затем при валидном результате синхронизируют с `lastValidSlot` — как в FDND1.2).
+  3. В колонке `slot.columnId` вставить один элемент-placeholder на позицию `slot.index` в массиве `stripped[slot.columnId]` (после `splice`-вставки длина = число карточек в этой колонке минус active, если active был в этой колонке, плюс один slot; глобально на доске ровно один placeholder).
+  4. Рендер колонки идёт по элементам `displayFlow[colId]`: для id карточки — `SortableBoardCard` / обёртка; для placeholder — отдельный компонент slot (без дублирования `BoardCardRow` для active).
+
+  **Соглашение об индексе slot при старте drag:** если в истине `sourceIndex` — индекс `activeCardId` в `cardOrderByColumn[sourceColumnId]`, то после шага 1 тот же визуальный «зазор» в исходной колонке — это вставка slot на индекс `sourceIndex` в `stripped[sourceColumnId]`. Поэтому при инициализации сеанса: `currentSlot = lastValidSlot = { columnId: sourceColumnId, index: sourceIndex }`.
+
+  **Идентификатор slot для dnd-kit:** один стабильный reserved id на весь сеанс (например константа вроде `BOARD_CARD_SLOT_ITEM_ID`), не пересекающийся с uuid карточек; детали collision/droppable — в FDND3–FDND4.
+
+  **Запрещено:** смешивать placeholder внутрь `cardOrderByColumn` как псевдо-id карточки или заранее мутировать порядок id в истине до drop «ради превью» — превью только через `displayCardFlow`.
+
 ### EPIC FDND2 - Вынести активную карточку в отдельный overlay
-- [ ] **FDND2.1 (todo)** Выбрать конкретную технологию overlay
+- [x] **FDND2.1 (done)** Выбрать конкретную технологию overlay
   - предпочтительно: штатный `DragOverlay` из `@dnd-kit/core`;
   - допустимо: свой portal/fixed-layer, только если `DragOverlay` не укладывается в текущую архитектуру;
   - **DoD**: активная карточка рендерится вне потока колонки и поверх доски.
-- [ ] **FDND2.2 (todo)** Зафиксировать геометрию карточки на старте drag
+  - Решение: использовать `DragOverlay` из `@dnd-kit/core` как основной путь реализации.
+  - Обоснование: в `web/src/app/boards/[boardId]/board-columns-dnd.tsx` уже есть единый `DndContext` для карточек и колонок, поэтому overlay можно встроить локально в существующее дерево без вынесения drag-состояния в новый внешний слой.
+  - Обоснование: это минимально инвазивный путь к следующему шагу (`FDND2.2` / `FDND2.3`) и прямое закрытие текущего расхождения, где активная карточка пока живёт как тот же `useSortable`-элемент списка.
+  - Ограничение: custom portal/fixed-layer не принимается как основной вариант заранее; к нему возвращаемся только если практическая интеграция `DragOverlay` действительно упрётся в clipping/positioning, который нельзя решить локально.
+- [x] **FDND2.2 (done)** Зафиксировать геометрию карточки на старте drag
   - измерить внешнюю ширину и высоту карточки в момент реального старта drag;
   - сохранить эти размеры в drag-session state;
   - не пересчитывать размеры при переходе между колонками;
   - **DoD**: overlay-card имеет стабильные `width` и `height` до drop/cancel.
-- [ ] **FDND2.3 (todo)** Переиспользовать `BoardCardRow` для overlay без продуктового расхождения контента
+  - Реализация: `SortableBoardCard` теперь регистрирует свой корневой DOM-узел в родительский реестр через `registerCardNode(card.id, node)` без ломки существующего `setNodeRef` от `useSortable`.
+  - Реализация: в `handleDragStart(event)` для карточного drag ищется DOM-узел активной карточки и один раз снимается `getBoundingClientRect()`, после чего в React state сохраняется `{ activeCardId, overlaySize: { width, height } }`.
+  - Реализация: для column-drag измерение не выполняется; на `handleDragCancel` и `handleDragEnd` измерение очищается, чтобы размер жил только в рамках drag-сеанса.
+  - Ограничение текущего шага: сам `DragOverlay` ещё не подключён, размер пока только подготовлен и стабильно доступен для следующего шага.
+- [x] **FDND2.3 (done)** Переиспользовать `BoardCardRow` для overlay без продуктового расхождения контента
   - не создавать отдельную "облегчённую" карточку с другим набором полей;
   - разрешены только слой и тень как дополнительное визуальное усиление;
   - **DoD**: пользователь видит тот же объект, который взял с доски.
-- [ ] **FDND2.4 (todo)** Убрать старый inline-drag визуальный путь
+  - Реализация: в `DndContext` добавлен `DragOverlay`, внутри которого рендерится тот же `BoardCardRow`, что и в колонке.
+  - Реализация: overlay использует snapshot активной карточки, снятый на `dragStart`, поэтому содержимое не подменяется отдельной упрощённой структурой.
+  - Реализация: в `BoardCardRow` добавлен минимальный флаг `disableOpen`, чтобы overlay не открывал модалку и не создавал лишнюю интерактивность поверх drag-сеанса.
+  - Ограничение текущего шага: старая inline-drag визуализация ещё не удалена; её снятие остаётся отдельной задачей `FDND2.4`.
+- [x] **FDND2.4 (done)** Убрать старый inline-drag визуальный путь
   - удалить зависимость на `transform.x = 0` как основной workaround для card-drag;
   - перестать делать активную карточку "полупрозрачной карточкой в колонке";
   - **DoD**: больше нет ощущения, что карточка живёт в старой колонке до drop.
+  - Сделано: для **активной** перетаскиваемой карточки inline `transform`/полупрозрачность не применяются — только невидимый якорь; `x: 0` остаётся для **прочих** sortable-карточек в колонке во время чужого reorder-preview (см. комментарий в коде).
 
 ### EPIC FDND3 - Скрыть исходную карточку и ввести единый slot вставки
 - [ ] **FDND3.1 (todo)** Скрыть исходную карточку как обычный элемент списка на время drag
