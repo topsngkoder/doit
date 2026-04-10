@@ -143,13 +143,13 @@ export function BoardLabelsButton({
       </Button>
       <Modal open={open} title="Метки доски" onClose={() => setOpen(false)} className="max-w-md">
         <div className="flex max-h-[min(70vh,520px)] flex-col gap-4 overflow-hidden">
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-app-secondary">
             Метки общие для доски. После создания их можно назначать на карточки в модальном окне карточки.
           </p>
-          <form onSubmit={handleCreate} className="shrink-0 space-y-2 rounded-lg border border-slate-800/90 bg-slate-900/40 p-3">
-            <p className="text-xs font-medium text-slate-300">Новая метка</p>
+          <form onSubmit={handleCreate} className="surface-muted shrink-0 space-y-2 rounded-lg border p-3">
+            <p className="text-xs font-medium text-app-primary">Новая метка</p>
             <label className="flex flex-col gap-1">
-              <span className="text-xs text-slate-400">Название (1–30 символов)</span>
+              <span className="text-xs text-app-secondary">Название (1–30 символов)</span>
               <input
                 className={inputClass}
                 value={name}
@@ -161,15 +161,15 @@ export function BoardLabelsButton({
               />
             </label>
             <label className="flex items-center gap-3">
-              <span className="text-xs text-slate-400">Цвет</span>
+              <span className="text-xs text-app-secondary">Цвет</span>
               <input
                 type="color"
                 value={color}
                 onChange={(e) => setColor(e.target.value)}
                 disabled={pending}
-                className="h-9 w-14 cursor-pointer rounded border border-slate-600 bg-slate-900"
+                className="h-9 w-14 cursor-pointer rounded border border-app-default bg-app-surface"
               />
-              <span className="font-mono text-xs text-slate-500">{color.toUpperCase()}</span>
+              <span className="font-mono text-xs text-app-tertiary">{color.toUpperCase()}</span>
             </label>
             <div className="flex justify-end pt-1">
               <Button type="submit" size="sm" disabled={pending}>
@@ -179,19 +179,19 @@ export function BoardLabelsButton({
           </form>
 
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <p className="mb-2 text-xs font-medium text-slate-300">Текущие метки</p>
+            <p className="mb-2 text-xs font-medium text-app-primary">Текущие метки</p>
             {sorted.length === 0 ?
-              <p className="text-xs text-slate-500">Пока ни одной — добавьте выше.</p>
+              <p className="text-xs text-app-tertiary">Пока ни одной — добавьте выше.</p>
             : <ul className="space-y-1.5">
                 {sorted.map((l, idx) => (
                   <li
                     key={l.id}
-                    className="rounded-md border border-slate-800 bg-slate-900/50 px-2 py-1.5"
+                    className="rounded-md border border-app-default bg-app-surface px-2 py-1.5"
                   >
                     {editingId === l.id ?
                       <div className="space-y-2">
                         <label className="flex flex-col gap-1">
-                          <span className="text-xs text-slate-400">Название</span>
+                          <span className="text-xs text-app-secondary">Название</span>
                           <input
                             className={inputClass}
                             value={editingName}
@@ -201,15 +201,15 @@ export function BoardLabelsButton({
                           />
                         </label>
                         <label className="flex items-center gap-3">
-                          <span className="text-xs text-slate-400">Цвет</span>
+                          <span className="text-xs text-app-secondary">Цвет</span>
                           <input
                             type="color"
                             value={editingColor}
                             onChange={(e) => setEditingColor(e.target.value)}
                             disabled={editPendingId !== null}
-                            className="h-8 w-12 cursor-pointer rounded border border-slate-600 bg-slate-900"
+                            className="h-8 w-12 cursor-pointer rounded border border-app-default bg-app-surface"
                           />
-                          <span className="font-mono text-xs text-slate-500">{editingColor.toUpperCase()}</span>
+                          <span className="font-mono text-xs text-app-tertiary">{editingColor.toUpperCase()}</span>
                         </label>
                         <div className="flex flex-wrap justify-end gap-2">
                           <Button
@@ -238,7 +238,7 @@ export function BoardLabelsButton({
                             style={{ backgroundColor: l.color }}
                             aria-hidden
                           />
-                          <span className="truncate text-sm text-slate-100">{l.name}</span>
+                          <span className="truncate text-sm text-app-primary">{l.name}</span>
                         </div>
                         <div className="flex shrink-0 items-center gap-1">
                           <Button
@@ -274,7 +274,7 @@ export function BoardLabelsButton({
                             type="button"
                             variant="secondary"
                             size="sm"
-                            className="text-rose-200 hover:bg-rose-950/40"
+                            className="text-[color:var(--danger-subtle-text)] hover:bg-[color:var(--danger-subtle-bg)]"
                             disabled={deletePendingId !== null || pending || movePendingId !== null}
                             onClick={() => void handleDelete(l.id)}
                           >
@@ -288,7 +288,7 @@ export function BoardLabelsButton({
           </div>
 
           {error ?
-            <p className="shrink-0 text-sm text-rose-400" role="alert">
+            <p className="shrink-0 text-sm text-app-validation-error" role="alert">
               {error}
             </p>
           : null}

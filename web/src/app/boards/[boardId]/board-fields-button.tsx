@@ -146,17 +146,17 @@ export function BoardFieldsButton({
       </Button>
       <Modal open={open} title="Поля доски" onClose={() => setOpen(false)} className="max-w-3xl">
         <div className="flex max-h-[min(80vh,700px)] flex-col gap-4 overflow-hidden">
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-app-secondary">
             Управляйте пользовательскими полями карточек: тип, обязательность и порядок.
           </p>
 
           <form
             onSubmit={(e) => void handleSubmitField(e)}
-            className="shrink-0 rounded-lg border border-slate-800/90 bg-slate-900/40 p-3"
+            className="surface-muted shrink-0 rounded-lg border p-3"
           >
             <div className="grid gap-2 md:grid-cols-[2fr_1fr_auto]">
               <label className="flex flex-col gap-1">
-                <span className="text-xs text-slate-400">Название (1-50)</span>
+                <span className="text-xs text-app-secondary">Название (1-50)</span>
                 <input
                   className={inputClass}
                   value={form.name}
@@ -167,7 +167,7 @@ export function BoardFieldsButton({
                 />
               </label>
               <label className="flex flex-col gap-1">
-                <span className="text-xs text-slate-400">Тип</span>
+                <span className="text-xs text-app-secondary">Тип</span>
                 <select
                   className={inputClass}
                   value={form.fieldType}
@@ -186,10 +186,10 @@ export function BoardFieldsButton({
                   ))}
                 </select>
               </label>
-              <label className="mt-6 flex items-center gap-2 text-sm text-slate-200">
+              <label className="mt-6 flex items-center gap-2 text-sm text-app-primary">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 accent-sky-500"
+                  className="checkbox-app h-4 w-4"
                   checked={form.isRequired}
                   onChange={(e) => setForm((s) => ({ ...s, isRequired: e.target.checked }))}
                   disabled={pending}
@@ -216,9 +216,9 @@ export function BoardFieldsButton({
           </form>
 
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <p className="mb-2 text-xs font-medium text-slate-300">Текущие поля</p>
+            <p className="mb-2 text-xs font-medium text-app-primary">Текущие поля</p>
             {sorted.length === 0 ?
-              <p className="text-xs text-slate-500">Пока нет полей. Создайте первое поле выше.</p>
+              <p className="text-xs text-app-tertiary">Пока нет полей. Создайте первое поле выше.</p>
             : <ul className="space-y-2">
                 {sorted.map((field, index) => {
                   const optionDraft = optionDrafts[field.id] ?? {
@@ -231,14 +231,14 @@ export function BoardFieldsButton({
                   return (
                     <li
                       key={field.id}
-                      className="rounded-lg border border-slate-800 bg-slate-900/40 p-3"
+                      className="rounded-lg border border-app-default bg-app-surface p-3"
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-slate-100">
+                          <p className="truncate text-sm font-medium text-app-primary">
                             {field.name}
                           </p>
-                          <p className="text-xs text-slate-400">
+                          <p className="text-xs text-app-secondary">
                             {
                               FIELD_TYPE_OPTIONS.find((o) => o.value === field.fieldType)?.label
                             }{" "}
@@ -285,7 +285,7 @@ export function BoardFieldsButton({
                             type="button"
                             size="sm"
                             variant="secondary"
-                            className="text-rose-200 hover:bg-rose-950/40"
+                            className="text-[color:var(--danger-subtle-text)] hover:bg-[color:var(--danger-subtle-bg)]"
                             disabled={pending}
                             onClick={() =>
                               void withPending(() =>
@@ -299,13 +299,13 @@ export function BoardFieldsButton({
                       </div>
 
                       {field.fieldType === "select" ?
-                        <div className="mt-3 rounded-md border border-slate-800/80 bg-slate-950/40 p-2">
-                          <p className="mb-2 text-xs font-medium text-slate-300">
+                        <div className="mt-3 rounded-md border border-app-divider bg-app-surface-muted p-2">
+                          <p className="mb-2 text-xs font-medium text-app-primary">
                             Варианты списка
                           </p>
                           <div className="space-y-1.5">
                             {options.length === 0 ?
-                              <p className="text-xs text-slate-500">
+                              <p className="text-xs text-app-tertiary">
                                 Пока нет вариантов. Добавьте первый.
                               </p>
                             : options.map((opt, optIdx) => {
@@ -328,7 +328,7 @@ export function BoardFieldsButton({
                                       aria-hidden
                                     />
                                     <input
-                                      className="min-w-[140px] flex-1 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-slate-100"
+                                      className="field-base min-w-[140px] flex-1 px-2 py-1 text-xs"
                                       value={edit.name}
                                       maxLength={50}
                                       disabled={pending}
@@ -341,7 +341,7 @@ export function BoardFieldsButton({
                                     />
                                     <input
                                       type="color"
-                                      className="h-8 w-10 cursor-pointer rounded border border-slate-700 bg-slate-900"
+                                      className="h-8 w-10 cursor-pointer rounded border border-app-default bg-app-surface"
                                       value={edit.color}
                                       disabled={pending}
                                       onChange={(e) =>
@@ -409,7 +409,7 @@ export function BoardFieldsButton({
                                       type="button"
                                       size="sm"
                                       variant="secondary"
-                                      className="text-rose-200 hover:bg-rose-950/40"
+                                      className="text-[color:var(--danger-subtle-text)] hover:bg-[color:var(--danger-subtle-bg)]"
                                       disabled={pending}
                                       onClick={() =>
                                         void withPending(() =>
@@ -447,7 +447,7 @@ export function BoardFieldsButton({
                             />
                             <input
                               type="color"
-                              className="h-9 w-14 cursor-pointer rounded border border-slate-700 bg-slate-900"
+                              className="h-9 w-14 cursor-pointer rounded border border-app-default bg-app-surface"
                               value={optionDraft.color}
                               disabled={pending}
                               onChange={(e) =>
@@ -496,7 +496,7 @@ export function BoardFieldsButton({
           </div>
 
           {error ?
-            <p className="shrink-0 text-sm text-rose-400" role="alert">
+            <p className="shrink-0 text-sm text-app-validation-error" role="alert">
               {error}
             </p>
           : null}

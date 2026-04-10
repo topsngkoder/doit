@@ -135,7 +135,7 @@ export function BoardCardPreviewButton({
         className="max-w-3xl"
       >
         <div className="flex max-h-[min(80vh,700px)] flex-col gap-4 overflow-hidden">
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-app-secondary">
             Выберите, какие элементы показывать в карточках, и их порядок. Поле
             «Название» всегда включено и должно быть первым.
           </p>
@@ -150,19 +150,19 @@ export function BoardCardPreviewButton({
                 const isTitle = item.itemType === "title";
                 const canDelete = item.itemType === "custom_field";
                 return (
-                  <li key={item.id} className="rounded-lg border border-slate-800 bg-slate-900/40 p-3">
+                  <li key={item.id} className="rounded-lg border border-app-default bg-app-surface p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate text-base font-medium text-slate-100">
+                        <p className="truncate text-base font-medium text-app-primary">
                           {previewLabel(item.itemType)}
                           {fieldName ? `: ${fieldName}` : ""}
                         </p>
                       </div>
                       <div className="flex flex-wrap items-center gap-1">
-                        <label className="mr-1 flex items-center gap-2 text-sm text-slate-300">
+                        <label className="mr-1 flex items-center gap-2 text-sm text-app-secondary">
                           <input
                             type="checkbox"
-                            className="h-4 w-4 accent-sky-500"
+                            className="checkbox-app h-4 w-4"
                             checked={item.enabled}
                             disabled={pending || isTitle}
                             onChange={(e) =>
@@ -204,7 +204,7 @@ export function BoardCardPreviewButton({
                             type="button"
                             size="sm"
                             variant="secondary"
-                            className="text-rose-200 hover:bg-rose-950/40"
+                            className="text-[color:var(--danger-subtle-text)] hover:bg-[color:var(--danger-subtle-bg)]"
                             disabled={pending}
                             onClick={() =>
                               void withPending(() =>
@@ -223,8 +223,8 @@ export function BoardCardPreviewButton({
             </ul>
           </div>
 
-          <div className="shrink-0 rounded-lg border border-slate-800/90 bg-slate-900/40 p-3">
-            <p className="mb-2 text-sm font-medium text-slate-300">
+          <div className="surface-muted shrink-0 rounded-lg border p-3">
+            <p className="mb-2 text-sm font-medium text-app-primary">
               Добавить пользовательское поле в превью
             </p>
             <div className="grid gap-2 md:grid-cols-[1fr_auto]">
@@ -258,7 +258,7 @@ export function BoardCardPreviewButton({
           </div>
 
           {error ?
-            <p className="shrink-0 text-sm text-rose-400" role="alert">
+            <p className="shrink-0 text-sm text-app-validation-error" role="alert">
               {error}
             </p>
           : null}
