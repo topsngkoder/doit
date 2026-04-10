@@ -7,6 +7,7 @@ import {
   markAllInternalNotificationsReadAction,
   markInternalNotificationReadAction
 } from "./actions";
+import { NotificationsScrollShell } from "./notifications-scroll-shell";
 
 type NotificationsPageProps = {
   searchParams: Promise<{ error?: string }>;
@@ -49,7 +50,7 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
     "focus-ring-app rounded-md px-3 py-1.5 text-xs font-medium text-app-secondary transition-colors hover:bg-app-surface-muted hover:text-app-primary";
 
   return (
-    <main className="notifications-scroll-transparent mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-6 overflow-y-auto py-2">
+    <NotificationsScrollShell>
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight text-app-primary">
@@ -157,7 +158,7 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
           </ul>
         )}
       </section>
-    </main>
+    </NotificationsScrollShell>
   );
 }
 
