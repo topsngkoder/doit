@@ -33,6 +33,7 @@ export function BoardSettingsMenu({
 }: BoardSettingsMenuProps) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const menuRootRef = React.useRef<HTMLDivElement>(null);
   const hasAnySettings =
     canManageBoardLabels || canManageCardFields || canManageCardPreview || canChangeBoardBackground;
 
@@ -61,6 +62,24 @@ export function BoardSettingsMenu({
     };
   }, [clearCloseTimer]);
 
+  React.useEffect(() => {
+    if (!menuOpen) return;
+    const handlePointerDownOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (menuRootRef.current && !menuRootRef.current.contains(target)) {
+        clearCloseTimer();
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handlePointerDownOutside);
+    document.addEventListener("touchstart", handlePointerDownOutside);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDownOutside);
+      document.removeEventListener("touchstart", handlePointerDownOutside);
+    };
+  }, [menuOpen, clearCloseTimer]);
+
   if (!hasAnySettings) {
     return null;
   }
@@ -70,6 +89,7 @@ export function BoardSettingsMenu({
 
   return (
     <div
+      ref={menuRootRef}
       className="relative inline-block"
       onMouseEnter={openMenu}
       onMouseLeave={closeMenuWithDelay}
