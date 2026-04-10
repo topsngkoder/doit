@@ -99,11 +99,7 @@ export function BoardCanvas({
           cardContentPermissions={cardContentPermissions}
           columns={columns}
           visibleColumnIds={columns.map((column) => column.id)}
-          currentPage={0}
-          totalPages={1}
-          currentPageStartIndex={0}
           cardsByColumnId={cardsByColumnId}
-          onRequestPageChange={() => {}}
         />
       </div>
     </BoardBackgroundFrame>

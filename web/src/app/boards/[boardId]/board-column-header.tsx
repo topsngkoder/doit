@@ -23,10 +23,6 @@ type BoardColumnHeaderProps = {
   canRename: boolean;
   canReorder: boolean;
   canDelete: boolean;
-  canMoveToPrevPage?: boolean;
-  canMoveToNextPage?: boolean;
-  onMoveToPrevPage?: (() => Promise<void>) | null;
-  onMoveToNextPage?: (() => Promise<void>) | null;
   /** Ручка перетаскивания колонки (@dnd-kit); только при `canReorder`. */
   columnDrag?: {
     setActivatorNodeRef: (element: HTMLElement | null) => void;
@@ -115,10 +111,6 @@ export function BoardColumnHeader({
   canRename,
   canReorder,
   canDelete,
-  canMoveToPrevPage = false,
-  canMoveToNextPage = false,
-  onMoveToPrevPage = null,
-  onMoveToNextPage = null,
   columnDrag = null
 }: BoardColumnHeaderProps) {
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -126,7 +118,6 @@ export function BoardColumnHeader({
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [asyncError, setAsyncError] = React.useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = React.useState(false);
-  const [moveBusyDirection, setMoveBusyDirection] = React.useState<"prev" | "next" | null>(null);
   const menuRef = React.useRef<HTMLDivElement>(null);
 
   const closeMenu = React.useCallback(() => setMenuOpen(false), []);
@@ -157,27 +148,7 @@ export function BoardColumnHeader({
     }
   };
 
-  const handleMove = async (direction: "prev" | "next") => {
-    const handler = direction === "prev" ? onMoveToPrevPage : onMoveToNextPage;
-    if (!handler) return;
-    const canMove = direction === "prev" ? canMoveToPrevPage : canMoveToNextPage;
-    if (!canMove) return;
-    setAsyncError(null);
-    setMoveBusyDirection(direction);
-    try {
-      await handler();
-      closeMenu();
-    } catch (error) {
-      const message =
-        error instanceof Error && error.message ? error.message : "Не удалось переместить колонку.";
-      setAsyncError(message);
-    } finally {
-      setMoveBusyDirection(null);
-    }
-  };
-
-  const hasPageMoveActions = canReorder && (onMoveToPrevPage != null || onMoveToNextPage != null);
-  const showMenu = canRename || canDelete || hasPageMoveActions;
+  const showMenu = canRename || canDelete;
   const editFormKey = `${columnId}-${name}-${columnType}`;
 
   return (
@@ -240,26 +211,6 @@ export function BoardColumnHeader({
                       >
                         Изменить название и тип…
                       </button>
-                    ) : null}
-                    {hasPageMoveActions ? (
-                      <>
-                        <button
-                          type="button"
-                          className="flex w-full px-3 py-2 text-left text-app-secondary hover:bg-app-surface-muted hover:text-app-primary disabled:cursor-not-allowed disabled:opacity-50"
-                          onClick={() => void handleMove("prev")}
-                          disabled={!canMoveToPrevPage || moveBusyDirection != null}
-                        >
-                          {moveBusyDirection === "prev" ? "Перенос…" : "На предыдущий экран"}
-                        </button>
-                        <button
-                          type="button"
-                          className="flex w-full px-3 py-2 text-left text-app-secondary hover:bg-app-surface-muted hover:text-app-primary disabled:cursor-not-allowed disabled:opacity-50"
-                          onClick={() => void handleMove("next")}
-                          disabled={!canMoveToNextPage || moveBusyDirection != null}
-                        >
-                          {moveBusyDirection === "next" ? "Перенос…" : "На следующий экран"}
-                        </button>
-                      </>
                     ) : null}
                     {canDelete ? (
                       <button
