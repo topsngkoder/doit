@@ -67,7 +67,7 @@ function EditColumnForm({
   return (
     <form action={formAction} className="space-y-3">
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-slate-400">Название</span>
+        <span className="text-xs text-app-tertiary">Название</span>
         <input
           name="name"
           type="text"
@@ -78,7 +78,7 @@ function EditColumnForm({
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-slate-400">Тип колонки</span>
+        <span className="text-xs text-app-tertiary">Тип колонки</span>
         <select
           name="column_type"
           required
@@ -93,7 +93,7 @@ function EditColumnForm({
         </select>
       </label>
       {state.ok === false && state.message ? (
-        <p className="text-sm text-rose-400">{state.message}</p>
+        <p className="text-sm text-app-validation-error">{state.message}</p>
       ) : null}
       <div className="flex justify-end gap-2 pt-2">
         <EditSubmitButton />
@@ -158,7 +158,7 @@ export function BoardColumnHeader({
             <button
               type="button"
               ref={columnDrag.setActivatorNodeRef}
-              className="mt-0.5 shrink-0 cursor-grab touch-none rounded border border-transparent px-0.5 text-slate-500 hover:text-slate-300 active:cursor-grabbing"
+              className="mt-0.5 shrink-0 cursor-grab touch-none rounded border border-transparent px-0.5 text-app-tertiary hover:text-app-secondary active:cursor-grabbing"
               title="Перетащить колонку"
               aria-label="Перетащить колонку"
               {...columnDrag.attributes}
@@ -170,13 +170,13 @@ export function BoardColumnHeader({
             </button>
           : null}
           <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[18px] font-medium text-slate-100">{name}</h2>
+          <h2 className="truncate text-[18px] font-medium text-app-primary">{name}</h2>
           <div className="mt-0.5 flex flex-wrap items-center gap-2">
-            <span className="text-[10px] uppercase tracking-wide text-slate-500">
+            <span className="text-[10px] uppercase tracking-wide text-app-tertiary">
               {columnTypeLabel(columnType)}
             </span>
-            <span className="text-[10px] text-slate-600">·</span>
-            <span className="text-[10px] text-slate-500">{cardCount} карточек</span>
+            <span className="text-[10px] text-app-tertiary">·</span>
+            <span className="text-[10px] text-app-tertiary">{cardCount} карточек</span>
           </div>
           </div>
         </div>
@@ -188,7 +188,7 @@ export function BoardColumnHeader({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="h-7 w-7 p-0 text-slate-400 hover:text-slate-100"
+                  className="h-7 w-7 p-0 text-app-tertiary hover:text-app-primary"
                   aria-expanded={menuOpen}
                   aria-haspopup="true"
                   title="Действия с колонкой"
@@ -197,11 +197,11 @@ export function BoardColumnHeader({
                   ⋮
                 </Button>
                 {menuOpen ? (
-                  <div className="absolute right-0 z-20 mt-1 min-w-[180px] rounded-md border border-slate-800 bg-slate-950 py-1 text-xs shadow-lg">
+                  <div className="popup-panel absolute right-0 z-20 mt-1 min-w-[180px] py-1 text-xs shadow-[var(--shadow-card)]">
                     {canRename ? (
                       <button
                         type="button"
-                        className="flex w-full px-3 py-2 text-left text-slate-200 hover:bg-slate-800/90"
+                        className="flex w-full px-3 py-2 text-left text-app-secondary hover:bg-app-surface-muted hover:text-app-primary"
                         onClick={() => {
                           closeMenu();
                           setAsyncError(null);
@@ -214,7 +214,8 @@ export function BoardColumnHeader({
                     {canDelete ? (
                       <button
                         type="button"
-                        className="flex w-full px-3 py-2 text-left text-rose-300 hover:bg-slate-800/90"
+                        className="flex w-full px-3 py-2 text-left hover:bg-app-surface-muted"
+                        style={{ color: "var(--danger-subtle-text)" }}
                         onClick={() => {
                           closeMenu();
                           setAsyncError(null);
@@ -231,7 +232,7 @@ export function BoardColumnHeader({
           </div>
         ) : null}
       </div>
-      {asyncError ? <p className="text-xs text-rose-400">{asyncError}</p> : null}
+      {asyncError ? <p className="text-xs text-app-validation-error">{asyncError}</p> : null}
 
       <Modal open={editOpen} title="Колонка" onClose={() => setEditOpen(false)}>
         <EditColumnForm
@@ -242,7 +243,7 @@ export function BoardColumnHeader({
           initialType={columnType}
           onSuccess={() => setEditOpen(false)}
         />
-        <div className="mt-3 flex justify-end border-t border-slate-800 pt-3">
+        <div className="mt-3 flex justify-end border-t border-app-divider pt-3">
           <Button type="button" variant="ghost" size="sm" onClick={() => setEditOpen(false)}>
             Отмена
           </Button>
@@ -250,10 +251,10 @@ export function BoardColumnHeader({
       </Modal>
 
       <Modal open={deleteOpen} title="Удалить колонку?" onClose={() => setDeleteOpen(false)}>
-        <p className="text-sm text-slate-300">
+        <p className="text-sm text-app-secondary">
           Колонка «{name}» будет удалена. Удаление возможно только если в ней нет карточек.
         </p>
-        {asyncError ? <p className="mt-2 text-sm text-rose-400">{asyncError}</p> : null}
+        {asyncError ? <p className="mt-2 text-sm text-app-validation-error">{asyncError}</p> : null}
         <div className="mt-4 flex justify-end gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={() => setDeleteOpen(false)}>
             Отмена

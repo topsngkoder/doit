@@ -20,6 +20,8 @@
 - **2026-04-10** — **T16 DONE**: `notifications/settings/page.tsx` и `notification-settings-client.tsx` переведены на семантические токены §8.5/§9: заголовок/описание/ссылка «← Уведомления» на `text-app-*` + `focus-ring-app`; карточки настроек и таблица на `surface-card`, разделители `border-app-divider` / `--border-divider`; status-блоки браузерных уведомлений и автосохранения через `--success|warning|danger-subtle-*`; checkbox-контролы таблицы переведены на `.checkbox-app` (§7.3) с токенным accent/focus/disabled. Миграции БД не требовались.
 - **2026-04-10** — **T17 DONE**: `board-background-frame.tsx` — вуаль над фоновым изображением доски переведена на токен `--board-image-veil` внутри `linear-gradient(...)`, без изменений signed URL/caching логики. В `globals.css`: `:root` (dark) `--board-image-veil: rgba(2, 6, 23, 0.25)` (эквивалент текущего поведения), `html[data-theme="light"]` — `rgba(255, 255, 255, 0.18)` строго по §10. Пользовательский цвет/изображение доски не подменяются темой. Миграции БД не требовались.
 - **2026-04-10** — **T18 DONE**: board canvas/columns/cards переведены на семантические токены (§11): в `globals.css` добавлен `--board-column-bg` (dark: полупрозрачный тёмный, light: `rgba(255,255,255,0.88)`), в `board-columns-dnd.tsx` колонки стали `border-app-default` + `shadow-[var(--shadow-card)]` + `backdrop-blur`, карточки — `bg-app-surface` с границей/hover/focus по `--border-*`/`--focus-ring`, пустые состояния и DnD drop-zone на `border-app-divider`/`border-app-strong`. Кнопка `+ Карточка` (`create-card-modal.tsx`) переведена на токены (`bg-app-surface-muted`, `border-app-strong`, hover/focus). `board-column-header.tsx` и `add-board-column-button.tsx` — текст/ошибки/меню/разделители на `text-app-*`, `popup-panel`, `border-app-divider`. `page.tsx` заголовок доски — `text-app-primary`. Миграции БД не требовались.
+- **2026-04-10** — **T19 DONE**: цветные label/select chips приведены к правилу §12 (`16%` пользовательского цвета + базовая поверхность, с сохранением исходного цвета в границе): `board-columns-dnd.tsx` — primary-акцент карточки и chips меток/select-опций на `color-mix(... 16%, var(--bg-surface))`; `edit-card-modal.tsx` — chips меток карточки теперь border/background от цвета метки, меню выбора/замены меток переведены на `popup-panel` и токены текста/hover; `board-fields-button.tsx` — каталог select-опций визуализируется цветными chips-плашками с тем же правилом смешивания. Миграции БД не требовались.
+- **2026-04-10** — **T20 DONE**: card modal и комментарии переведены на светлый визуальный язык (§13) без изменения layout/логики: `edit-card-modal.tsx` — табы/заголовок/разделители/списки истории/секции полей/ошибки/деструктивные состояния на `text-app-*`, `border-app-*`, `bg-app-*`, `--warning|danger-subtle-*`; правая колонка вынесена на `bg-app-surface-muted` и `border-app-divider`. `card-comments-sidebar.tsx` — вся правая панель, reply-блоки, таймстемпы, действия `Ответить/Редактировать/Удалить`, ошибки и divider-ы на семантические токены. `create-card-modal.tsx` — подписи полей, link-блоки и ошибки синхронизированы с токенами модального слоя. Миграции БД не требовались.
 
 ## Назначение
 Этот документ предназначен для AI-агента, который будет внедрять требования из `.ai/light-theme-specification.md`.
@@ -588,6 +590,16 @@
 | `+ Карточка` | `create-card-modal.tsx` — токенные цвета/границы/hover/focus (`bg-app-surface-muted`, `border-app-strong`, `focus-ring-app`) |
 | Заголовки/меню колонок | `board-column-header.tsx`, `add-board-column-button.tsx` — `text-app-*`, `popup-panel`, `border-app-divider`; ошибки `text-app-validation-error` |
 
+## Результат T19 — цветные label/select chips
+
+| Что | Где |
+| --- | --- |
+| Метки в карточке доски | `board-columns-dnd.tsx` — chips меток `borderColor = label.color`, `background = color-mix(... 16%, var(--bg-surface))` |
+| Select-чипы в превью карточки | `board-columns-dnd.tsx` — chips select-опций с тем же правилом `16% + 84% surface` и текстом на `--text-primary` |
+| Primary-подсветка карточки по первой метке | `board-columns-dnd.tsx` — удалён hardcoded dark-mix, теперь `color-mix(... 16%, var(--bg-surface))` |
+| Метки в card modal | `edit-card-modal.tsx` — текущие метки карточки как цветные chips (цвет границы сохраняется), popups выбора/замены на `popup-panel` + токенный hover |
+| Каталог select-опций | `board-fields-button.tsx` — строки опций рендерятся цветными chips-плашками с сохранением исходного цвета |
+
 ---
 
 ## Трекер задач
@@ -612,8 +624,8 @@
 | T16 | DONE | Перевести настройки уведомлений и checkbox-like controls | `notifications/settings/*` | T06, T07, T08 | Табличные и карточные блоки работают в обеих темах |
 | T17 | DONE | Реализовать светлую вуаль над board image и сохранить пользовательские фоновые исключения | `board-background-frame.tsx` | T04, T05 | Изображение/цвет доски не ломаются, светлая вуаль есть только в `light` |
 | T18 | DONE | Перевести board canvas, колонки, карточки и `+ Карточка` | board UI файлы в `[boardId]` | T06, T08, T17 | Колонки и карточки читаемы на любом фоне |
-| T19 | TODO | Перевести цветные label/select chips по правилу `16% color + 84% white` | board/card/label/select related files | T18 | Цветные чипы соответствуют спецификации и не теряют пользовательский цвет |
-| T20 | TODO | Перевести card modal и связанные popup-поверхности на светлый визуальный язык | `edit-card-modal.tsx`, `card-comments-sidebar.tsx`, `create-card-modal.tsx`, др. board popups | T08, T18, T19 | Card modal сохраняет layout, но полностью светлая визуально |
+| T19 | DONE | Перевести цветные label/select chips по правилу `16% color + 84% white` | `board-columns-dnd.tsx`, `edit-card-modal.tsx`, `board-fields-button.tsx` | T18 | Цветные чипы соответствуют спецификации и не теряют пользовательский цвет |
+| T20 | DONE | Перевести card modal и связанные popup-поверхности на светлый визуальный язык | `edit-card-modal.tsx`, `card-comments-sidebar.tsx`, `create-card-modal.tsx`, др. board popups | T08, T18, T19 | Card modal сохраняет layout, но полностью светлая визуально |
 | T21 | TODO | Выровнять focus/hover/disabled states по всей затронутой UI-зоне | все затронутые UI и screen файлы | T06-T20 | Focus явно виден, disabled читаем, hover мягкий и заметный |
 | T22 | TODO | Финально вычистить hardcoded dark values из затронутых файлов | все изменённые файлы | T05-T21 | В затронутых местах не осталось жёстких тёмных поверхностей вне исключений |
 | T23 | TODO | Провести ручную регрессионную проверку `dark` и `light` на ключевых экранах | приложение целиком | T11-T22 | Обе темы работают без визуальных регрессий |

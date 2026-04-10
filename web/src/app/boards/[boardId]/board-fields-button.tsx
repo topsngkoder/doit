@@ -316,7 +316,11 @@ export function BoardFieldsButton({
                                 return (
                                   <div
                                     key={opt.id}
-                                    className="flex flex-wrap items-center gap-1 rounded border border-slate-800 px-2 py-1"
+                                    className="flex flex-wrap items-center gap-1 rounded border px-2 py-1"
+                                    style={{
+                                      borderColor: edit.color,
+                                      backgroundColor: `color-mix(in srgb, ${edit.color} 16%, var(--bg-surface))`
+                                    }}
                                   >
                                     <span
                                       className="h-3 w-3 rounded-full"

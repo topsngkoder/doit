@@ -42,7 +42,7 @@ function MemberAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string | 
     );
   }
   return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-800 text-xs font-medium text-slate-200">
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-app-surface-muted text-xs font-medium text-app-primary">
       {initial}
     </div>
   );
@@ -224,27 +224,27 @@ export function CardCommentsSidebar({
   };
 
   return (
-    <div className="flex min-h-[240px] flex-col overflow-visible bg-slate-950/50 md:h-full md:min-h-0 md:overflow-hidden">
-      <div className="shrink-0 border-b border-slate-800 px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-100">Комментарии</h3>
+    <div className="flex min-h-[240px] flex-col overflow-visible bg-app-surface-muted md:h-full md:min-h-0 md:overflow-hidden">
+      <div className="shrink-0 border-b border-app-divider px-4 py-3">
+        <h3 className="text-sm font-semibold text-app-primary">Комментарии</h3>
       </div>
 
       <form
         onSubmit={(e) => void handleSubmit(e)}
-        className="shrink-0 space-y-2 border-b border-slate-800 p-4"
+        className="shrink-0 space-y-2 border-b border-app-divider p-4"
       >
         {replyTarget ?
-          <div className="flex items-start justify-between gap-2 rounded-md bg-slate-900/80 px-2 py-1.5 text-xs text-slate-400">
+          <div className="flex items-start justify-between gap-2 rounded-md bg-app-surface px-2 py-1.5 text-xs text-app-secondary">
             <div className="min-w-0">
-              <span className="text-slate-500">Ответ на комментарий </span>
-              <span className="text-slate-300">
+              <span className="text-app-tertiary">Ответ на комментарий </span>
+              <span className="text-app-secondary">
                 {memberName(boardMembers, replyTarget.authorUserId)}
               </span>
-              <p className="truncate text-slate-500">{replyTarget.body}</p>
+              <p className="truncate text-app-tertiary">{replyTarget.body}</p>
             </div>
             <button
               type="button"
-              className="shrink-0 rounded p-0.5 text-slate-500 hover:text-slate-300"
+              className="shrink-0 rounded p-0.5 text-app-tertiary hover:text-app-secondary"
               onClick={() => setReplyToId(null)}
               aria-label="Сбросить ответ"
             >
@@ -272,15 +272,15 @@ export function CardCommentsSidebar({
 
       <div className="px-4 py-3 md:min-h-0 md:flex-1 md:overflow-y-auto">
         {loading ?
-          <p className="text-xs text-slate-500">Загрузка…</p>
+          <p className="text-xs text-app-tertiary">Загрузка…</p>
         : null}
         {error ?
-          <p className="text-xs text-rose-400" role="alert">
+          <p className="text-app-validation-error text-xs" role="alert">
             {error}
           </p>
         : null}
         {!loading && comments.length === 0 ?
-          <p className="text-xs text-slate-500">Пока нет комментариев</p>
+          <p className="text-xs text-app-tertiary">Пока нет комментариев</p>
         : null}
         <ul className="flex flex-col gap-4">
           {comments.map((c) => {
@@ -293,23 +293,23 @@ export function CardCommentsSidebar({
             const isPendingComment = mutatingCommentId === c.id;
 
             return (
-              <li key={c.id} className="border-b border-slate-800/80 pb-4 last:border-0 last:pb-0">
+              <li key={c.id} className="border-b border-app-divider pb-4 last:border-0 last:pb-0">
                 {parent ?
-                  <div className="mb-2 rounded bg-slate-900/50 px-2 py-1 text-xs text-slate-500">
+                  <div className="mb-2 rounded bg-app-surface px-2 py-1 text-xs text-app-tertiary">
                     <span>Ответ на комментарий </span>
-                    <span className="text-slate-400">
+                    <span className="text-app-secondary">
                       {memberName(boardMembers, parent.authorUserId)}
                     </span>
-                    <p className="truncate text-slate-600">{parent.body}</p>
+                    <p className="truncate text-app-tertiary">{parent.body}</p>
                   </div>
                 : null}
                 <div className="flex gap-2">
                   <MemberAvatar name={author} avatarUrl={av} />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
-                      <span className="text-sm font-medium text-slate-100">{author}</span>
+                      <span className="text-sm font-medium text-app-primary">{author}</span>
                       <time
-                        className="text-xs text-slate-500"
+                        className="text-xs text-app-tertiary"
                         dateTime={c.createdAt}
                         title={c.createdAt}
                       >
@@ -348,12 +348,12 @@ export function CardCommentsSidebar({
                           </Button>
                         </div>
                       </div>
-                    : <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-200">{c.body}</p>}
+                    : <p className="mt-1 whitespace-pre-wrap break-words text-sm text-app-primary">{c.body}</p>}
                     {!isEditing ?
                       <div className="mt-2 flex items-center gap-3">
                         <button
                           type="button"
-                          className="text-xs text-sky-500 hover:text-sky-400"
+                          className="text-xs text-app-link hover:text-[color:var(--text-link-hover)]"
                           onClick={() => handleReply(c.id)}
                         >
                           Ответить
@@ -361,7 +361,7 @@ export function CardCommentsSidebar({
                         {canEditThis ?
                           <button
                             type="button"
-                            className="text-xs text-slate-400 hover:text-slate-200"
+                            className="text-xs text-app-secondary hover:text-app-primary"
                             onClick={() => handleStartEdit(c)}
                             disabled={isPendingComment}
                           >
@@ -371,7 +371,7 @@ export function CardCommentsSidebar({
                         {canDeleteThis ?
                           <button
                             type="button"
-                            className="text-xs text-rose-400 hover:text-rose-300"
+                            className="text-xs text-[color:var(--danger-strong)] hover:text-[color:var(--danger-subtle-text)]"
                             onClick={() => void handleDelete(c.id)}
                             disabled={isPendingComment}
                           >

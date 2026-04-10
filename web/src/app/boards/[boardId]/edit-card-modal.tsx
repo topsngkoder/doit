@@ -93,7 +93,7 @@ function AssigneeAvatar({
   return (
     <div
       className={cn(
-        "flex items-center justify-center rounded-full bg-slate-700 font-medium text-slate-200",
+        "flex items-center justify-center rounded-full bg-app-surface-muted font-medium text-app-primary",
         className
       )}
       aria-hidden
@@ -428,8 +428,8 @@ export function EditCardModal({
         : <button
             type="button"
             className={cn(
-              "max-w-[min(100%,34rem)] truncate text-left text-base font-semibold text-slate-50",
-              canEditContent && !pending && "cursor-text hover:text-slate-200"
+              "max-w-[min(100%,34rem)] truncate text-left text-base font-semibold text-app-primary",
+              canEditContent && !pending && "cursor-text hover:text-app-secondary"
             )}
             onClick={() => {
               if (!canEditContent || pending) return;
@@ -441,7 +441,7 @@ export function EditCardModal({
           </button>
       }
       onClose={onClose}
-      headerClassName="border-b border-slate-800"
+      headerClassName="border-b border-app-divider"
       verticalAlign="custom"
       overlayClassName="items-center md:items-start md:pt-[7vh] xl:pt-[11vh]"
       className="max-w-none rounded-lg"
@@ -451,14 +451,14 @@ export function EditCardModal({
       <div className="flex flex-col md:min-h-0 md:flex-1 md:flex-row md:overflow-hidden xl:min-h-[420px]">
         <div className="flex w-full shrink-0 flex-col overflow-y-visible px-5 pb-5 pt-1 md:min-h-0 md:min-w-0 md:basis-2/3 md:grow-0 md:overflow-y-auto">
           <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+            <div className="flex items-center gap-2 border-b border-app-divider pb-2">
               <button
                 type="button"
                 className={cn(
                   "rounded-md px-2.5 py-1 text-xs font-medium",
                   activeTab === "details" ?
-                    "bg-slate-800 text-slate-100"
-                  : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                    "bg-app-surface-muted text-app-primary"
+                  : "text-app-secondary hover:bg-app-surface-muted hover:text-app-primary"
                 )}
                 onClick={() => setActiveTab("details")}
               >
@@ -469,8 +469,8 @@ export function EditCardModal({
                 className={cn(
                   "rounded-md px-2.5 py-1 text-xs font-medium",
                   activeTab === "history" ?
-                    "bg-slate-800 text-slate-100"
-                  : "text-slate-400 hover:bg-slate-900 hover:text-slate-200"
+                    "bg-app-surface-muted text-app-primary"
+                  : "text-app-secondary hover:bg-app-surface-muted hover:text-app-primary"
                 )}
                 onClick={() => setActiveTab("history")}
               >
@@ -500,15 +500,15 @@ export function EditCardModal({
                         className={cn(
                           "flex items-center justify-center rounded-full border p-1 text-left text-sm transition-colors",
                           isCardCreator ?
-                            "border-amber-400/90 bg-amber-950/20 text-amber-100"
-                          : "border-slate-700 bg-slate-900/80 text-slate-100 hover:border-slate-600"
+                            "border-[color:var(--warning-subtle-border)] bg-[color:var(--warning-subtle-bg)] text-[color:var(--warning-subtle-text)]"
+                          : "border-app-default bg-app-surface text-app-primary hover:border-app-strong"
                         )}
                         title={m.displayName}
                       >
                         <span className="relative flex items-center justify-center">
                           {isResponsible ?
                             <span
-                              className="pointer-events-none absolute -bottom-2.5 left-1/2 -translate-x-1/2 text-sky-200 drop-shadow-[0_0_4px_rgba(56,189,248,0.7)]"
+                              className="pointer-events-none absolute -bottom-2.5 left-1/2 -translate-x-1/2 text-[color:var(--info-strong)] drop-shadow-[0_0_4px_color-mix(in_srgb,var(--info-strong)_55%,transparent)]"
                               aria-hidden
                             >
                               <span className="text-sm leading-none">🛠️</span>
@@ -532,12 +532,12 @@ export function EditCardModal({
                                 className="h-12 w-12 shrink-0 text-sm"
                               />
                               <div className="min-w-0 flex-1">
-                                <p className="font-medium text-slate-100">{m.displayName}</p>
-                                <p className="break-all text-slate-400">{m.email}</p>
+                                <p className="font-medium text-app-primary">{m.displayName}</p>
+                                <p className="break-all text-app-secondary">{m.email}</p>
                               </div>
                             </div>
                             {showActions ?
-                              <div className="flex flex-col gap-1.5 border-t border-slate-800 pt-2">
+                              <div className="flex flex-col gap-1.5 border-t border-app-divider pt-2">
                                 {!isResponsible ?
                                   <Button
                                     type="button"
@@ -554,7 +554,7 @@ export function EditCardModal({
                                   type="button"
                                   variant="secondary"
                                   size="sm"
-                                  className="w-full justify-center text-rose-200 hover:bg-rose-950/50"
+                                  className="w-full justify-center text-[color:var(--danger-subtle-text)] hover:bg-[color:var(--danger-subtle-bg)]"
                                   disabled={assigneePending || selectedAssigneeIds.size <= 1}
                                   onClick={() => void toggleAssignee(m.userId)}
                                 >
@@ -574,19 +574,19 @@ export function EditCardModal({
             {activeTab === "history" ?
               <div className="space-y-2">
                 {card.activityEntries.length === 0 ?
-                  <p className="rounded-md border border-slate-800 bg-slate-900/50 px-3 py-2 text-sm text-slate-400">
+                  <p className="rounded-md border border-app-divider bg-app-surface-muted px-3 py-2 text-sm text-app-secondary">
                     История пока пуста.
                   </p>
                 : <ul className="space-y-2">
                     {card.activityEntries.map((entry) => (
                       <li
                         key={entry.id}
-                        className="rounded-md border border-slate-800 bg-slate-900/70 px-3 py-2"
+                        className="rounded-md border border-app-divider bg-app-surface px-3 py-2"
                       >
-                        <p className="text-sm text-slate-100">
+                        <p className="text-sm text-app-primary">
                           {entry.message || entry.activityType}
                         </p>
-                        <p className="mt-1 text-xs text-slate-500">
+                        <p className="mt-1 text-xs text-app-tertiary">
                           {entry.actorDisplayName} ·{" "}
                           {new Date(entry.createdAt).toLocaleString("ru-RU")}
                         </p>
@@ -598,7 +598,7 @@ export function EditCardModal({
             <div className="sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-start sm:gap-3">
               <label
                 htmlFor={`card-desc-${card.id}`}
-                className="mb-1 block pt-2 text-xs text-slate-400 sm:mb-0"
+                  className="mb-1 block pt-2 text-xs text-app-secondary sm:mb-0"
               >
                 Описание
               </label>
@@ -616,8 +616,8 @@ export function EditCardModal({
               const sortedFields = [...fieldDefinitions].sort((a, b) => a.position - b.position);
               if (sortedFields.length === 0) return null;
               return (
-                <div className="space-y-4 border-t border-slate-800 pt-4">
-                  <p className="text-xs font-medium text-slate-400">Поля доски</p>
+                <div className="space-y-4 border-t border-app-divider pt-4">
+                  <p className="text-xs font-medium text-app-secondary">Поля доски</p>
                   {sortedFields.map((f) => {
                     const d = fieldDrafts[f.id];
                     const reqLabel = f.isRequired ? " *" : "";
@@ -630,7 +630,7 @@ export function EditCardModal({
                           key={f.id}
                           className="sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-start sm:gap-3"
                         >
-                          <span className="pb-1 pt-2 text-xs text-slate-400 sm:pb-0">
+                          <span className="pb-1 pt-2 text-xs text-app-secondary sm:pb-0">
                             {f.name}
                             {reqLabel}
                           </span>
@@ -656,7 +656,7 @@ export function EditCardModal({
                           key={f.id}
                           className="sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-start sm:gap-3"
                         >
-                          <span className="pb-1 pt-2 text-xs text-slate-400 sm:pb-0">
+                          <span className="pb-1 pt-2 text-xs text-app-secondary sm:pb-0">
                             {f.name}
                             {reqLabel}
                           </span>
@@ -682,13 +682,13 @@ export function EditCardModal({
                           key={f.id}
                           className="sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-start sm:gap-3"
                         >
-                          <p className="pb-1 pt-2 text-xs font-medium text-slate-400 sm:pb-0">
+                          <p className="pb-1 pt-2 text-xs font-medium text-app-secondary sm:pb-0">
                             {f.name}
                             {reqLabel}
                           </p>
-                          <div className="space-y-2 rounded-md border border-slate-800/80 p-3">
+                          <div className="space-y-2 rounded-[var(--radius-control)] border border-app-divider bg-app-surface-muted p-3">
                             <label className="flex flex-col gap-1">
-                            <span className="text-xs text-slate-500">URL</span>
+                            <span className="text-xs text-app-tertiary">URL</span>
                             <input
                               type="url"
                               value={d.url}
@@ -708,7 +708,7 @@ export function EditCardModal({
                             />
                             </label>
                             <label className="flex flex-col gap-1">
-                              <span className="text-xs text-slate-500">Текст ссылки (необязательно)</span>
+                              <span className="text-xs text-app-tertiary">Текст ссылки (необязательно)</span>
                               <input
                                 value={d.text}
                                 onChange={(e) =>
@@ -737,7 +737,7 @@ export function EditCardModal({
                           key={f.id}
                           className="sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-start sm:gap-3"
                         >
-                          <span className="pb-1 pt-2 text-xs text-slate-400 sm:pb-0">
+                          <span className="pb-1 pt-2 text-xs text-app-secondary sm:pb-0">
                             {f.name}
                             {reqLabel}
                           </span>
@@ -775,8 +775,8 @@ export function EditCardModal({
 
             <div>
               {canManageAssignees && membersToAdd.length > 0 ?
-                <div className="mt-4 border-t border-slate-800/80 pt-3">
-                  <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                <div className="mt-4 border-t border-app-divider pt-3">
+                  <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-app-tertiary">
                     Добавить участника с доски
                   </p>
                   <ul className="space-y-2">
@@ -788,7 +788,7 @@ export function EditCardModal({
                         >
                           <input
                             type="checkbox"
-                            className="rounded border-slate-600"
+                            className="checkbox-app"
                             checked={false}
                             disabled={assigneePending || pending}
                             onChange={() => void toggleAssignee(m.userId)}
@@ -809,11 +809,11 @@ export function EditCardModal({
             </div>
 
             <div>
-              <p className="mb-2 text-xs font-medium text-slate-400">Метка</p>
+              <p className="mb-2 text-xs font-medium text-app-secondary">Метка</p>
               {boardLabels.length === 0 ?
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-app-tertiary">
                   На доске пока нет меток. Владелец или администратор доски может создать их кнопкой{" "}
-                  <span className="text-slate-400">«Метки»</span> в шапке страницы доски.
+                  <span className="text-app-secondary">«Метки»</span> в шапке страницы доски.
                 </p>
               : <>
                   <div className="mb-2 flex flex-wrap gap-1.5">
@@ -825,23 +825,23 @@ export function EditCardModal({
                           className={cn(
                             "text-xs",
                             canManageLabels ?
-                              "text-slate-400 hover:text-slate-200"
-                            : "cursor-default text-slate-500"
+                              "text-app-secondary hover:text-app-primary"
+                            : "cursor-default text-app-tertiary"
                           )}
                           onClick={() => setOpenLabelMenuId((cur) => (cur === "new" ? null : "new"))}
                         >
                           Меток нет
                         </button>
                         {canManageLabels && openLabelMenuId === "new" ?
-                          <ul className="absolute z-[70] mt-1 max-h-48 w-[18rem] overflow-auto rounded-md border border-slate-700 bg-slate-950 py-1 shadow-lg">
+                          <ul className="popup-panel absolute z-[70] mt-1 max-h-48 w-[18rem] overflow-auto py-1 shadow-[var(--shadow-card)]">
                             {labelCandidates.length === 0 ?
-                              <li className="px-3 py-2 text-xs text-slate-500">Нет доступных меток</li>
+                              <li className="px-3 py-2 text-xs text-app-tertiary">Нет доступных меток</li>
                             : labelCandidates.map((l) => (
                                 <li key={l.id}>
                                   <button
                                     type="button"
                                     disabled={labelPending || pending}
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800"
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-app-primary hover:bg-app-surface-muted"
                                     onClick={() => void toggleCardLabel(l.id, true)}
                                   >
                                     <span
@@ -865,8 +865,12 @@ export function EditCardModal({
                           <button
                             type="button"
                             disabled={!canManageLabels || labelPending || pending}
-                            className="inline-flex max-w-full items-center gap-1 rounded-md border border-slate-700 bg-slate-900/80 px-2 py-1 text-xs text-slate-100"
-                            style={{ borderLeftWidth: 3, borderLeftColor: l.color }}
+                            className="inline-flex max-w-full items-center gap-1 rounded-md border px-2 py-1 text-xs"
+                            style={{
+                              borderColor: l.color,
+                              backgroundColor: `color-mix(in srgb, ${l.color} 16%, var(--bg-surface))`,
+                              color: "var(--text-primary)"
+                            }}
                             onClick={() =>
                               setOpenLabelMenuId((cur) => (cur === l.id ? null : l.id))
                             }
@@ -874,15 +878,15 @@ export function EditCardModal({
                             <span className="min-w-0 truncate">{l.name}</span>
                           </button>
                           {canManageLabels && openLabelMenuId === l.id ?
-                            <ul className="absolute z-[70] mt-1 max-h-48 w-[18rem] overflow-auto rounded-md border border-slate-700 bg-slate-950 py-1 shadow-lg">
+                            <ul className="popup-panel absolute z-[70] mt-1 max-h-48 w-[18rem] overflow-auto py-1 shadow-[var(--shadow-card)]">
                               {labelCandidates.length === 0 ?
-                                <li className="px-3 py-2 text-xs text-slate-500">Нет доступных меток</li>
+                                <li className="px-3 py-2 text-xs text-app-tertiary">Нет доступных меток</li>
                               : labelCandidates.map((candidate) => (
                                   <li key={candidate.id}>
                                     <button
                                       type="button"
                                       disabled={labelPending || pending}
-                                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800"
+                                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-app-primary hover:bg-app-surface-muted"
                                       onClick={() => void replaceCardLabel(l.id, candidate.id)}
                                     >
                                       <span
@@ -900,7 +904,7 @@ export function EditCardModal({
                             <button
                               type="button"
                               disabled={labelPending || pending}
-                              className="shrink-0 rounded p-0.5 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+                              className="shrink-0 rounded p-0.5 text-app-secondary hover:bg-app-surface-muted hover:text-app-primary"
                               aria-label={`Снять метку ${l.name}`}
                               onClick={() => void toggleCardLabel(l.id, false)}
                             >
@@ -915,17 +919,17 @@ export function EditCardModal({
             </div>
 
             {error ?
-              <p className="text-sm text-rose-400" role="alert">
+              <p className="text-app-validation-error text-sm" role="alert">
                 {error}
               </p>
             : null}
 
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-app-divider pt-4">
               {canDelete ?
                 <div className="flex flex-wrap items-center gap-2">
                   {confirmDelete ?
                     <>
-                      <span className="text-xs text-amber-200/90">Удалить карточку безвозвратно?</span>
+                      <span className="text-xs text-[color:var(--warning-subtle-text)]">Удалить карточку безвозвратно?</span>
                       <Button
                         type="button"
                         variant="destructive"
@@ -949,13 +953,13 @@ export function EditCardModal({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="h-10 w-10 rounded-md p-0 text-rose-500 hover:bg-rose-950/20 hover:text-rose-400"
+                      className="h-10 w-10 rounded-md p-0 text-[color:var(--danger-strong)] hover:bg-[color:var(--danger-subtle-bg)] hover:text-[color:var(--danger-subtle-text)]"
                       disabled={pending}
                       aria-label="Удалить карточку"
                       title="Удалить карточку"
                       onClick={() => setConfirmDelete(true)}
                     >
-                      <TrashIcon className="h-7 w-7 text-white" />
+                      <TrashIcon className="h-7 w-7" />
                     </Button>}
                 </div>
               : <span />}
@@ -982,7 +986,7 @@ export function EditCardModal({
         </div>
 
         <aside
-          className="flex w-full shrink-0 flex-col overflow-visible border-t border-slate-800 md:min-h-0 md:min-w-0 md:basis-1/3 md:grow-0 md:overflow-hidden md:border-l md:border-t-0"
+          className="flex w-full shrink-0 flex-col overflow-visible border-t border-app-divider bg-app-surface-muted md:min-h-0 md:min-w-0 md:basis-1/3 md:grow-0 md:overflow-hidden md:border-l md:border-t-0"
           aria-label="Комментарии к карточке"
         >
           <CardCommentsSidebar

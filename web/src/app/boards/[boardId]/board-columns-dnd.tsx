@@ -223,11 +223,11 @@ function EmptyColumnDrop({ columnId, emphasized }: { columnId: string; emphasize
     <div
       ref={setNodeRef}
       className={
-        emphasized ? "min-h-12 rounded-md border border-dashed border-slate-700/80 py-3"
+        emphasized ? "min-h-12 rounded-md border border-dashed border-app-strong bg-app-surface-muted/40 py-3"
         : "min-h-2 shrink-0"
       }
       style={
-        isOver ? { boxShadow: "inset 0 0 0 1px rgb(96 165 250 / 0.35)" } : undefined
+        isOver ? { boxShadow: "inset 0 0 0 var(--focus-ring-width) var(--focus-ring)" } : undefined
       }
     />
   );
@@ -293,15 +293,15 @@ function BoardCardRow({
       role={canOpen ? "button" : undefined}
       className={
         canOpen ?
-          "flex cursor-pointer gap-2 rounded-md border border-slate-800 bg-slate-900/90 px-3 py-2 text-sm text-slate-200 shadow-sm transition-colors hover:border-slate-600"
-        : "flex gap-2 rounded-md border border-slate-800 bg-slate-900/90 px-3 py-2 text-sm text-slate-200 shadow-sm"
+          "flex cursor-pointer gap-2 rounded-[var(--radius-control)] border border-app-default bg-app-surface px-3 py-2 text-sm text-app-primary shadow-[var(--shadow-card)] transition-[border-color,box-shadow] hover:border-app-strong focus-visible:outline-none focus-visible:shadow-[0_0_0_var(--focus-ring-width)_var(--focus-ring)]"
+        : "flex gap-2 rounded-[var(--radius-control)] border border-app-default bg-app-surface px-3 py-2 text-sm text-app-primary shadow-[var(--shadow-card)]"
       }
       style={
         primaryLabel ?
           {
             borderLeftWidth: 4,
             borderLeftColor: primaryLabel.color,
-            backgroundColor: `color-mix(in srgb, ${primaryLabel.color} 12%, rgb(15 23 42 / 90%))`
+            backgroundColor: `color-mix(in srgb, ${primaryLabel.color} 16%, var(--bg-surface))`
           }
         : undefined
       }
@@ -321,7 +321,7 @@ function BoardCardRow({
       {dragHandleProps ?
         <button
           type="button"
-          className="mt-0.5 shrink-0 cursor-grab text-slate-500 hover:text-slate-300 active:cursor-grabbing"
+          className="mt-0.5 shrink-0 cursor-grab text-app-tertiary hover:text-app-secondary active:cursor-grabbing"
           aria-label="Перетащить карточку"
           {...dragHandleProps.attributes}
           {...dragHandleProps.listeners}
@@ -349,8 +349,8 @@ function BoardCardRow({
                       return (
                         <span
                           key={userId}
-                          className={`inline-flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border bg-slate-700 text-[10px] font-medium text-slate-100 ${
-                            isResponsible ? "border-amber-400" : "border-slate-800"
+                          className={`inline-flex h-5 w-5 items-center justify-center overflow-hidden rounded-full border bg-app-surface-muted text-[10px] font-medium text-app-secondary ${
+                            isResponsible ? "border-[color:var(--warning-strong)]" : "border-app-default"
                           }`}
                           title={displayName}
                         >
@@ -361,7 +361,7 @@ function BoardCardRow({
                       );
                     })}
                     {orderedAssigneeUserIds.length > 4 ?
-                      <span className="ml-1 text-[11px] text-slate-400">{`+${orderedAssigneeUserIds.length - 4}`}</span>
+                      <span className="ml-1 text-[11px] text-app-tertiary">{`+${orderedAssigneeUserIds.length - 4}`}</span>
                     : null}
                   </div>
                 );
@@ -370,13 +370,13 @@ function BoardCardRow({
                 return (
                   <span
                     key={item.id}
-                    className="inline-flex items-center gap-1 rounded bg-slate-800/80 px-1.5 py-0.5 text-[11px] text-slate-300"
+                    className="inline-flex items-center gap-1 rounded bg-app-surface-muted px-1.5 py-0.5 text-[11px] text-app-secondary"
                     title={`Комментариев: ${card.commentsCount}`}
                     aria-label={`Комментариев: ${card.commentsCount}`}
                   >
                     <svg
                       viewBox="0 0 16 16"
-                      className="h-3.5 w-3.5 text-slate-400"
+                      className="h-3.5 w-3.5 text-app-tertiary"
                       aria-hidden="true"
                       focusable="false"
                     >
@@ -399,10 +399,11 @@ function BoardCardRow({
                     {cardLabels.map((label) => (
                       <span
                         key={label.id}
-                        className="inline-flex max-w-full items-center rounded border px-1.5 py-0.5 text-[11px] text-slate-100"
+                        className="inline-flex max-w-full items-center rounded border px-1.5 py-0.5 text-[11px]"
                         style={{
                           borderColor: label.color,
-                          backgroundColor: `color-mix(in srgb, ${label.color} 16%, rgb(15 23 42 / 0.96))`
+                          backgroundColor: `color-mix(in srgb, ${label.color} 16%, var(--bg-surface))`,
+                          color: "var(--text-primary)"
                         }}
                       >
                         <span className="min-w-0 truncate">{label.name}</span>
@@ -415,7 +416,7 @@ function BoardCardRow({
                 if (!card.responsibleUserId) return null;
                 const name = memberNamesById.get(card.responsibleUserId) ?? "Участник";
                 return (
-                  <span key={item.id} className="rounded bg-slate-800/80 px-1.5 py-0.5 text-[11px] text-slate-300">
+                  <span key={item.id} className="rounded bg-app-surface-muted px-1.5 py-0.5 text-[11px] text-app-secondary">
                     {`Отв.: ${name}`}
                   </span>
                 );
@@ -428,7 +429,7 @@ function BoardCardRow({
                 if (!snapshot) return null;
                 let value = "";
                 let chipStyle: CSSProperties | undefined;
-                let chipClassName = "rounded bg-slate-800/80 px-1.5 py-0.5 text-[11px] text-slate-300";
+                let chipClassName = "rounded bg-app-surface-muted px-1.5 py-0.5 text-[11px] text-app-secondary";
                 if (fieldDef.fieldType === "text") {
                   value = snapshot.textValue ?? "";
                 } else if (fieldDef.fieldType === "date") {
@@ -440,10 +441,11 @@ function BoardCardRow({
                   value = option?.name ?? "";
                   if (option?.color) {
                     chipClassName =
-                      "rounded border px-1.5 py-0.5 text-[11px] text-slate-100";
+                      "rounded border px-1.5 py-0.5 text-[11px]";
                     chipStyle = {
                       borderColor: option.color,
-                      backgroundColor: `color-mix(in srgb, ${option.color} 16%, rgb(15 23 42 / 0.96))`
+                      backgroundColor: `color-mix(in srgb, ${option.color} 16%, var(--bg-surface))`,
+                      color: "var(--text-primary)"
                     };
                   }
                 }
@@ -607,7 +609,7 @@ function SortableColumnShell({
     <div
       ref={setNodeRef}
       style={columnStyle}
-      className="flex w-72 shrink-0 flex-col gap-3 rounded-lg bg-slate-950/70 p-3 ring-1 ring-slate-800"
+      className="flex w-72 shrink-0 flex-col gap-3 rounded-[var(--radius-surface)] border border-app-default bg-[color:var(--board-column-bg)] p-3 shadow-[var(--shadow-card)] backdrop-blur-sm"
     >
       <BoardColumnHeader
         boardId={boardId}
@@ -640,7 +642,7 @@ function SortableColumnShell({
             />
           ))}
           {cards.length === 0 ?
-            <div className="rounded-md border border-dashed border-slate-800/80 px-3 py-6 text-center text-xs text-slate-500">
+            <div className="rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
               Пока нет карточек
             </div>
           : null}
@@ -704,7 +706,7 @@ function StaticColumnShell({
   const cards = cardIds.map((id) => cardsById.get(id)).filter(Boolean) as BoardCardListItem[];
 
   return (
-    <div className="flex w-72 shrink-0 flex-col gap-3 rounded-lg bg-slate-950/70 p-3 ring-1 ring-slate-800">
+    <div className="flex w-72 shrink-0 flex-col gap-3 rounded-[var(--radius-surface)] border border-app-default bg-[color:var(--board-column-bg)] p-3 shadow-[var(--shadow-card)] backdrop-blur-sm">
       <BoardColumnHeader
         boardId={boardId}
         columnId={col.id}
@@ -736,7 +738,7 @@ function StaticColumnShell({
             />
           ))}
           {cards.length === 0 ?
-            <div className="rounded-md border border-dashed border-slate-800/80 px-3 py-6 text-center text-xs text-slate-500">
+            <div className="rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
               Пока нет карточек
             </div>
           : null}
@@ -804,7 +806,7 @@ function BoardGridStatic({
       {columnRows.map((col, index) => (
         <div
           key={col.id}
-          className="flex w-72 shrink-0 flex-col gap-3 rounded-lg bg-slate-950/70 p-3 ring-1 ring-slate-800"
+          className="flex w-72 shrink-0 flex-col gap-3 rounded-[var(--radius-surface)] border border-app-default bg-[color:var(--board-column-bg)] p-3 shadow-[var(--shadow-card)] backdrop-blur-sm"
         >
           <BoardColumnHeader
             boardId={boardId}
@@ -839,7 +841,7 @@ function BoardGridStatic({
                 </div>
               ))}
             {(cardOrderByColumn[col.id] ?? []).length === 0 ?
-              <div className="rounded-md border border-dashed border-slate-800/80 px-3 py-6 text-center text-xs text-slate-500">
+              <div className="rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
                 Пока нет карточек
               </div>
             : null}
@@ -1864,17 +1866,23 @@ export function BoardColumnsDnD({
       {editModal}
       <div className="flex flex-wrap items-center justify-between gap-2">
         {realtimeStatus !== "SUBSCRIBED" || realtimeError ? (
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-app-tertiary">
             Realtime:{" "}
-            <span className={realtimeStatus === "SUBSCRIBED" ? "text-emerald-400" : "text-amber-400"}>
+            <span
+              className={realtimeStatus === "SUBSCRIBED" ? "" : ""}
+              style={{
+                color:
+                  realtimeStatus === "SUBSCRIBED" ? "var(--success-subtle-text)" : "var(--warning-subtle-text)"
+              }}
+            >
               {realtimeStatus}
             </span>
-            {realtimeError ? <span className="ml-2 text-rose-400">{realtimeError}</span> : null}
+            {realtimeError ? <span className="ml-2" style={{ color: "var(--danger-subtle-text)" }}>{realtimeError}</span> : null}
           </p>
         ) : null}
       </div>
       {persistError ?
-        <p className="text-xs text-rose-400" role="alert">
+        <p className="text-xs text-app-validation-error" role="alert">
           {persistError}
         </p>
       : null}

@@ -114,7 +114,7 @@ export function CreateCardModal({
     <Modal open={open} title="Новая карточка" onClose={onClose} className="max-w-xl">
       <form onSubmit={onSubmit} className="space-y-4">
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-slate-400">Название *</span>
+          <span className="text-xs text-app-secondary">Название *</span>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -127,7 +127,7 @@ export function CreateCardModal({
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-slate-400">Описание</span>
+          <span className="text-xs text-app-secondary">Описание</span>
           <textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -146,7 +146,7 @@ export function CreateCardModal({
           if (f.fieldType === "text" && d.fieldType === "text") {
             return (
               <label key={f.id} className="flex flex-col gap-1">
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-app-secondary">
                   {f.name}
                   {reqLabel}
                 </span>
@@ -168,7 +168,7 @@ export function CreateCardModal({
           if (f.fieldType === "date" && d.fieldType === "date") {
             return (
               <label key={f.id} className="flex flex-col gap-1">
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-app-secondary">
                   {f.name}
                   {reqLabel}
                 </span>
@@ -189,13 +189,16 @@ export function CreateCardModal({
 
           if (f.fieldType === "link" && d.fieldType === "link") {
             return (
-              <div key={f.id} className="space-y-2 rounded-md border border-slate-800/80 p-3">
-                <p className="text-xs font-medium text-slate-400">
+              <div
+                key={f.id}
+                className="space-y-2 rounded-[var(--radius-control)] border border-app-divider bg-app-surface-muted p-3"
+              >
+                <p className="text-xs font-medium text-app-secondary">
                   {f.name}
                   {reqLabel}
                 </p>
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs text-slate-500">URL</span>
+                  <span className="text-xs text-app-tertiary">URL</span>
                   <input
                     type="url"
                     value={d.url}
@@ -214,7 +217,7 @@ export function CreateCardModal({
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-xs text-slate-500">Текст ссылки (необязательно)</span>
+                  <span className="text-xs text-app-tertiary">Текст ссылки (необязательно)</span>
                   <input
                     value={d.text}
                     onChange={(e) =>
@@ -238,7 +241,7 @@ export function CreateCardModal({
             const opts = [...f.selectOptions].sort((a, b) => a.position - b.position);
             return (
               <label key={f.id} className="flex flex-col gap-1">
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-app-secondary">
                   {f.name}
                   {reqLabel}
                 </span>
@@ -273,7 +276,7 @@ export function CreateCardModal({
         })}
 
         {error ? (
-          <p className="text-sm text-rose-400" role="alert">
+          <p className="text-app-validation-error text-sm" role="alert">
             {error}
           </p>
         ) : null}
@@ -317,7 +320,7 @@ export function CreateCardButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full rounded-md border border-dashed border-slate-700 bg-slate-900/40 py-2 text-xs font-medium text-slate-300 transition-colors hover:border-sky-600/60 hover:bg-slate-900/70 hover:text-sky-200"
+        className="focus-ring-app w-full rounded-[var(--radius-control)] border border-dashed border-app-strong bg-app-surface-muted py-2 text-xs font-medium text-app-secondary transition-colors hover:border-app-accent hover:bg-app-surface hover:text-app-primary"
       >
         + Карточка
       </button>

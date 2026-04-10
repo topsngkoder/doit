@@ -45,7 +45,7 @@ function CreateColumnForm({
   return (
     <form action={formAction} className="space-y-3">
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-slate-400">Название</span>
+        <span className="text-xs text-app-tertiary">Название</span>
         <input
           name="name"
           type="text"
@@ -56,7 +56,7 @@ function CreateColumnForm({
         />
       </label>
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-slate-400">Тип</span>
+        <span className="text-xs text-app-tertiary">Тип</span>
         <select
           name="column_type"
           required
@@ -71,10 +71,10 @@ function CreateColumnForm({
         </select>
       </label>
       {state.ok === false && state.message ? (
-        <p className="text-sm text-rose-400">{state.message}</p>
+        <p className="text-sm text-app-validation-error">{state.message}</p>
       ) : null}
       {state.ok ? (
-        <p className="text-sm text-emerald-400">Колонка создана.</p>
+        <p className="text-sm" style={{ color: "var(--success-subtle-text)" }}>Колонка создана.</p>
       ) : null}
       <div className="flex justify-end gap-2 pt-2">
         <SubmitButton />
@@ -102,11 +102,11 @@ export function AddBoardColumnButton({ boardId, canCreate }: AddBoardColumnButto
         + Колонка
       </Button>
       <Modal open={open} title="Новая колонка" onClose={() => setOpen(false)}>
-        <p className="mb-4 text-xs text-slate-400">
+        <p className="mb-4 text-xs text-app-tertiary">
           Колонка добавляется в конец списка. Порядок можно менять стрелками в заголовке колонки.
         </p>
         <CreateColumnForm key={formKey} boardId={boardId} onSuccess={onSuccess} />
-        <div className="mt-3 flex justify-end border-t border-slate-800 pt-3">
+        <div className="mt-3 flex justify-end border-t border-app-divider pt-3">
           <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
             Отмена
           </Button>
