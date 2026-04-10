@@ -204,7 +204,7 @@ export default async function RootLayout({
               </div>
             </header>
           ) : null}
-          <main className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 overflow-hidden px-4">{children}</main>
+          <main className="flex min-h-0 w-full flex-1 overflow-hidden px-4">{children}</main>
         </div>
         </BrowserNativeNotificationsProvider>
         </ThemeProvider>

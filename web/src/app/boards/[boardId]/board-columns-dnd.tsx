@@ -49,7 +49,7 @@ import {
 
 const COLUMN_DND_PREFIX = "column:";
 const COLUMN_SHELL_CLASS =
-  "flex h-full min-h-0 w-full shrink-0 flex-col gap-3 rounded-[var(--radius-surface)] border border-app-default bg-[color:var(--board-column-bg)] p-3 shadow-[var(--shadow-card)] backdrop-blur-sm md:w-72";
+  "flex max-h-full w-full shrink-0 flex-col gap-3 rounded-[var(--radius-surface)] border border-app-default bg-[color:var(--board-column-bg)] p-3 shadow-[var(--shadow-card)] backdrop-blur-sm md:w-72";
 
 function columnDndId(columnId: string) {
   return `${COLUMN_DND_PREFIX}${columnId}`;
@@ -687,7 +687,7 @@ function SortableColumnShell({
               />
             ))}
             {cards.length === 0 ?
-              <div className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
+              <div className="flex min-h-24 items-center justify-center rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
                 Пока нет карточек
               </div>
             : null}
@@ -797,7 +797,7 @@ function StaticColumnShell({
               />
             ))}
             {cards.length === 0 ?
-              <div className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
+              <div className="flex min-h-24 items-center justify-center rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
                 Пока нет карточек
               </div>
             : null}
@@ -870,7 +870,7 @@ function BoardGridStatic({
 }) {
   const columnCount = columnRows.length;
   return (
-    <div className="flex h-full min-h-0 w-max min-w-full gap-3 pb-2 md:gap-4">
+    <div className="flex h-full min-h-0 w-max min-w-full items-start gap-3 pb-2 md:gap-4">
       {columnRows.map((col, index) => (
         <div
           key={col.id}
@@ -913,7 +913,7 @@ function BoardGridStatic({
                 </div>
               ))}
             {(cardOrderByColumn[col.id] ?? []).length === 0 ?
-              <div className="flex min-h-0 flex-1 items-center justify-center rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
+              <div className="flex min-h-24 items-center justify-center rounded-md border border-dashed border-app-divider bg-app-surface-muted/40 px-3 py-6 text-center text-xs text-app-tertiary">
                 Пока нет карточек
               </div>
             : null}
@@ -1964,7 +1964,7 @@ export function BoardColumnsDnD({
         items={visibleColumnItems.map((c) => columnDndId(c.id))}
         strategy={horizontalListSortingStrategy}
       >
-        <div className="flex h-full min-h-0 w-max min-w-full gap-3 pb-2 md:gap-4">
+        <div className="flex h-full min-h-0 w-max min-w-full items-start gap-3 pb-2 md:gap-4">
           {visibleColumnItems.map((col, index) => (
             <SortableColumnShell
               key={col.id}
@@ -1995,7 +1995,7 @@ export function BoardColumnsDnD({
           ))}
         </div>
       </SortableContext>
-    : <div className="flex h-full min-h-0 w-max min-w-full gap-3 pb-2 md:gap-4">
+    : <div className="flex h-full min-h-0 w-max min-w-full items-start gap-3 pb-2 md:gap-4">
         {visibleColumnItems.map((col, index) => (
           <StaticColumnShell
             key={col.id}
