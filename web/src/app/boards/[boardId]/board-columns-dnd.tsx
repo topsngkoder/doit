@@ -123,6 +123,26 @@ function buildCardDisplayFlowForColumn(
   return out;
 }
 
+/** Порядок `items` в `SortableContext` при float-drag: как порядок DOM (якорь активной карточки, затем карточки из `displayFlow`). Иначе стратегия видит off-screen якорь и неверные индексы — соседи получают огромные `transform`. */
+function sortableCardIdsForFloatDragColumn(
+  columnId: string,
+  cardOrderByColumn: Record<string, string[]>,
+  overlay: CardDragOverlayState
+): string[] {
+  const flow = buildCardDisplayFlowForColumn(
+    columnId,
+    cardOrderByColumn,
+    overlay.activeCardId,
+    overlay.lastValidSlot
+  );
+  const fromFlow = flow
+    .filter((r): r is { kind: "card"; id: string } => r.kind === "card")
+    .map((r) => r.id);
+  return columnId === overlay.sourceColumnId ?
+      [overlay.activeCardId, ...fromFlow]
+    : fromFlow;
+}
+
 type CardLayoutBroadcastPayload = {
   v: 1;
   boardId: string;
@@ -233,6 +253,70 @@ function resolveCardDropTarget(
     if (idx >= 0) return { columnId: colId, index: idx };
   }
   return null;
+}
+
+/**
+ * Позиция вставки в координатах виртуального списка (после удаления activeCardId из всех колонок) — см. FDND1.2 / `buildCardDisplayFlowForColumn`.
+ */
+function resolveCardDropTargetVirtual(
+  overId: UniqueIdentifier,
+  cardOrder: Record<string, string[]>,
+  activeCardId: string,
+  allowedColumnIds?: Set<string>
+): { columnId: string; index: number } | null {
+  const oid = String(overId);
+  if (oid === BOARD_CARD_SLOT_LIST_KEY) return null;
+  if (oid.startsWith("empty-")) {
+    const colId = oid.slice("empty-".length);
+    if (allowedColumnIds && !allowedColumnIds.has(colId)) return null;
+    const list = cardOrder[colId];
+    if (!list) return null;
+    const stripped = list.filter((id) => id !== activeCardId);
+    return { columnId: colId, index: stripped.length };
+  }
+  if (isColumnDndId(overId)) {
+    const colId = parseColumnDndId(overId);
+    if (allowedColumnIds && !allowedColumnIds.has(colId)) return null;
+    const list = cardOrder[colId];
+    if (!list) return null;
+    const stripped = list.filter((id) => id !== activeCardId);
+    return { columnId: colId, index: stripped.length };
+  }
+  for (const [colId, ids] of Object.entries(cardOrder)) {
+    if (allowedColumnIds && !allowedColumnIds.has(colId)) continue;
+    const idx = ids.indexOf(oid);
+    if (idx < 0) continue;
+    if (oid === activeCardId) return null;
+    const sourceIdx = ids.indexOf(activeCardId);
+    const virtualIndex = sourceIdx < 0 ? idx : idx < sourceIdx ? idx : idx - 1;
+    return { columnId: colId, index: virtualIndex };
+  }
+  return null;
+}
+
+/** Виртуальный slot → индексы полных массивов для `applyCardReorder`. */
+function virtualCardSlotToApplyTarget(
+  cardOrder: Record<string, string[]>,
+  activeCardId: string,
+  fromCol: string,
+  virtual: { columnId: string; index: number }
+): { columnId: string; index: number } | null {
+  const fromArr = cardOrder[fromCol];
+  const posInFrom = fromArr.indexOf(activeCardId);
+  if (posInFrom < 0) return null;
+
+  if (virtual.columnId !== fromCol) {
+    const toArr = cardOrder[virtual.columnId];
+    if (!toArr) return null;
+    const insertAt = Math.max(0, Math.min(virtual.index, toArr.length));
+    return { columnId: virtual.columnId, index: insertAt };
+  }
+
+  const stripped = fromArr.filter((id) => id !== activeCardId);
+  const v = Math.max(0, Math.min(virtual.index, stripped.length));
+  const merged = [...stripped.slice(0, v), activeCardId, ...stripped.slice(v)];
+  const realIndex = merged.indexOf(activeCardId);
+  return { columnId: fromCol, index: realIndex };
 }
 
 function applyCardReorder(
@@ -650,7 +734,9 @@ function SortableBoardCard({
   /** FDND3.1: при активном float-drag контент карточки только в overlay; в списке — зазор этой высоты. */
   listDragPlaceholderHeightPx,
   /** FDND3.3: активная карточка вынесена из потока списка; `useSortable` остаётся на скрытом узле вне визуального порядка. */
-  floatingSourceAnchor
+  floatingSourceAnchor,
+  /** Пока другая карточка в float-drag, не применять reorder-transform от `@dnd-kit` — раскладка уже задаётся `displayFlow`. */
+  suppressListReorderTransform
 }: {
   card: BoardCardListItem;
   currentUserId: string;
@@ -666,6 +752,7 @@ function SortableBoardCard({
   registerCardNode?: (cardId: string, node: HTMLDivElement | null) => void;
   listDragPlaceholderHeightPx?: number;
   floatingSourceAnchor?: boolean;
+  suppressListReorderTransform?: boolean;
 }) {
   const {
     attributes,
@@ -725,6 +812,12 @@ function SortableBoardCard({
         opacity: 0,
         transition,
         pointerEvents: "none"
+      }
+    : suppressListReorderTransform ?
+      {
+        transform: undefined,
+        transition: undefined,
+        opacity: 1
       }
     : {
         transform:
@@ -897,6 +990,11 @@ function SortableColumnShell({
   const showBottomEmptyColumnDrop =
     canMoveCards && !(cardDragOverlay && isPersistedEmptyColumn);
 
+  const sortableContextCardIds = React.useMemo(() => {
+    if (!useSlotProjection || !cardDragOverlay) return cardIds;
+    return sortableCardIdsForFloatDragColumn(col.id, cardOrderByColumn, cardDragOverlay);
+  }, [useSlotProjection, cardDragOverlay, col.id, cardOrderByColumn, cardIds]);
+
   return (
     <div
       ref={setNodeRef}
@@ -920,7 +1018,7 @@ function SortableColumnShell({
         canDelete={columnPermissions.canDelete}
         columnDrag={columnDrag}
       />
-      <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
+      <SortableContext items={sortableContextCardIds} strategy={verticalListSortingStrategy}>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {floatingAnchorCard ?
             <SortableBoardCard
@@ -947,7 +1045,16 @@ function SortableColumnShell({
                     );
                   }
                   const c = cardsById.get(row.id);
-                  return c ? <SortableBoardCard key={row.id} card={c} {...sortableCardProps} /> : null;
+                  return c ?
+                      <SortableBoardCard
+                        key={row.id}
+                        card={c}
+                        {...sortableCardProps}
+                        suppressListReorderTransform={
+                          Boolean(cardDragOverlay && cardDragOverlay.activeCardId !== row.id)
+                        }
+                      />
+                    : null;
                 })}
                 {isPersistedEmptyColumn && displayFlow.length === 0 ?
                   <div role="listitem">
@@ -1080,6 +1187,11 @@ function StaticColumnShell({
   const showBottomEmptyColumnDrop =
     canMoveCards && !(cardDragOverlay && isPersistedEmptyColumn);
 
+  const sortableContextCardIds = React.useMemo(() => {
+    if (!useSlotProjection || !cardDragOverlay) return cardIds;
+    return sortableCardIdsForFloatDragColumn(col.id, cardOrderByColumn, cardDragOverlay);
+  }, [useSlotProjection, cardDragOverlay, col.id, cardOrderByColumn, cardIds]);
+
   return (
     <div className={COLUMN_SHELL_CLASS} data-board-column-id={col.id}>
       <BoardColumnHeader
@@ -1098,7 +1210,7 @@ function StaticColumnShell({
         canDelete={columnPermissions.canDelete}
         columnDrag={null}
       />
-      <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
+      <SortableContext items={sortableContextCardIds} strategy={verticalListSortingStrategy}>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {floatingAnchorCard ?
             <SortableBoardCard
@@ -1125,7 +1237,16 @@ function StaticColumnShell({
                     );
                   }
                   const c = cardsById.get(row.id);
-                  return c ? <SortableBoardCard key={row.id} card={c} {...sortableCardProps} /> : null;
+                  return c ?
+                      <SortableBoardCard
+                        key={row.id}
+                        card={c}
+                        {...sortableCardProps}
+                        suppressListReorderTransform={
+                          Boolean(cardDragOverlay && cardDragOverlay.activeCardId !== row.id)
+                        }
+                      />
+                    : null;
                 })}
                 {isPersistedEmptyColumn && displayFlow.length === 0 ?
                   <div role="listitem">
@@ -1316,6 +1437,10 @@ export function BoardColumnsDnD({
   const [realtimeStatus, setRealtimeStatus] = React.useState<string>("connecting");
   const [realtimeError, setRealtimeError] = React.useState<string | null>(null);
   const [cardDragOverlay, setCardDragOverlay] = React.useState<CardDragOverlayState | null>(null);
+  const cardDragOverlayRef = React.useRef<CardDragOverlayState | null>(null);
+  React.useEffect(() => {
+    cardDragOverlayRef.current = cardDragOverlay;
+  }, [cardDragOverlay]);
   const localRef = React.useRef(local);
   localRef.current = local;
   const pendingColumnSignatureRef = React.useRef<string | null>(null);
@@ -2075,9 +2200,10 @@ export function BoardColumnsDnD({
       setCardDragOverlay((prev) => {
         if (!prev) return prev;
         if (!over) return prev;
-        const t = resolveCardDropTarget(
+        const t = resolveCardDropTargetVirtual(
           over.id,
           localRef.current.cardOrderByColumn,
+          prev.activeCardId,
           visibleColumnIdsSet
         );
         if (!t) return prev;
@@ -2101,8 +2227,10 @@ export function BoardColumnsDnD({
 
   const handleDragEnd = async (event: DragEndEvent) => {
     dragInProgressRef.current = false;
-    setCardDragOverlay(null);
     const { active, over } = event;
+    const cardDragSessionSnapshot =
+      !isColumnDndId(active.id) ? cardDragOverlayRef.current : null;
+    setCardDragOverlay(null);
     if (!isColumnDndId(active.id)) {
       suppressCardModalOpenUntilMsRef.current = Date.now() + CARD_DRAG_SUPPRESS_MODAL_OPEN_MS;
     }
@@ -2165,7 +2293,18 @@ export function BoardColumnsDnD({
     if (!fromCol) return;
     if (!visibleColumnIdsSet.has(fromCol)) return;
 
-    const target = resolveCardDropTarget(over.id, local.cardOrderByColumn, visibleColumnIdsSet);
+    let target: { columnId: string; index: number } | null = null;
+    if (cardDragSessionSnapshot?.activeCardId === activeCardId) {
+      target = virtualCardSlotToApplyTarget(
+        local.cardOrderByColumn,
+        activeCardId,
+        fromCol,
+        cardDragSessionSnapshot.lastValidSlot
+      );
+    }
+    if (!target) {
+      target = resolveCardDropTarget(over.id, local.cardOrderByColumn, visibleColumnIdsSet);
+    }
     if (!target) return;
 
     if (
