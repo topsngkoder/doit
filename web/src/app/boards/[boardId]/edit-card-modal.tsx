@@ -170,6 +170,7 @@ export function EditCardModal({
     () => new Set()
   );
   const [assigneePending, setAssigneePending] = React.useState(false);
+  const [assigneeSearchQuery, setAssigneeSearchQuery] = React.useState("");
   const [openAssigneePanelUserId, setOpenAssigneePanelUserId] = React.useState<string | null>(
     null
   );
@@ -210,6 +211,7 @@ export function EditCardModal({
   React.useEffect(() => {
     if (!open || !card) return;
     setSelectedAssigneeIds(new Set(card.assigneeUserIds));
+    setAssigneeSearchQuery("");
   }, [open, card?.id, assigneeSyncKey]);
 
   React.useEffect(() => {
@@ -346,6 +348,15 @@ export function EditCardModal({
 
   const assigneesOnCard = boardMembers.filter((m) => selectedAssigneeIds.has(m.userId));
   const membersToAdd = boardMembers.filter((m) => !selectedAssigneeIds.has(m.userId));
+  const assigneeSearchQueryNormalized = assigneeSearchQuery.trim().toLocaleLowerCase("ru-RU");
+  const assigneeSearchSuggestions =
+    !assigneeSearchQueryNormalized ? []
+    : membersToAdd
+        .filter((m) => {
+          const haystack = `${m.displayName} ${m.email}`.toLocaleLowerCase("ru-RU");
+          return haystack.includes(assigneeSearchQueryNormalized);
+        })
+        .slice(0, 8);
 
   const labelsOnCard = boardLabels
     .filter((l) => selectedLabelIds.has(l.id))
@@ -776,34 +787,48 @@ export function EditCardModal({
             <div>
               {canManageAssignees && membersToAdd.length > 0 ?
                 <div className="mt-4 border-t border-app-divider pt-3">
-                  <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-app-tertiary">
-                    Добавить участника с доски
-                  </p>
-                  <ul className="space-y-2">
-                    {membersToAdd.map((m) => (
-                      <li key={m.userId}>
-                        <label
-                          className="flex cursor-pointer items-center gap-2 text-sm"
-                          title={`${m.displayName} (${m.email})`}
-                        >
-                          <input
-                            type="checkbox"
-                            className="checkbox-app"
-                            checked={false}
-                            disabled={assigneePending || pending}
-                            onChange={() => void toggleAssignee(m.userId)}
-                          />
-                          <AssigneeAvatar
-                            label={m.displayName}
-                            src={m.avatarUrl ?? null}
-                            className="h-6 w-6 shrink-0 text-[10px]"
-                          />
-                          <span className="sr-only">{m.displayName}</span>
-                          <span className="sr-only">{m.email}</span>
-                        </label>
-                      </li>
-                    ))}
-                  </ul>
+                  <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-app-tertiary">Добавить участника</p>
+                  <div className="relative max-w-[22rem]">
+                    <input
+                      type="text"
+                      value={assigneeSearchQuery}
+                      onChange={(e) => setAssigneeSearchQuery(e.target.value)}
+                      placeholder="Поиск по имени или фамилии"
+                      disabled={assigneePending || pending}
+                      className={cn(inputClass, "h-8 py-1.5 text-sm")}
+                      autoComplete="off"
+                      aria-label="Поиск участника для добавления"
+                    />
+                    {assigneeSearchQuery.trim().length > 0 ?
+                      <div className="popup-panel absolute left-0 right-0 top-[calc(100%+6px)] z-[70] max-h-64 overflow-auto py-1 shadow-[var(--shadow-card)]">
+                        {assigneeSearchSuggestions.length === 0 ?
+                          <p className="px-3 py-2 text-sm text-app-tertiary">Ничего не найдено</p>
+                        : <ul>
+                            {assigneeSearchSuggestions.map((m) => (
+                              <li key={m.userId}>
+                                <button
+                                  type="button"
+                                  disabled={assigneePending || pending}
+                                  onClick={() => {
+                                    void toggleAssignee(m.userId);
+                                    setAssigneeSearchQuery("");
+                                  }}
+                                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-app-primary hover:bg-app-surface-muted"
+                                  title={`${m.displayName} (${m.email})`}
+                                >
+                                  <AssigneeAvatar
+                                    label={m.displayName}
+                                    src={m.avatarUrl ?? null}
+                                    className="h-6 w-6 shrink-0 text-[10px]"
+                                  />
+                                  <span className="min-w-0 truncate">{m.displayName}</span>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>}
+                      </div>
+                    : null}
+                  </div>
                 </div>
               : null}
             </div>
