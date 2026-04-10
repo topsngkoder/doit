@@ -49,7 +49,7 @@ import {
 
 const COLUMN_DND_PREFIX = "column:";
 const COLUMN_SHELL_CLASS =
-  "flex max-h-full w-full shrink-0 flex-col gap-3 rounded-[var(--radius-surface)] border border-app-default bg-[color:var(--board-column-bg)] p-3 shadow-[var(--shadow-card)] backdrop-blur-sm md:w-72";
+  "flex max-h-full w-72 shrink-0 flex-col gap-3 rounded-[var(--radius-surface)] border border-app-default bg-[color:var(--board-column-bg)] p-3 shadow-[var(--shadow-card)] backdrop-blur-sm";
 
 function columnDndId(columnId: string) {
   return `${COLUMN_DND_PREFIX}${columnId}`;
