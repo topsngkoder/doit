@@ -28,8 +28,7 @@ type BoardCanvasProps = {
   canModerateComments: boolean;
   cardContentPermissions: CardContentPermissions;
   board: {
-    backgroundType: "color" | "image";
-    backgroundColor: string | null;
+    backgroundType: "none" | "image";
     backgroundImagePath: string | null;
   };
   columns: Array<{
@@ -63,7 +62,6 @@ export function BoardCanvas({
   return (
     <BoardBackgroundFrame
       backgroundType={board.backgroundType}
-      backgroundColor={board.backgroundColor}
       backgroundImagePath={board.backgroundImagePath}
       className="flex h-full min-h-[320px] flex-1 flex-col gap-4 p-4"
     >

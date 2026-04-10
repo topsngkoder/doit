@@ -111,6 +111,14 @@
   --header-avatar-bg: var(--bg-surface-muted);
   --header-avatar-text: var(--text-secondary);
   --header-avatar-border-hover: rgba(107, 114, 128, 0.7);
+
+  /* Центр уведомлений — строки и бейджи (§8.5 light; в dark — info-subtle / приглушённые поверхности) */
+  --notification-read-row-bg: rgba(24, 24, 27, 0.5);
+  --notification-read-row-border: var(--border-default);
+  --notification-unread-badge-bg: rgba(96, 165, 250, 0.2);
+  --notification-unread-badge-text: var(--info-subtle-text);
+  --notification-read-badge-bg: var(--bg-surface-subtle);
+  --notification-read-badge-text: var(--text-tertiary);
 }
 
 html[data-theme="light"] {
@@ -203,6 +211,13 @@ html[data-theme="light"] {
   --header-avatar-bg: #f8fafc;
   --header-avatar-text: #334155;
   --header-avatar-border-hover: #2563eb;
+
+  --notification-read-row-bg: #ffffff;
+  --notification-read-row-border: #e5eaf1;
+  --notification-unread-badge-bg: #dbeafe;
+  --notification-unread-badge-text: #1e40af;
+  --notification-read-badge-bg: #eef2f7;
+  --notification-read-badge-text: #475569;
 }
 
 @tailwind base;
@@ -360,6 +375,37 @@ html[data-theme="light"] {
   .checkbox-app:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+
+  /* Центр уведомлений §8.5 */
+  .notification-item-unread {
+    border-radius: var(--radius-control);
+    border: 1px solid var(--info-subtle-border);
+    background-color: var(--info-subtle-bg);
+  }
+
+  .notification-item-read {
+    border-radius: var(--radius-control);
+    border: 1px solid var(--notification-read-row-border);
+    background-color: var(--notification-read-row-bg);
+  }
+
+  .notification-badge-unread {
+    border-radius: var(--radius-pill);
+    padding: 0.125rem 0.5rem;
+    font-size: 11px;
+    font-weight: 600;
+    background-color: var(--notification-unread-badge-bg);
+    color: var(--notification-unread-badge-text);
+  }
+
+  .notification-badge-read {
+    border-radius: var(--radius-pill);
+    padding: 0.125rem 0.5rem;
+    font-size: 11px;
+    font-weight: 600;
+    background-color: var(--notification-read-badge-bg);
+    color: var(--notification-read-badge-text);
   }
 
   /* Toast: статусные подложки по токенам (dark/light из :root / html[data-theme="light"]) */

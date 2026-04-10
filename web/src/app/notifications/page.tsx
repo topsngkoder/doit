@@ -45,24 +45,24 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
   const notifications = rows ?? [];
   const unreadCount = notifications.filter((n) => !n.read_at).length;
 
+  const headerLinkClass =
+    "focus-ring-app rounded-md px-3 py-1.5 text-xs font-medium text-app-secondary transition-colors hover:bg-app-surface-muted hover:text-app-primary";
+
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col justify-center gap-6">
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-50">
+          <h1 className="text-2xl font-semibold tracking-tight text-app-primary">
             Центр уведомлений
           </h1>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-app-secondary">
             Ваши уведомления в приложении. Непрочитанных:{" "}
-            <span className="font-medium text-slate-200">{unreadCount}</span>.
+            <span className="font-medium text-app-primary">{unreadCount}</span>.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/notifications/settings"
-            className="rounded-md px-3 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-900/60 hover:text-slate-50"
-          >
+          <Link href="/notifications/settings" className={headerLinkClass}>
             Настройки
           </Link>
 
@@ -88,9 +88,9 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
         <Toast title="Ошибка загрузки" message={listError.message} variant="error" />
       ) : null}
 
-      <section className="rounded-lg border border-slate-800 bg-slate-950/60 px-4 py-5 text-sm text-slate-200">
+      <section className="surface-card px-4 py-5 text-sm text-app-primary">
         {notifications.length === 0 ? (
-          <p className="text-slate-400">Пока нет уведомлений.</p>
+          <p className="text-app-secondary">Пока нет уведомлений.</p>
         ) : (
           <ul className="space-y-3">
             {notifications.map((n) => {
@@ -106,29 +106,26 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
                 <li
                   key={n.id}
                   className={[
-                    "rounded-lg border p-3",
-                    isUnread ?
-                      "border-sky-600/60 bg-sky-500/10"
-                    : "border-slate-800 bg-slate-950/40"
+                    "p-3",
+                    isUnread ? "notification-item-unread" : "notification-item-read"
                   ].join(" ")}
                 >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="truncate font-medium text-slate-50">{n.title}</div>
+                        <div className="truncate font-medium text-app-primary">{n.title}</div>
                         <span
-                          className={[
-                            "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                            isUnread ? "bg-sky-500/20 text-sky-200" : "bg-slate-800 text-slate-300"
-                          ].join(" ")}
+                          className={
+                            isUnread ? "notification-badge-unread" : "notification-badge-read"
+                          }
                         >
                           {isUnread ? "новое" : "прочитано"}
                         </span>
                       </div>
-                      <div className="whitespace-pre-wrap break-words text-sm text-slate-200">
+                      <div className="whitespace-pre-wrap break-words text-sm text-app-secondary">
                         {n.body}
                       </div>
-                      <div className="text-xs text-slate-400">
+                      <div className="text-xs text-app-tertiary">
                         {formatRuDateTime(n.created_at)}
                         {n.read_at ? ` · прочитано: ${formatRuDateTime(n.read_at)}` : null}
                       </div>
@@ -138,7 +135,7 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
                       {href ? (
                         <Link
                           href={href}
-                          className="rounded-md px-3 py-1.5 text-xs font-medium text-sky-300 hover:bg-slate-900/60 hover:text-sky-200"
+                          className="focus-ring-app rounded-md px-3 py-1.5 text-xs font-medium text-app-link transition-colors hover:bg-app-surface-muted hover:text-[color:var(--text-link-hover)]"
                         >
                           Открыть
                         </Link>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import {
-  updateBoardBackgroundColorAction,
+  removeBoardBackgroundImageAction,
   updateBoardBackgroundImageAction,
   type BoardBackgroundMutationResult
 } from "./actions";
@@ -15,8 +15,7 @@ const inputClass = "field-base";
 type BoardBackgroundButtonProps = {
   boardId: string;
   canManage: boolean;
-  currentType: "color" | "image";
-  currentColor: string | null;
+  hasBackgroundImage: boolean;
   triggerClassName?: string;
   triggerVariant?: "primary" | "secondary" | "ghost" | "destructive";
   onTriggerClick?: () => void;
@@ -25,39 +24,20 @@ type BoardBackgroundButtonProps = {
 export function BoardBackgroundButton({
   boardId,
   canManage,
-  currentType,
-  currentColor,
+  hasBackgroundImage,
   triggerClassName,
   triggerVariant = "secondary",
   onTriggerClick
 }: BoardBackgroundButtonProps) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
-  const [color, setColor] = React.useState(currentColor ?? "#18181B");
   const [file, setFile] = React.useState<File | null>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [pendingMode, setPendingMode] = React.useState<"color" | "image" | null>(null);
-
-  React.useEffect(() => {
-    setColor(currentColor ?? "#18181B");
-  }, [currentColor, open]);
+  const [pendingMode, setPendingMode] = React.useState<"image" | "remove" | null>(null);
 
   if (!canManage) {
     return null;
   }
-
-  const handleSaveColor = async () => {
-    if (pendingMode) return;
-    setError(null);
-    setPendingMode("color");
-    const res: BoardBackgroundMutationResult = await updateBoardBackgroundColorAction(boardId, color);
-    setPendingMode(null);
-    if (!res.ok) {
-      setError(res.message);
-      return;
-    }
-    router.refresh();
-  };
 
   const handleUploadImage = async () => {
     if (pendingMode) return;
@@ -77,6 +57,19 @@ export function BoardBackgroundButton({
     router.refresh();
   };
 
+  const handleRemoveImage = async () => {
+    if (pendingMode) return;
+    setError(null);
+    setPendingMode("remove");
+    const res: BoardBackgroundMutationResult = await removeBoardBackgroundImageAction(boardId);
+    setPendingMode(null);
+    if (!res.ok) {
+      setError(res.message);
+      return;
+    }
+    router.refresh();
+  };
+
   return (
     <>
       <Button
@@ -93,37 +86,13 @@ export function BoardBackgroundButton({
       </Button>
       <Modal open={open} title="Фон доски" onClose={() => setOpen(false)} className="max-w-md">
         <div className="space-y-4">
-          <p className="text-xs text-slate-400">
-            Можно выбрать цвет или загрузить изображение.
+          <p className="text-xs text-app-secondary">
+            Без изображения используется фон приложения (тёмная или светлая тема). Можно загрузить
+            картинку на фон доски.
           </p>
 
-          <div className="space-y-2 rounded-lg border border-slate-800/90 bg-slate-900/40 p-3">
-            <p className="text-xs font-medium text-slate-300">Цвет</p>
-            <label className="flex items-center gap-3">
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                disabled={pendingMode !== null}
-                className="h-9 w-14 cursor-pointer rounded border border-slate-600 bg-slate-900"
-              />
-              <span className="font-mono text-xs text-slate-500">{color.toUpperCase()}</span>
-            </label>
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                size="sm"
-                variant={currentType === "color" ? "secondary" : "primary"}
-                disabled={pendingMode !== null}
-                onClick={() => void handleSaveColor()}
-              >
-                {pendingMode === "color" ? "Сохранение…" : "Применить цвет"}
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-2 rounded-lg border border-slate-800/90 bg-slate-900/40 p-3">
-            <p className="text-xs font-medium text-slate-300">Изображение</p>
+          <div className="space-y-2 rounded-[var(--radius-surface)] border border-app-default bg-app-surface-muted p-3">
+            <p className="text-xs font-medium text-app-primary">Изображение</p>
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif"
@@ -131,21 +100,32 @@ export function BoardBackgroundButton({
               disabled={pendingMode !== null}
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
             />
-            <div className="flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2">
+              {hasBackgroundImage ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={pendingMode !== null}
+                  onClick={() => void handleRemoveImage()}
+                >
+                  {pendingMode === "remove" ? "Удаление…" : "Убрать изображение"}
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 size="sm"
-                variant={currentType === "image" ? "secondary" : "primary"}
+                variant="primary"
                 disabled={pendingMode !== null}
                 onClick={() => void handleUploadImage()}
               >
-                {pendingMode === "image" ? "Загрузка…" : "Загрузить изображение"}
+                {pendingMode === "image" ? "Загрузка…" : hasBackgroundImage ? "Заменить изображение" : "Загрузить изображение"}
               </Button>
             </div>
           </div>
 
           {error ?
-            <p className="text-sm text-rose-400" role="alert">
+            <p className="text-sm text-app-validation-error" role="alert">
               {error}
             </p>
           : null}

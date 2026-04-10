@@ -27,14 +27,6 @@ export type BoardBackgroundMutationResult =
   | { ok: true }
   | { ok: false; message: string };
 
-function normalizeHexColor(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (!/^#[0-9A-Fa-f]{6}$/.test(trimmed)) {
-    return null;
-  }
-  return trimmed.toUpperCase();
-}
-
 function extensionForMimeType(mimeType: string): string | null {
   if (mimeType === "image/jpeg") return "jpg";
   if (mimeType === "image/png") return "png";
@@ -43,15 +35,9 @@ function extensionForMimeType(mimeType: string): string | null {
   return null;
 }
 
-export async function updateBoardBackgroundColorAction(
-  boardId: string,
-  colorRaw: string
+export async function removeBoardBackgroundImageAction(
+  boardId: string
 ): Promise<BoardBackgroundMutationResult> {
-  const color = normalizeHexColor(colorRaw);
-  if (!color) {
-    return { ok: false, message: "Некорректный цвет: нужен формат #RRGGBB." };
-  }
-
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -77,8 +63,8 @@ export async function updateBoardBackgroundColorAction(
   const { error: updateError } = await supabase
     .from("boards")
     .update({
-      background_type: "color",
-      background_color: color,
+      background_type: "none",
+      background_color: null,
       background_image_path: null
     })
     .eq("id", boardId);

@@ -36,13 +36,12 @@ function writeCachedSignedUrl(path: string, url: string) {
 }
 
 export function BoardBackgroundFrame(props: {
-  backgroundType: "color" | "image";
-  backgroundColor: string | null;
+  backgroundType: "none" | "image";
   backgroundImagePath: string | null;
   className?: string;
   children: ReactNode;
 }) {
-  const { backgroundType, backgroundColor, backgroundImagePath, className, children } = props;
+  const { backgroundType, backgroundImagePath, className, children } = props;
   const [signedUrl, setSignedUrl] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -83,23 +82,18 @@ export function BoardBackgroundFrame(props: {
     };
   }, [backgroundType, backgroundImagePath]);
 
-  const backdropClass =
-    backgroundType === "color" && backgroundColor
-      ? ""
-      : "bg-slate-900/40";
+  const showImage = backgroundType === "image" && signedUrl;
+  const surfaceClass = showImage ? "" : "bg-app-page";
 
   const style: CSSProperties = {};
-  if (backgroundType === "color" && backgroundColor) {
-    style.backgroundColor = backgroundColor;
-  }
-  if (backgroundType === "image" && signedUrl) {
+  if (showImage) {
     style.backgroundImage = `linear-gradient(rgba(2, 6, 23, 0.25), rgba(2, 6, 23, 0.25)), url("${signedUrl}")`;
     style.backgroundSize = "cover";
     style.backgroundPosition = "center";
   }
 
   return (
-    <section className={`${className ?? ""} ${backdropClass}`} style={style}>
+    <section className={[className, surfaceClass].filter(Boolean).join(" ")} style={style}>
       {children}
     </section>
   );

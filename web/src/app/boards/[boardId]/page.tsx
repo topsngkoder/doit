@@ -38,7 +38,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
   type SnapshotBoard = {
     id: string;
     name: string;
-    background_type: "color" | "image";
+    background_type: "none" | "image";
     background_color: string | null;
     background_image_path: string | null;
   };
@@ -336,8 +336,9 @@ export default async function BoardPage({ params }: BoardPageProps) {
             boardLabels={boardLabels}
             fieldDefinitions={fieldDefinitions}
             previewItems={previewItems}
-            backgroundType={board.background_type as "color" | "image"}
-            backgroundColor={board.background_color}
+            hasBackgroundImage={
+              board.background_type === "image" && !!board.background_image_path
+            }
           />
         </div>
       </div>
@@ -368,8 +369,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
           canDeleteOwnComment={canDeleteOwnComment}
           canModerateComments={canModerateComments}
           board={{
-            backgroundType: board.background_type as "color" | "image",
-            backgroundColor: board.background_color,
+            backgroundType: board.background_type as "none" | "image",
             backgroundImagePath: board.background_image_path
           }}
           columns={columns}

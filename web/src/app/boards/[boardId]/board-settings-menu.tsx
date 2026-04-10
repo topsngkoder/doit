@@ -17,8 +17,7 @@ type BoardSettingsMenuProps = {
   boardLabels: BoardLabelOption[];
   fieldDefinitions: NewCardFieldDefinition[];
   previewItems: BoardCardPreviewItem[];
-  backgroundType: "color" | "image";
-  backgroundColor: string | null;
+  hasBackgroundImage: boolean;
 };
 
 export function BoardSettingsMenu({
@@ -30,8 +29,7 @@ export function BoardSettingsMenu({
   boardLabels,
   fieldDefinitions,
   previewItems,
-  backgroundType,
-  backgroundColor
+  hasBackgroundImage
 }: BoardSettingsMenuProps) {
   const [menuOpen, setMenuOpen] = React.useState(false);
   const closeTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -125,8 +123,7 @@ export function BoardSettingsMenu({
             <BoardBackgroundButton
               boardId={boardId}
               canManage={canChangeBoardBackground}
-              currentType={backgroundType}
-              currentColor={backgroundColor}
+              hasBackgroundImage={hasBackgroundImage}
               triggerVariant="ghost"
               triggerClassName="w-full justify-start whitespace-nowrap cursor-pointer hover:bg-slate-800/90"
               onTriggerClick={() => setMenuOpen(false)}
