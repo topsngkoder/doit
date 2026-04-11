@@ -17,7 +17,7 @@ export function cardAttachmentUploadApiPath(boardId: string, cardId: string): st
   return `/api/boards/${encodeURIComponent(boardId)}/cards/${encodeURIComponent(cardId)}/attachments/upload`;
 }
 
-/** GET — 302 на временный URL Яндекса (спец. 11.3: без прикладного кэша между запросами). YDB5.6: `fieldDefinitionId` в query. */
+/** GET — тело файла с `Content-Disposition` по `original_file_name` (спец. 11.5); временный URL Яндекса только на сервере (спец. 11.3). YDB5.6: `fieldDefinitionId` в query. */
 export function cardAttachmentDownloadPath(
   boardId: string,
   cardId: string,

@@ -18,7 +18,7 @@ import {
 export const CARD_ATTACHMENT_DOWNLOAD_TEMPORARY_URL_MAX_APP_CACHE_SECONDS = 300;
 
 export type ResolveCardAttachmentTemporaryDownloadUrlResult =
-  | { ok: true; temporaryUrl: string }
+  | { ok: true; temporaryUrl: string; originalFileName: string; mimeType: string | null }
   | { ok: false; httpStatus: number; message: string };
 
 function invalidIdsResult(): ResolveCardAttachmentTemporaryDownloadUrlResult {
@@ -26,7 +26,8 @@ function invalidIdsResult(): ResolveCardAttachmentTemporaryDownloadUrlResult {
 }
 
 /**
- * YDB5.1 / YDB5.2 / YDB5.3 / YDB5.6: на каждый вызов — новая временная ссылка у API Диска; URL не сохраняем в приложении.
+ * YDB5.1 / YDB5.2 / YDB5.3 / YDB5.6 / спец. 11.5: на каждый вызов — новая временная ссылка у API Диска; URL не сохраняем в приложении
+ * и не отдаём клиенту напрямую (маршрут скачивания проксирует тело с `Content-Disposition` по `original_file_name`).
  * Спец. 11.4: если строка `ready` есть, а файла на Диске нет (`not_found` от API) — ответ с
  * {@link YANDEX_DISK_MSG_FILE_NOT_FOUND_ON_DISK}, запись вложения в БД не изменяем и не удаляем.
  * Лимит прикладного кэша URL — {@link CARD_ATTACHMENT_DOWNLOAD_TEMPORARY_URL_MAX_APP_CACHE_SECONDS}.
@@ -51,7 +52,7 @@ export async function resolveCardAttachmentTemporaryDownloadUrl(
 
   const { data: row, error: rowError } = await supabase
     .from("card_attachments")
-    .select("id, storage_path")
+    .select("id, storage_path, original_file_name, mime_type")
     .eq("id", attachmentId)
     .eq("board_id", boardId)
     .eq("card_id", cardId)
@@ -80,7 +81,12 @@ export async function resolveCardAttachmentTemporaryDownloadUrl(
 
   try {
     const temporaryUrl = await diskGetDownloadLink(tokenResult.accessToken, row.storage_path);
-    return { ok: true, temporaryUrl };
+    return {
+      ok: true,
+      temporaryUrl,
+      originalFileName: row.original_file_name ?? "",
+      mimeType: row.mime_type ?? null
+    };
   } catch (e) {
     if (e instanceof YandexDiskClientError) {
       const msg =

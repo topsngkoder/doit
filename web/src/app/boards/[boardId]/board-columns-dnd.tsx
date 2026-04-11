@@ -31,7 +31,10 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
 import type { CardAttachmentListItem } from "@/lib/card-attachment-ui-types";
+import { flattenReadyYandexAttachmentsForBoardCardTile } from "@/lib/yandex-disk/flatten-ready-yandex-attachments-for-board-card-tile";
+import { cardAttachmentDownloadPath } from "@/lib/yandex-disk/yandex-disk-board-ui-endpoints";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { useBoardYandexDiskIntegration } from "./board-yandex-disk-integration-context";
 import { BoardColumnHeader } from "./board-column-header";
 import {
   CreateCardButton,
@@ -449,6 +452,7 @@ function EmptyColumnCardDropSlot({ columnId, heightPx }: { columnId: string; hei
 }
 
 function BoardCardRow({
+  boardId,
   card,
   currentUserId,
   cardContentPermissions,
@@ -465,6 +469,7 @@ function BoardCardRow({
   shouldSuppressCardModalOpenClick,
   disableOpen = false
 }: {
+  boardId: string;
   card: BoardCardListItem;
   currentUserId: string;
   cardContentPermissions: CardContentPermissions;
@@ -486,7 +491,20 @@ function BoardCardRow({
   /** Overlay использует тот же визуальный компонент, но без открытия модалки. */
   disableOpen?: boolean;
 }) {
+  const yandexDiskIntegration = useBoardYandexDiskIntegration();
   const canOpen = !disableOpen && canOpenCardModal(cardContentPermissions, card, currentUserId);
+  const yandexIntegrationActive = yandexDiskIntegration?.status === "active";
+  const canClickDownloadOnTile =
+    !disableOpen &&
+    canOpenCardModal(cardContentPermissions, card, currentUserId) &&
+    yandexIntegrationActive;
+  const tileYandexAttachments = React.useMemo(() => {
+    const flat = flattenReadyYandexAttachmentsForBoardCardTile(
+      fieldDefinitions,
+      card.readyAttachmentsByFieldId
+    );
+    return flat.slice(0, 3);
+  }, [fieldDefinitions, card.id, card.readyAttachmentsByFieldId]);
   // Матрица move × open (`canMoveCards` → sortableDragSurface или visualMoveSurface до mount, `canOpenCardModal` → canOpen), план DND3.x / DND6.x / DND7.1:
   // — sortableDragSurface && !canOpen: только drag, без открытия (DND3.2); tabIndex снят с последовательного фокуса (DND6.1).
   // — !sortableDragSurface && canOpen: клик/Enter/Space по всей поверхности, без drag listeners (DND3.3).
@@ -735,12 +753,43 @@ function BoardCardRow({
               return null;
             })}
         </div>
+        {tileYandexAttachments.length > 0 ?
+          <div
+            className="mt-1.5 min-w-0 border-t border-app-divider/60 pt-1.5"
+            role="list"
+            aria-label="Вложения Яндекс.Диска"
+          >
+            {tileYandexAttachments.map((a) => (
+              <div key={a.id} className="min-w-0 py-0.5 first:pt-0" role="listitem">
+                {canClickDownloadOnTile ?
+                  <a
+                    href={cardAttachmentDownloadPath(boardId, card.id, a.id, a.field_definition_id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={a.original_file_name}
+                    className="block w-full min-w-0 truncate text-left text-[11px] font-normal text-blue-600 underline-offset-2 hover:underline hover:text-blue-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring)] dark:text-blue-400 dark:hover:text-blue-300"
+                    onClick={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    {a.original_file_name}
+                  </a>
+                : <span
+                    className="block w-full min-w-0 truncate text-[11px] text-blue-600 dark:text-blue-400"
+                    title={a.original_file_name}
+                  >
+                    {a.original_file_name}
+                  </span>}
+              </div>
+            ))}
+          </div>
+        : null}
       </div>
     </div>
   );
 }
 
 function SortableBoardCard({
+  boardId,
   card,
   currentUserId,
   cardContentPermissions,
@@ -760,6 +809,7 @@ function SortableBoardCard({
   /** Пока другая карточка в float-drag, не применять reorder-transform от `@dnd-kit` — раскладка уже задаётся `displayFlow`. */
   suppressListReorderTransform
 }: {
+  boardId: string;
   card: BoardCardListItem;
   currentUserId: string;
   cardContentPermissions: CardContentPermissions;
@@ -858,6 +908,7 @@ function SortableBoardCard({
       {showListPlaceholder ?
         <BoardCardInsertSlot heightPx={listDragPlaceholderHeightPx} />
       : <BoardCardRow
+          boardId={boardId}
           card={card}
           currentUserId={currentUserId}
           cardContentPermissions={cardContentPermissions}
@@ -996,6 +1047,7 @@ function SortableColumnShell({
     : cards.length === 0;
 
   const sortableCardProps = {
+    boardId,
     currentUserId,
     cardContentPermissions,
     boardLabels,
@@ -1193,6 +1245,7 @@ function StaticColumnShell({
     : cards.length === 0;
 
   const sortableCardProps = {
+    boardId,
     currentUserId,
     cardContentPermissions,
     boardLabels,
@@ -1390,6 +1443,7 @@ function BoardGridStatic({
               .map((card) => (
                 <div key={card!.id} role="listitem">
                   <BoardCardRow
+                    boardId={boardId}
                     card={card!}
                     currentUserId={currentUserId}
                     cardContentPermissions={cardContentPermissions}
@@ -2625,6 +2679,7 @@ export function BoardColumnsDnD({
                 }}
               >
                 <BoardCardRow
+                  boardId={boardId}
                   card={cardDragOverlay.card}
                   currentUserId={currentUserId}
                   cardContentPermissions={cardContentPermissions}
