@@ -114,6 +114,8 @@
 | 2026-04-11 | YDB5.2 | Спец. 11.3: каждый GET скачивания по-прежнему запрашивает новый URL у Диска (без серверного кэша). `download/route.ts`: `dynamic = "force-dynamic"`, заголовки `Cache-Control: private, no-store, no-cache, max-age=0, must-revalidate` и `Pragma: no-cache` на JSON и на 302. Константа `CARD_ATTACHMENT_DOWNLOAD_TEMPORARY_URL_MAX_APP_CACHE_SECONDS = 300` в `resolve-card-attachment-temporary-download-url.ts` как верхняя граница прикладного кэша при будущем UI. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
 | 2026-04-11 | YDB5.3 | Спец. 11.4: при `YandexDiskClientError` с `code === "not_found"` после `diskGetDownloadLink` ответ HTTP 404 и текст `YANDEX_DISK_MSG_FILE_NOT_FOUND_ON_DISK`; мутаций `card_attachments` нет. Явная ветка в `resolve-card-attachment-temporary-download-url.ts`, JSDoc (11.4 + отсутствие удаления строки). В `yandex-disk-client.ts` у `diskGetDownloadLink` — привязка 404/`DiskNotFoundError` к `not_found`. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
 | 2026-04-11 | YDB5.4 | `web/src/lib/yandex-disk/delete-card-attachment.ts`: `deleteCardAttachment` — сессия, `can_edit_card_content`, только `status=ready`, активная интеграция + `ensureBoardYandexDiskAccessToken`, `diskDeleteResource` затем `DELETE` строки; `not_found` от Диска → удаление строки (спец. 12.3). Константа `YANDEX_DISK_MSG_NO_DELETE_PERMISSION` (спец. 15.1). `web/src/app/boards/[boardId]/card-attachment-delete-actions.ts`: `deleteCardAttachmentAction` + `revalidatePath`. RLS DELETE уже в YDB1.4. Новых миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB5.5 | `web/src/lib/yandex-disk/best-effort-delete-yandex-disk-objects-on-card-delete.ts`: `bestEffortDeleteYandexDiskObjectsForCard` — service-role список вложений (`listCardAttachmentsAllStatusesForServiceRole`), пути `yandex_disk` с дедупом; `ensureBoardYandexDiskAccessToken`; цикл `diskDeleteResource` (`not_found` — ок, прочие ошибки — `console.warn`, удаление карточки не блокируется). `deleteCardAction` в `actions.ts`: вызов до `DELETE cards`. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB6.1 | Миграция `20260411231500_ydb6_1_get_board_snapshot_yandex_disk_integration.sql`: `get_board_snapshot` дополнен ключом `yandex_disk_integration` — при отсутствии строки интеграции `null`; иначе объект с `status` для всех с `board.view`, а `yandex_login`, `root_folder_path`, `last_authorized_at`, `last_error_text` только если `boards.owner_user_id = auth.uid()` или `is_system_admin` (без токенов). `npx supabase db push` применён. TS-типы snapshot — в YDB6.3. |
 
 ### EPIC YDB1 - Подготовить модель данных и миграции
 - [x] **YDB1.1 (done)** Спроектировать таблицу привязки Яндекс.Диска к доске
@@ -254,14 +256,14 @@
   - затем удалять запись из БД;
   - если файла у провайдера уже нет, всё равно удалять запись и считать операцию успешной очисткой;
   - **DoD**: delete-flow соответствует разделу 12.2 и 12.3.
-- [ ] **YDB5.5 (todo)** Реализовать удаление вложений при удалении карточки
+- [x] **YDB5.5 (done)** Реализовать удаление вложений при удалении карточки
   - до/во время удаления карточки пройти по её вложениям;
   - попытаться очистить файлы в Яндекс.Диске;
   - при отсутствии части файлов у провайдера не валить удаление карточки;
   - **DoD**: удаление карточки убирает записи вложений и пытается очистить provider-side ресурсы без ложных фейлов.
 
 ### EPIC YDB6 - Подготовить snapshot, типы и серверные контракты для UI
-- [ ] **YDB6.1 (todo)** Расширить `get_board_snapshot` данными интеграции уровня доски
+- [x] **YDB6.1 (done)** Расширить `get_board_snapshot` данными интеграции уровня доски
   - добавить безопасный срез состояния интеграции без токенов;
   - вернуть: статус, логин аккаунта, путь корневой папки, дату последней успешной авторизации, last_error_text при необходимости для owner-only UI;
   - **DoD**: SSR может отрисовать раздел интеграции без дополнительных клиентских запросов.

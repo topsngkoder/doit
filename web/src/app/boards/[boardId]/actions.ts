@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { bestEffortDeleteYandexDiskObjectsForCard } from "@/lib/yandex-disk/best-effort-delete-yandex-disk-objects-on-card-delete";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   COLUMN_TYPES,
@@ -1998,6 +1999,8 @@ export async function deleteCardAction(
   if (!row || row.board_id !== boardId) {
     return { ok: false, message: "Карточка не найдена на этой доске." };
   }
+
+  await bestEffortDeleteYandexDiskObjectsForCard(boardId, cardId);
 
   const { error } = await supabase.from("cards").delete().eq("id", cardId).eq("board_id", boardId);
 
