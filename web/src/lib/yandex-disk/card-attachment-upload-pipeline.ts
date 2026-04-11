@@ -6,6 +6,7 @@ import { normalizeUuidParam } from "@/lib/board-id-param";
 
 import { ensureBoardYandexDiskAccessToken } from "./board-yandex-disk-access-token";
 import {
+  diskResourceExists,
   diskGetUploadLink,
   diskPutUpload,
   YandexDiskClientError
@@ -49,6 +50,29 @@ async function markAttachmentFailed(supabase: SupabaseClient, attachmentId: stri
   if (error) {
     console.error("card_attachments mark failed:", error.message, attachmentId);
   }
+}
+
+async function waitForUploadedObjectToAppear(
+  accessToken: string,
+  storagePath: string
+): Promise<boolean> {
+  // `202 Accepted` у Яндекса означает, что файл уже принят uploader-ом, но ещё переносится в Диск.
+  // Даём провайдеру короткое окно стабилизации, чтобы не оставлять успешные загрузки в `uploading`.
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    try {
+      if (await diskResourceExists(accessToken, storagePath)) {
+        return true;
+      }
+    } catch (e) {
+      if (!(e instanceof YandexDiskClientError) || e.code !== "network_error") {
+        throw e;
+      }
+    }
+  }
+  return false;
 }
 
 export type UploadOneCardAttachmentFileResult =
@@ -108,18 +132,39 @@ export async function uploadOneCardAttachmentFile(
   try {
     const { href } = await diskGetUploadLink(tokenResult.accessToken, storagePath);
     const buf = new Uint8Array(await file.arrayBuffer());
-    await diskPutUpload(href, buf, { contentType: mimeType !== "application/octet-stream" ? mimeType : undefined });
+    const uploadResult = await diskPutUpload(href, buf, {
+      contentType: mimeType !== "application/octet-stream" ? mimeType : undefined
+    });
+    if (uploadResult.acceptedAsync) {
+      await waitForUploadedObjectToAppear(tokenResult.accessToken, storagePath);
+    }
   } catch (e) {
-    if (e instanceof YandexDiskClientError) {
+    if (e instanceof YandexDiskClientError && e.code === "network_error") {
+      try {
+        if (await waitForUploadedObjectToAppear(tokenResult.accessToken, storagePath)) {
+          console.warn("card attachment upload recovered after network_error:", attachmentId);
+        } else {
+          throw e;
+        }
+      } catch (recoveryError) {
+        if (!(recoveryError instanceof YandexDiskClientError) || recoveryError.code !== "network_error") {
+          console.error("card attachment upload recovery:", recoveryError);
+        }
+        console.error("card attachment disk upload:", e.code, e.rawProviderMessage ?? e.message);
+        await markAttachmentFailed(supabase, attachmentId);
+        return { ok: false, message: YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE };
+      }
+    } else if (e instanceof YandexDiskClientError) {
       const mapped =
         mapYandexDiskClientErrorToProductMessage(e, "upload") ?? YANDEX_DISK_MSG_UPLOAD_FAILED;
       console.error("card attachment disk upload:", e.code, e.rawProviderMessage ?? e.message);
       await markAttachmentFailed(supabase, attachmentId);
       return { ok: false, message: mapped };
+    } else {
+      console.error("card attachment disk upload:", e);
+      await markAttachmentFailed(supabase, attachmentId);
+      return { ok: false, message: YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE };
     }
-    console.error("card attachment disk upload:", e);
-    await markAttachmentFailed(supabase, attachmentId);
-    return { ok: false, message: YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE };
   }
 
   const { error: readyError } = await supabase

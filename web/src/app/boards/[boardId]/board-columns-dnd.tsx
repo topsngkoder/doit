@@ -182,6 +182,27 @@ function buildCardsById(map: Map<string, BoardCardListItem[]>): Map<string, Boar
   return m;
 }
 
+/**
+ * Когда `pendingCardSignatureRef` блокирует полную подмену локального порядка (оптимистичный DnD ≠ SSR),
+ * всё равно подтягиваем `readyAttachmentsByFieldId` с сервера — иначе после `router.refresh()` вложения
+ * не появляются в открытой карточке, хотя строки в БД уже `ready`.
+ */
+function mergeReadyAttachmentsFromServer(
+  prev: BoardLocalState,
+  serverCardsById: Map<string, BoardCardListItem>
+): BoardLocalState {
+  const cardsById = new Map(prev.cardsById);
+  for (const [id, serverCard] of serverCardsById) {
+    const local = cardsById.get(id);
+    if (!local) continue;
+    cardsById.set(id, {
+      ...local,
+      readyAttachmentsByFieldId: serverCard.readyAttachmentsByFieldId
+    });
+  }
+  return { ...prev, cardsById };
+}
+
 function cardOrderRecordSignature(order: Record<string, string[]>): string {
   const keys = Object.keys(order).sort((a, b) => a.localeCompare(b));
   return keys.map((k) => `${k}=${(order[k] ?? []).join(",")}`).join("|");
@@ -1480,16 +1501,18 @@ export function BoardColumnsDnD({
   const cardSig = cardOrderSignature(cardsByColumnId);
   React.useEffect(() => {
     const pendingCardSig = pendingCardSignatureRef.current;
+    const serverCardsById = buildCardsById(cardsByColumnId);
     if (pendingCardSig) {
       if (cardSig === pendingCardSig) {
         pendingCardSignatureRef.current = null;
       } else {
+        setLocal((prev) => mergeReadyAttachmentsFromServer(prev, serverCardsById));
         return;
       }
     }
     setLocal((prev) => ({
       ...prev,
-      cardsById: buildCardsById(cardsByColumnId),
+      cardsById: serverCardsById,
       cardOrderByColumn: buildCardOrderRecord(cardsByColumnId)
     }));
   }, [boardId, cardsByColumnId, cardSig]);
@@ -2407,6 +2430,11 @@ export function BoardColumnsDnD({
       canEditOwnComment={canEditOwnComment}
       canDeleteOwnComment={canDeleteOwnComment}
       canModerate={canModerateComments}
+      canDownloadAttachments={
+        editingCard ?
+          canOpenCardModal(cardContentPermissions, editingCard, currentUserId)
+        : false
+      }
       currentUserId={currentUserId}
       boardMembers={membersForNewCard}
       fieldDefinitions={fieldDefinitions}

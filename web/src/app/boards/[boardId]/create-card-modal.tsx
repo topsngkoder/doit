@@ -16,6 +16,8 @@ import {
   type FieldDraft,
   type NewCardFieldDefinition
 } from "./card-field-drafts";
+import { yandexDiskCardFieldNonActiveIntegrationHint } from "@/lib/yandex-disk/yandex-disk-card-field-empty-copy";
+import { useBoardYandexDiskIntegration } from "./board-yandex-disk-integration-context";
 
 export type NewCardMemberOption = {
   userId: string;
@@ -45,6 +47,7 @@ export function CreateCardModal({
   fieldDefinitions,
   currentUserId
 }: CreateCardModalProps) {
+  const yandexDiskIntegration = useBoardYandexDiskIntegration();
   const router = useRouter();
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
@@ -273,18 +276,26 @@ export function CreateCardModal({
           }
 
           if (f.fieldType === "yandex_disk" && d.fieldType === "yandex_disk") {
+            const yandexInactiveHint =
+              yandexDiskIntegration?.status === "active" ?
+                null
+              : yandexDiskCardFieldNonActiveIntegrationHint(yandexDiskIntegration);
             return (
               <div
                 key={f.id}
-                className="rounded-[var(--radius-control)] border border-app-divider bg-app-surface-muted p-3"
+                className="space-y-2 rounded-[var(--radius-control)] border border-app-divider bg-app-surface-muted p-3"
               >
                 <p className="text-xs font-medium text-app-secondary">
                   {f.name}
                   {reqLabel}
                 </p>
-                <p className="mt-1 text-xs text-app-tertiary">
-                  Файлы с Яндекс.Диска можно будет добавить после создания карточки.
+                <p className="text-xs text-app-tertiary">
+                  После создания карточки файлы можно добавить в этом поле в окне редактирования (вкладка
+                  «Детали»).
                 </p>
+                {yandexInactiveHint ?
+                  <p className="text-xs text-app-secondary">{yandexInactiveHint}</p>
+                : null}
               </div>
             );
           }

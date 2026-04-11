@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { bestEffortDeleteYandexDiskObjectsForBoardFieldDefinition } from "@/lib/yandex-disk/best-effort-delete-yandex-disk-objects-on-board-field-delete";
 import { bestEffortDeleteYandexDiskObjectsForCard } from "@/lib/yandex-disk/best-effort-delete-yandex-disk-objects-on-card-delete";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 import { isBoardFieldType } from "./board-field-types";
 import {
   COLUMN_TYPES,
@@ -794,7 +796,7 @@ export async function updateBoardFieldDefinitionAction(
 
   const { data: row, error: readError } = await supabase
     .from("board_field_definitions")
-    .select("id, board_id")
+    .select("id, board_id, field_type")
     .eq("id", fieldDefinitionId)
     .maybeSingle();
 
@@ -803,6 +805,63 @@ export async function updateBoardFieldDefinitionAction(
   }
   if (!row || row.board_id !== boardId) {
     return { ok: false, message: "Поле не найдено на этой доске." };
+  }
+
+  const previousType = row.field_type;
+  const nextType = payload.fieldType;
+
+  if (previousType !== nextType) {
+    const { data: canManageFields, error: permErr } = await supabase.rpc(
+      "has_board_permission",
+      {
+        p_board_id: boardId,
+        p_permission: "card_fields.manage"
+      }
+    );
+    if (permErr) {
+      return { ok: false, message: permErr.message };
+    }
+    if (!canManageFields) {
+      return { ok: false, message: "Нет права управлять полями доски." };
+    }
+
+    if (previousType === "yandex_disk" && nextType !== "yandex_disk") {
+      const admin = getSupabaseServiceRoleClient();
+      const { count, error: cntErr } = await admin
+        .from("card_attachments")
+        .select("*", { count: "exact", head: true })
+        .eq("board_id", boardId)
+        .eq("field_definition_id", fieldDefinitionId);
+      if (cntErr) {
+        return { ok: false, message: cntErr.message };
+      }
+      if (count != null && count > 0) {
+        return {
+          ok: false,
+          message:
+            "Нельзя сменить тип поля: для него есть вложения Яндекс.Диска. Удалите файлы или удалите поле."
+        };
+      }
+    }
+
+    if (nextType === "yandex_disk" && previousType !== "yandex_disk") {
+      const admin = getSupabaseServiceRoleClient();
+      const { error: delCvErr } = await admin
+        .from("card_field_values")
+        .delete()
+        .eq("field_definition_id", fieldDefinitionId);
+      if (delCvErr) {
+        return { ok: false, message: delCvErr.message };
+      }
+
+      const { error: delOptErr } = await supabase
+        .from("board_field_select_options")
+        .delete()
+        .eq("field_definition_id", fieldDefinitionId);
+      if (delOptErr) {
+        return { ok: false, message: delOptErr.message };
+      }
+    }
   }
 
   const { error } = await supabase
@@ -841,7 +900,7 @@ export async function deleteBoardFieldDefinitionAction(
 
   const { data: row, error: readError } = await supabase
     .from("board_field_definitions")
-    .select("id, board_id")
+    .select("id, board_id, field_type")
     .eq("id", fieldDefinitionId)
     .maybeSingle();
 
@@ -850,6 +909,10 @@ export async function deleteBoardFieldDefinitionAction(
   }
   if (!row || row.board_id !== boardId) {
     return { ok: false, message: "Поле не найдено на этой доске." };
+  }
+
+  if (row.field_type === "yandex_disk") {
+    await bestEffortDeleteYandexDiskObjectsForBoardFieldDefinition(boardId, fieldDefinitionId);
   }
 
   const { error } = await supabase
@@ -1561,6 +1624,18 @@ export type CreateCardFieldValuePayload = {
   select_option_id?: string;
 };
 
+/** Значения полей `yandex_disk` живут в `card_attachments`, не в RPC `p_field_values` (YDB7.2). */
+function excludeYandexDiskFieldValuesForRpc(
+  definitions: { id: string; field_type: string }[],
+  fieldValues: CreateCardFieldValuePayload[]
+): CreateCardFieldValuePayload[] {
+  const yandexIds = new Set(
+    definitions.filter((d) => d.field_type === "yandex_disk").map((d) => d.id)
+  );
+  if (yandexIds.size === 0) return fieldValues;
+  return fieldValues.filter((v) => !yandexIds.has(v.field_definition_id));
+}
+
 export type CreateCardResult =
   | { ok: true; cardId: string }
   | { ok: false; message: string };
@@ -1605,13 +1680,26 @@ export async function createCardAction(
     return { ok: false, message: "Выберите хотя бы одного участника карточки." };
   }
 
+  const { data: fieldDefs, error: fieldDefsError } = await supabase
+    .from("board_field_definitions")
+    .select("id, field_type")
+    .eq("board_id", boardId);
+  if (fieldDefsError) {
+    return { ok: false, message: fieldDefsError.message };
+  }
+
+  const fieldValuesForRpc = excludeYandexDiskFieldValuesForRpc(
+    fieldDefs ?? [],
+    payload.fieldValues
+  );
+
   const { data: cardId, error } = await supabase.rpc("create_card_with_details", {
     p_board_id: boardId,
     p_column_id: payload.columnId,
     p_title: title,
     p_description: description,
     p_assignee_user_ids: assignees,
-    p_field_values: payload.fieldValues
+    p_field_values: fieldValuesForRpc
   });
 
   if (error) {
@@ -1949,11 +2037,24 @@ export async function updateCardBodyAndCustomFieldsAction(
     return { ok: false, message: "Карточка не найдена на этой доске." };
   }
 
+  const { data: fieldDefs, error: fieldDefsError } = await supabase
+    .from("board_field_definitions")
+    .select("id, field_type")
+    .eq("board_id", boardId);
+  if (fieldDefsError) {
+    return { ok: false, message: fieldDefsError.message };
+  }
+
+  const fieldValuesForRpc = excludeYandexDiskFieldValuesForRpc(
+    fieldDefs ?? [],
+    payload.fieldValues
+  );
+
   const { error } = await supabase.rpc("update_card_body_and_custom_fields", {
     p_card_id: cardId,
     p_title: title,
     p_description: description,
-    p_field_values: payload.fieldValues
+    p_field_values: fieldValuesForRpc
   });
 
   if (error) {

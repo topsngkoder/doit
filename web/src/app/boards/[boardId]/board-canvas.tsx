@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { BoardYandexDiskIntegrationProvider } from "./board-yandex-disk-integration-context";
 import { BoardColumnsDnD } from "./board-columns-dnd";
 import type { NewCardFieldDefinition, NewCardMemberOption } from "./create-card-modal";
+import type { BoardYandexDiskIntegrationSnapshot } from "@/lib/board-snapshot-types";
 import type {
   BoardCardListItem,
   BoardColumnPermissions,
@@ -40,6 +42,7 @@ type BoardCanvasProps = {
     position: number;
   }>;
   cardsByColumnId: Map<string, BoardCardListItem[]>;
+  yandexDiskIntegration: BoardYandexDiskIntegrationSnapshot;
 };
 
 export function BoardCanvas({
@@ -59,7 +62,8 @@ export function BoardCanvas({
   cardContentPermissions,
   board,
   columns,
-  cardsByColumnId
+  cardsByColumnId,
+  yandexDiskIntegration
 }: BoardCanvasProps) {
   const columnsStageRef = React.useRef<HTMLDivElement | null>(null);
   const columnsSig = React.useMemo(
@@ -98,25 +102,27 @@ export function BoardCanvas({
         ref={columnsStageRef}
         className="board-columns-scroll min-h-0 flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth"
       >
-        <BoardColumnsDnD
-          boardId={boardId}
-          currentUserId={currentUserId}
-          canCreateCard={canCreateCard}
-          membersForNewCard={membersForNewCard}
-          boardLabels={boardLabels}
-          previewItems={previewItems}
-          fieldDefinitions={fieldDefinitions}
-          columnPermissions={columnPermissions}
-          canMoveCards={canMoveCards}
-          canCreateComment={canCreateComment}
-          canEditOwnComment={canEditOwnComment}
-          canDeleteOwnComment={canDeleteOwnComment}
-          canModerateComments={canModerateComments}
-          cardContentPermissions={cardContentPermissions}
-          columns={columns}
-          visibleColumnIds={columns.map((column) => column.id)}
-          cardsByColumnId={cardsByColumnId}
-        />
+        <BoardYandexDiskIntegrationProvider value={yandexDiskIntegration}>
+          <BoardColumnsDnD
+            boardId={boardId}
+            currentUserId={currentUserId}
+            canCreateCard={canCreateCard}
+            membersForNewCard={membersForNewCard}
+            boardLabels={boardLabels}
+            previewItems={previewItems}
+            fieldDefinitions={fieldDefinitions}
+            columnPermissions={columnPermissions}
+            canMoveCards={canMoveCards}
+            canCreateComment={canCreateComment}
+            canEditOwnComment={canEditOwnComment}
+            canDeleteOwnComment={canDeleteOwnComment}
+            canModerateComments={canModerateComments}
+            cardContentPermissions={cardContentPermissions}
+            columns={columns}
+            visibleColumnIds={columns.map((column) => column.id)}
+            cardsByColumnId={cardsByColumnId}
+          />
+        </BoardYandexDiskIntegrationProvider>
       </div>
     </BoardBackgroundFrame>
   );

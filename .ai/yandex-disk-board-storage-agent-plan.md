@@ -137,6 +137,14 @@
 | 2026-04-11 | YDB5.6 | Скачивание и удаление привязаны к `field_definition_id`: `resolveCardAttachmentTemporaryDownloadUrl` и `deleteCardAttachment` принимают `fieldDefinitionId`, SELECT/DELETE с `.eq("field_definition_id", …)`; GET download — обязательный query `field_definition_id`; `cardAttachmentDownloadPath(..., fieldDefinitionId)`; `deleteCardAttachmentAction` — четвёртый аргумент; JSDoc в `board-yandex-disk-ui-server-contract.ts`. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
 | 2026-04-11 | YDB6.5 | Плоский `card_ready_attachments` в RPC без изменений. Тип `CardReadyAttachmentsByFieldId` в `card-attachment-ui-types.ts`; `mapCardReadyAttachmentsRowsByCardId` в `board-snapshot-types.ts` — группировка по карточке и `field_definition_id`. `BoardCardListItem.readyAttachmentsByFieldId` вместо плоского `readyAttachments`; `page.tsx` и realtime-merge в `board-columns-dnd.tsx` обновлены. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
 | 2026-04-11 | YDB7.1 (каталог) | Тип `yandex_disk` в каталоге полей: `web/src/app/boards/[boardId]/board-field-types.ts` (`BOARD_FIELD_TYPES`, `BOARD_FIELD_TYPE_OPTIONS`, `isBoardFieldType`); `actions.ts` валидирует тип через импорт; `board-fields-button.tsx` — пункт «Яндекс диск» в списке «Тип». `card-field-drafts.ts`: `BoardCatalogFieldType`, черновик `{ fieldType: "yandex_disk" }`, пропуск в `buildFieldValuesPayload` и обязательности (до YDB8). Заглушки в `create-card-modal.tsx` / `edit-card-modal.tsx`. Миграция `20260412103000_ydb7_1_catalog_yandex_disk_field_rpc.sql`: в `create_card_with_details` и `update_card_body_and_custom_fields` ветка `ELSIF v_ftype = 'yandex_disk'` без записи в `card_field_values`. `npx supabase db push`, `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB7.2 (контракты) | Серверные контракты под `yandex_disk` без новых миграций: RPC уже из YDB7.1. `actions.ts` — `excludeYandexDiskFieldValuesForRpc`: в `createCardAction` и `updateCardBodyAndCustomFieldsAction` из `p_field_values` убираются записи для полей с `field_type = yandex_disk` (значения только через `card_attachments`). `updateBoardFieldDefinitionAction`: при любой смене типа — проверка `has_board_permission(..., card_fields.manage)`; переход **с** `yandex_disk` на другой тип запрещён, если есть строки `card_attachments` (подсчёт через `getSupabaseServiceRoleClient`); переход **на** `yandex_disk` — service-role `DELETE card_field_values` по `field_definition_id` и удаление `board_field_select_options` пользовательским клиентом. `npx supabase db push` — без изменений; `npx tsc --noEmit` в `web/` — ок. Snapshot `get_board_snapshot` по-прежнему отдаёт `field_type` в определениях полей — отдельной доработки не потребовалось. |
+| 2026-04-11 | YDB7.3 | Управление интеграцией перенесено в модалку «Поля доски»: `board-yandex-disk-integration-panel.tsx` (секция «Яндекс.Диск для этой доски», те же состояния/действия, что в бывшей модалке). `board-fields-button.tsx` — пропсы `yandexDiskIntegration`, `canViewYandexDiskIntegration`, `canManageYandexDiskIntegration`; панель при `canView…`. `board-settings-menu.tsx` — пункт «Яндекс.Диск» убран; задержки анимации пунктов меню сдвинуты не требовались (последний блок удалён). Удалён `board-yandex-disk-button.tsx`. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB7.4 | Несколько полей `yandex_disk`: UI «Поля доски» — подсказка при выборе типа, пояснение у строки поля в списке, счётчик/текст над панелью интеграции (`yandexDiskFieldCountLabel`). Удаление определения поля: `best-effort-delete-yandex-disk-objects-on-board-field-delete.ts` + вызов из `deleteBoardFieldDefinitionAction` до DELETE (как YDB5.5 для карточки). Одна интеграция по-прежнему в одном сворачиваемом блоке. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB7.5 | Product-safe UI в «Поля доски»: спец. 14.2 — для владельца дата «Последняя успешная авторизация» (`formatYandexDiskLastAuthorizedAtRu`); текст 8.1/15.1 `YANDEX_DISK_UI_OWNER_ONLY_INTEGRATION_MANAGEMENT` в интро/не-владелец; whitelist `last_error_text` расширен всеми строками разд. 15.2 (+ сервис недоступен). При неактивной интеграции и наличии полей «Яндекс диск» — предупреждающий блок `yandexDiskNonActiveIntegrationHint` над сворачиваемой секцией. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB8.1 | Поля `yandex_disk` в том же блоке «Поля доски» на вкладке «Детали»: сетка как у остальных полей, панель как у `link`; список из `card.readyAttachmentsByFieldId[fieldId]` (имя, размер, автор из `boardMembers`, дата); пусто — «Файлов пока нет.» Без отдельного глобального блока «Файлы»; вкладка «История» не тронута. `create-card-modal`: то же оформление блока, текст про загрузку после создания карточки. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB8.2 | Спец. 13.3–13.6 (пустое состояние): `board-yandex-disk-integration-context.tsx` + провайдер в `board-canvas.tsx`, данные из `snapshot.yandex_disk_integration`. `yandex-disk-card-field-empty-copy.ts` — тексты пустого состояния и подсказки при неактивной интеграции (дубликат разд. 15.2 для client). `edit-card-modal`: без права редактирования — только «Файлов пока нет.»; редактор + не `active` — то же + причина (нет строки / disconnected / reauth / error); редактор + `active` — пунктирная область + призыв перетащить или нажать «Добавить файлы» (кнопка и DnD — YDB8.4). `create-card-modal`: прежний текст про загрузку после создания + при неактивной интеграции доп. строка-причина; интерактива нет (файлы до создания карточки недоступны). Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB8.3 | Спец. 13.4: список `ready` по полю — имя, размер, автор, дата; «Скачать» — ссылка на `cardAttachmentDownloadPath(..., f.id)` при `canOpenCardModal` + `integration.status === active`; «Удалить» — `deleteCardAttachmentAction` при `canEditContent` + `active`, `router.refresh()` при успехе, ошибка над блоком «Поля доски». Проп `canDownloadAttachments` в `EditCardModal`, в `board-columns-dnd` из `canOpenCardModal`. Файлы по-прежнему из `readyAttachmentsByFieldId[f.id]`. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB8.4 | Спец. 13.3/13.5: `YandexDiskCardFieldAttachmentsSection` в `edit-card-modal.tsx` — скрытый `input[type=file][multiple]`, кнопка «Добавить файлы», DnD только внутри `role="region"` поля (`onDrop` на зоне поля); индикатор «Загрузка…» при `cardAttachmentUploadAction`; ошибки по полю в блоке; частичный batch — текст по файлам; при загрузке в одном поле остальные поля `yandex_disk` временно отключены; список + зона «добавить ещё» при наличии `ready`. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
 
 ### EPIC YDB1 - Подготовить модель данных и миграции
 - [x] **YDB1.1 (done)** Спроектировать таблицу привязки Яндекс.Диска к доске
@@ -322,39 +330,39 @@
   - обновить `BOARD_FIELD_TYPES`, клиентские union-типы и выпадающий список `Тип` в `BoardFieldsButton`;
   - не ломать существующие типы `text | date | select | link`;
   - **DoD**: в `Поля доски` можно создать/редактировать поле с типом `Яндекс диск`.
-- [ ] **YDB7.2 (todo)** Доработать серверные контракты и snapshot под `field_type = yandex_disk`
+- [x] **YDB7.2 (done)** Доработать серверные контракты и snapshot под `field_type = yandex_disk`
   - разрешить новый тип в actions/RPC/валидации;
   - не пытаться хранить значение такого поля в `card_field_values` по тем же правилам, что `text/date/link/select`;
   - **DoD**: сервер корректно различает обычные поля и файловые поля `Яндекс диск`.
-- [ ] **YDB7.3 (todo)** Перенести owner-only управление интеграцией в контекст `Поля доски`
+- [x] **YDB7.3 (done)** Перенести owner-only управление интеграцией в контекст `Поля доски`
   - подключение/повторная авторизация/отключение должны запускаться из UI поля типа `Яндекс диск` или его настроек;
   - отдельная обязательная кнопка `Яндекс.Диск` в `BoardSettingsMenu` больше не считается целевым решением;
   - **DoD**: весь integration-management соответствует обновлённой точке входа через `Поля доски`.
-- [ ] **YDB7.4 (todo)** Поддержать несколько полей типа `Яндекс диск` на одной доске
+- [x] **YDB7.4 (done)** Поддержать несколько полей типа `Яндекс диск` на одной доске
   - создание, удаление, сортировка и отображение нескольких таких определений;
   - единая board-level интеграция не должна дублироваться на каждое поле;
   - **DoD**: доска может иметь несколько файловых полей, использующих одну интеграцию Яндекс.Диска.
-- [ ] **YDB7.5 (todo)** Показать product-safe состояния и ошибки интеграции в UI `Поля доски`
+- [x] **YDB7.5 (done)** Показать product-safe состояния и ошибки интеграции в UI `Поля доски`
   - использовать фиксированные тексты спецификации там, где они заданы;
   - owner видит управляющие действия и детали, не-owner — только безопасный статус доступности;
   - **DoD**: пользователь получает понятное и безопасное сообщение прямо в сценарии `Поля доски`.
 
 ### EPIC YDB8 - Реализовать UI файловых полей `Яндекс диск` внутри карточки
-- [ ] **YDB8.1 (todo)** Встроить поля типа `Яндекс диск` в существующий блок пользовательских полей `edit-card-modal`
+- [x] **YDB8.1 (done)** Встроить поля типа `Яндекс диск` в существующий блок пользовательских полей `edit-card-modal`
   - не создавать отдельный глобальный блок `Файлы`, если поле уже живёт в секции пользовательских полей;
   - не ломать вкладки `Детали` и `История`;
   - **DoD**: файловые поля рендерятся на тех же основаниях, что и остальные поля доски.
-- [ ] **YDB8.2 (todo)** Реализовать пустое состояние для каждого файлового поля
+- [x] **YDB8.2 (done)** Реализовать пустое состояние для каждого файлового поля
   - если файлов нет и загрузка доступна: призыв перетащить или выбрать файлы;
   - если загрузка недоступна: без интерактивных элементов;
   - **DoD**: пустое состояние соответствует разделу 13.3 для каждого поля `Яндекс диск`.
-- [ ] **YDB8.3 (todo)** Реализовать список готовых вложений в разрезе поля
+- [x] **YDB8.3 (done)** Реализовать список готовых вложений в разрезе поля
   - показать исходное имя файла, размер, автора, дату загрузки;
   - кнопка `Скачать` только при праве просмотра;
   - кнопка `Удалить` только при праве редактирования содержимого карточки;
   - не смешивать файлы разных `field_definition_id`;
   - **DoD**: элемент списка соответствует разделу 13.4 и привязан к конкретному файловому полю.
-- [ ] **YDB8.4 (todo)** Реализовать upload UI внутри конкретного файлового поля
+- [x] **YDB8.4 (done)** Реализовать upload UI внутри конкретного файлового поля
   - кнопка `Добавить файлы`;
   - drag-and-drop зона только внутри открытой карточки и внутри конкретного поля;
   - локальный индикатор загрузки;

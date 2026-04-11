@@ -9,6 +9,13 @@ import {
   BOARD_FIELD_TYPE_OPTIONS,
   type BoardCatalogFieldType
 } from "./board-field-types";
+import { cn } from "@/lib/utils";
+import type { BoardYandexDiskIntegrationSnapshot } from "@/lib/board-snapshot-types";
+import {
+  getYandexDiskIntegrationModalPresentation,
+  yandexDiskNonActiveIntegrationHint
+} from "@/lib/yandex-disk/yandex-disk-integration-modal-presentation";
+import { BoardYandexDiskIntegrationPanel } from "./board-yandex-disk-integration-panel";
 import {
   createBoardFieldDefinitionAction,
   createBoardFieldSelectOptionAction,
@@ -23,10 +30,37 @@ import {
 
 const inputClass = "field-base";
 
+function yandexDiskFieldCountLabel(n: number): string {
+  if (n <= 0) {
+    return "После создания полей типа «Яндекс диск» все они будут использовать интеграцию ниже.";
+  }
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  const word =
+    mod10 === 1 && mod100 !== 11 ? "поле"
+    : mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) ? "поля"
+    : "полей";
+  return `На доске ${n} ${word} типа «Яндекс диск» — все используют одну интеграцию ниже (без дублирования папки).`;
+}
+
+function selectOptionCountLabel(count: number): string {
+  if (count === 0) return "Пока нет вариантов";
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod100 >= 11 && mod100 <= 14) return `${count} вариантов`;
+  if (mod10 === 1) return `${count} вариант`;
+  if (mod10 >= 2 && mod10 <= 4) return `${count} варианта`;
+  return `${count} вариантов`;
+}
+
 type BoardFieldsButtonProps = {
   boardId: string;
   canManage: boolean;
   fieldDefinitions: NewCardFieldDefinition[];
+  /** Статус интеграции в модалке «Поля доски» (YDB7.3). */
+  yandexDiskIntegration: BoardYandexDiskIntegrationSnapshot;
+  canViewYandexDiskIntegration: boolean;
+  canManageYandexDiskIntegration: boolean;
   triggerClassName?: string;
   triggerVariant?: "primary" | "secondary" | "ghost" | "destructive";
   onTriggerClick?: () => void;
@@ -42,6 +76,9 @@ export function BoardFieldsButton({
   boardId,
   canManage,
   fieldDefinitions,
+  yandexDiskIntegration,
+  canViewYandexDiskIntegration,
+  canManageYandexDiskIntegration,
   triggerClassName,
   triggerVariant = "secondary",
   onTriggerClick
@@ -62,11 +99,32 @@ export function BoardFieldsButton({
   const [optionEdits, setOptionEdits] = React.useState<Record<string, { name: string; color: string }>>(
     {}
   );
+  const [yandexDiskSectionOpen, setYandexDiskSectionOpen] = React.useState(false);
+  const [selectOptionsOpenByFieldId, setSelectOptionsOpenByFieldId] = React.useState<
+    Record<string, boolean>
+  >({});
+
+  const yandexDiskUi = getYandexDiskIntegrationModalPresentation(yandexDiskIntegration, {
+    forIntegrationManager: canManageYandexDiskIntegration
+  });
 
   const sorted = React.useMemo(
     () => [...fieldDefinitions].sort((a, b) => a.position - b.position),
     [fieldDefinitions]
   );
+
+  const yandexDiskFieldCount = React.useMemo(
+    () => sorted.filter((f) => f.fieldType === "yandex_disk").length,
+    [sorted]
+  );
+
+  const yandexDiskInactiveHint =
+    yandexDiskIntegration?.status !== "active" ?
+      yandexDiskNonActiveIntegrationHint({
+        yandexDiskFieldCount,
+        canManageIntegration: canManageYandexDiskIntegration
+      })
+    : null;
 
   const setDefaultForm = React.useCallback(() => {
     setEditingFieldId(null);
@@ -120,6 +178,8 @@ export function BoardFieldsButton({
       setOptionDrafts({});
       setOptionEdits({});
       setDefaultForm();
+      setYandexDiskSectionOpen(false);
+      setSelectOptionsOpenByFieldId({});
     }
   }, [open, setDefaultForm]);
 
@@ -193,6 +253,12 @@ export function BoardFieldsButton({
                 />
                 Обязательное
               </label>
+              {form.fieldType === "yandex_disk" ?
+                <p className="md:col-span-3 text-xs text-app-secondary">
+                  Можно создать несколько полей «Яндекс диск» на одной доске: у каждого своё имя и порядок, а
+                  папка на Диске и токены — общие для доски (раздел ниже).
+                </p>
+              : null}
             </div>
             <div className="mt-3 flex items-center justify-end gap-2">
               {editingFieldId ?
@@ -225,6 +291,9 @@ export function BoardFieldsButton({
                   const options = [...(field.selectOptions ?? [])].sort(
                     (a, b) => a.position - b.position
                   );
+                  const selectOptionsOpen = selectOptionsOpenByFieldId[field.id] ?? false;
+                  const selectToggleId = `board-field-select-${field.id}-toggle`;
+                  const selectPanelId = `board-field-select-${field.id}-panel`;
                   return (
                     <li
                       key={field.id}
@@ -242,6 +311,11 @@ export function BoardFieldsButton({
                             }{" "}
                             · {field.isRequired ? "обязательное" : "необязательное"}
                           </p>
+                          {field.fieldType === "yandex_disk" ?
+                            <p className="mt-1 text-[11px] text-app-tertiary">
+                              Файлы этого поля отделены от других полей «Яндекс диск»; хранилище доски одно.
+                            </p>
+                          : null}
                         </div>
                         <div className="flex flex-wrap items-center gap-1">
                           <Button
@@ -297,14 +371,50 @@ export function BoardFieldsButton({
                       </div>
 
                       {field.fieldType === "select" ?
-                        <div className="mt-3 rounded-md border border-app-divider bg-app-surface-muted p-2">
-                          <p className="mb-2 text-xs font-medium text-app-primary">
-                            Варианты списка
-                          </p>
+                        <div className="mt-3 shrink-0 border-t border-app-divider pt-2">
+                          <button
+                            type="button"
+                            className="focus-ring-app flex w-full items-center gap-2 rounded-md border border-app-default bg-app-surface-muted px-3 py-2 text-left transition-colors hover:bg-app-surface-subtle"
+                            aria-expanded={selectOptionsOpen}
+                            aria-controls={selectPanelId}
+                            id={selectToggleId}
+                            disabled={pending}
+                            onClick={() =>
+                              setSelectOptionsOpenByFieldId((prev) => ({
+                                ...prev,
+                                [field.id]: !(prev[field.id] ?? false)
+                              }))
+                            }
+                          >
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-sm font-medium text-app-primary">
+                                Варианты списка
+                              </span>
+                              <span className="block truncate text-xs text-app-secondary">
+                                {selectOptionCountLabel(options.length)}
+                              </span>
+                            </span>
+                            <span
+                              className={cn(
+                                "shrink-0 text-[10px] leading-none text-app-tertiary transition-transform duration-200",
+                                selectOptionsOpen && "rotate-180"
+                              )}
+                              aria-hidden
+                            >
+                              ▼
+                            </span>
+                          </button>
+                          {selectOptionsOpen ?
+                            <div
+                              id={selectPanelId}
+                              className="mt-2 max-h-[min(40vh,280px)] overflow-y-auto rounded-md border border-app-divider bg-app-surface-muted p-2"
+                              role="region"
+                              aria-labelledby={selectToggleId}
+                            >
                           <div className="space-y-1.5">
                             {options.length === 0 ?
                               <p className="text-xs text-app-tertiary">
-                                Пока нет вариантов. Добавьте первый.
+                                Пока нет вариантов. Добавьте первый ниже.
                               </p>
                             : options.map((opt, optIdx) => {
                                 const edit = optionEdits[opt.id] ?? {
@@ -485,6 +595,8 @@ export function BoardFieldsButton({
                               Добавить
                             </Button>
                           </div>
+                            </div>
+                          : null}
                         </div>
                       : null}
                     </li>
@@ -497,6 +609,57 @@ export function BoardFieldsButton({
             <p className="shrink-0 text-sm text-app-validation-error" role="alert">
               {error}
             </p>
+          : null}
+
+          {canViewYandexDiskIntegration ?
+            <div className="shrink-0 border-t border-app-divider pt-2">
+              {yandexDiskInactiveHint ?
+                <p
+                  className="mb-2 rounded-md border border-[color:var(--warning-subtle-border)] bg-[color:var(--warning-subtle-bg)] px-2 py-1.5 text-xs text-app-primary"
+                  role="status"
+                >
+                  {yandexDiskInactiveHint}
+                </p>
+              : null}
+              <button
+                type="button"
+                className="focus-ring-app flex w-full items-center gap-2 rounded-md border border-app-default bg-app-surface-muted px-3 py-2 text-left transition-colors hover:bg-app-surface-subtle"
+                aria-expanded={yandexDiskSectionOpen}
+                aria-controls="board-fields-yandex-disk-panel"
+                id="board-fields-yandex-disk-toggle"
+                onClick={() => setYandexDiskSectionOpen((v) => !v)}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-app-primary">Яндекс.Диск</span>
+                  <span className="block truncate text-xs text-app-secondary">{yandexDiskUi.title}</span>
+                </span>
+                <span
+                  className={cn(
+                    "shrink-0 text-[10px] leading-none text-app-tertiary transition-transform duration-200",
+                    yandexDiskSectionOpen && "rotate-180"
+                  )}
+                  aria-hidden
+                >
+                  ▼
+                </span>
+              </button>
+              {yandexDiskSectionOpen ?
+                <div
+                  id="board-fields-yandex-disk-panel"
+                  className="mt-2 max-h-[min(45vh,320px)] overflow-y-auto"
+                  role="region"
+                  aria-labelledby="board-fields-yandex-disk-toggle"
+                >
+                  <p className="mb-2 text-xs text-app-secondary">{yandexDiskFieldCountLabel(yandexDiskFieldCount)}</p>
+                  <BoardYandexDiskIntegrationPanel
+                    boardId={boardId}
+                    integration={yandexDiskIntegration}
+                    canManageIntegration={canManageYandexDiskIntegration}
+                    showIntroHeading={false}
+                  />
+                </div>
+              : null}
+            </div>
           : null}
         </div>
       </Modal>

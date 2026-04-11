@@ -50,7 +50,47 @@ const MSG_DISCONNECTED = "Интеграция Яндекс.Диска для э
 const MSG_REAUTH =
   "Подключение к Яндекс.Диску требует повторной авторизации владельца доски." as const;
 
-const OWNER_LAST_ERROR_WHITELIST = new Set<string>([MSG_REAUTH]);
+/** Раздел 8.1 / 15.1 — только владелец управляет интеграцией (клиент без server-only). */
+export const YANDEX_DISK_UI_OWNER_ONLY_INTEGRATION_MANAGEMENT =
+  "Подключать, отключать и переподключать Яндекс.Диск может только владелец доски." as const;
+
+/** Раздел 15.2 — не удалось создать папку (может попасть в `last_error_text` при расширении сервера). */
+const MSG_BOARD_FOLDER_CREATE_FAILED = "Не удалось создать папку доски в Яндекс.Диске." as const;
+
+/** Раздел 15.2 — смена диска при файлах. */
+const MSG_CANNOT_CHANGE_DISK_WITH_FILES =
+  "Нельзя сменить Яндекс.Диск для доски, пока в карточках есть файлы." as const;
+
+/**
+ * Все значения разд. 15.2 + отключение + сервис недоступен, которые приложение может хранить в `last_error_text`.
+ * Произвольный текст из БД в UI не показываем (YDB7.5).
+ */
+const OWNER_LAST_ERROR_WHITELIST = new Set<string>([
+  MSG_NOT_CONNECTED,
+  MSG_DISCONNECTED,
+  MSG_REAUTH,
+  MSG_BOARD_FOLDER_CREATE_FAILED,
+  MSG_CANNOT_CHANGE_DISK_WITH_FILES,
+  /** Совпадает с `YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE`. */
+  "Сервис Яндекс.Диска временно недоступен. Попробуйте позже."
+]);
+
+/**
+ * Дата последней успешной авторизации для владельца (спец. 14.2).
+ */
+export function formatYandexDiskLastAuthorizedAtRu(iso: string | null | undefined): string | null {
+  if (iso == null || iso === "") return null;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  try {
+    return new Intl.DateTimeFormat("ru-RU", {
+      dateStyle: "medium",
+      timeStyle: "short"
+    }).format(t);
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Текст `last_error_text` из snapshot показываем только если он совпадает с известным продуктовым сообщением
@@ -62,6 +102,20 @@ export function safeYandexDiskIntegrationLastErrorTextForOwner(
   const t = text?.trim();
   if (!t) return null;
   return OWNER_LAST_ERROR_WHITELIST.has(t) ? t : null;
+}
+
+/** Подсказка в «Поля доски», если есть поля «Яндекс диск», а интеграция не `active`. */
+export function yandexDiskNonActiveIntegrationHint(options: {
+  yandexDiskFieldCount: number;
+  canManageIntegration: boolean;
+}): string | null {
+  if (options.yandexDiskFieldCount <= 0) return null;
+  const base =
+    "Поля «Яндекс диск» на карточках работают только при активной интеграции. Сейчас загрузка и скачивание файлов в этих полях недоступны.";
+  if (options.canManageIntegration) {
+    return `${base} Подключите или восстановите интеграцию в блоке ниже.`;
+  }
+  return `${base} Обратитесь к владельцу доски.`;
 }
 
 export function getYandexDiskIntegrationModalPresentation(

@@ -5,7 +5,6 @@ import { BoardLabelsButton } from "./board-labels-button";
 import { BoardFieldsButton } from "./board-fields-button";
 import { BoardCardPreviewButton } from "./board-card-preview-button";
 import { BoardBackgroundButton } from "./board-background-button";
-import { BoardYandexDiskButton } from "./board-yandex-disk-button";
 import type { BoardLabelOption, BoardCardPreviewItem } from "./column-types";
 import type { NewCardFieldDefinition } from "./card-field-drafts";
 import type { BoardYandexDiskIntegrationSnapshot } from "@/lib/board-snapshot-types";
@@ -16,9 +15,8 @@ type BoardSettingsMenuProps = {
   canManageCardFields: boolean;
   canManageCardPreview: boolean;
   canChangeBoardBackground: boolean;
-  /** Просмотр блока интеграции в настройках (спец. 14 — статус для участников). */
+  /** Интеграция Яндекс.Диска — только в модалке «Поля доски» (YDB7.3). */
   canViewYandexDiskIntegration: boolean;
-  /** Подключение / переподключение OAuth (владелец доски или sysadmin). */
   canManageYandexDiskIntegration: boolean;
   yandexDiskIntegration: BoardYandexDiskIntegrationSnapshot;
   boardLabels: BoardLabelOption[];
@@ -49,8 +47,7 @@ export function BoardSettingsMenu({
     canManageBoardLabels ||
     canManageCardFields ||
     canManageCardPreview ||
-    canChangeBoardBackground ||
-    canViewYandexDiskIntegration;
+    canChangeBoardBackground;
 
   const clearCloseTimer = React.useCallback(() => {
     if (!closeTimerRef.current) return;
@@ -147,6 +144,9 @@ export function BoardSettingsMenu({
               boardId={boardId}
               canManage={canManageCardFields}
               fieldDefinitions={fieldDefinitions}
+              yandexDiskIntegration={yandexDiskIntegration}
+              canViewYandexDiskIntegration={canViewYandexDiskIntegration}
+              canManageYandexDiskIntegration={canManageYandexDiskIntegration}
               triggerVariant="ghost"
               triggerClassName="w-full justify-start whitespace-nowrap cursor-pointer hover:bg-app-surface-muted"
               onTriggerClick={closeMenuFromAction}
@@ -173,18 +173,6 @@ export function BoardSettingsMenu({
               onTriggerClick={closeMenuFromAction}
             />
           </div>
-          {canViewYandexDiskIntegration ? (
-            <div className={itemRevealClass()} style={{ transitionDelay: menuOpen ? "180ms" : "0ms" }}>
-              <BoardYandexDiskButton
-                boardId={boardId}
-                canManageIntegration={canManageYandexDiskIntegration}
-                integration={yandexDiskIntegration}
-                triggerVariant="ghost"
-                triggerClassName="w-full justify-start whitespace-nowrap cursor-pointer hover:bg-app-surface-muted"
-                onTriggerClick={closeMenuFromAction}
-              />
-            </div>
-          ) : null}
         </div>
       </div>
     </div>

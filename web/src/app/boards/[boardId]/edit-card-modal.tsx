@@ -25,8 +25,42 @@ import {
 import { CardCommentsSidebar } from "./card-comments-sidebar";
 import type { NewCardMemberOption } from "./create-card-modal";
 import type { BoardCardListItem, BoardLabelOption } from "./column-types";
+import type { CardAttachmentListItem } from "@/lib/card-attachment-ui-types";
+import {
+  YANDEX_DISK_CARD_FIELD_EMPTY_UPLOAD_CTA,
+  YANDEX_DISK_CARD_FIELD_EMPTY_VIEWER,
+  yandexDiskCardFieldNonActiveIntegrationHint
+} from "@/lib/yandex-disk/yandex-disk-card-field-empty-copy";
+import { cardAttachmentDownloadPath } from "@/lib/yandex-disk/yandex-disk-board-ui-endpoints";
+import { useBoardYandexDiskIntegration } from "./board-yandex-disk-integration-context";
+import {
+  cardAttachmentUploadAction,
+  deleteCardAttachmentAction
+} from "./board-yandex-disk-ui-server-contract";
 
 const inputClass = "field-base";
+
+function formatAttachmentBytesRu(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return "—";
+  const units = ["Б", "КБ", "МБ", "ГБ"] as const;
+  let v = bytes;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i += 1;
+  }
+  const rounded =
+    i === 0 ? Math.round(v) : v >= 10 ? Math.round(v) : Math.round(v * 10) / 10;
+  return `${rounded}\u00a0${units[i]}`;
+}
+
+function attachmentUploaderLabel(
+  members: NewCardMemberOption[],
+  uploadedByUserId: string
+): string {
+  const m = members.find((x) => x.userId === uploadedByUserId);
+  return m?.displayName ?? "Участник";
+}
 
 function AutoSizeTextarea({
   value,
@@ -120,6 +154,228 @@ function TrashIcon({ className }: { className?: string }) {
   );
 }
 
+/** YDB8.4: загрузка только внутри открытой карточки и конкретного поля `yandex_disk`. */
+function YandexDiskCardFieldAttachmentsSection({
+  boardId,
+  cardId,
+  fieldId,
+  fieldName,
+  reqLabel,
+  attachments,
+  boardMembers,
+  canEditContent,
+  canOfferYandexUpload,
+  canDownloadThisField,
+  canDeleteThisField,
+  yandexNonActiveHint,
+  formPending,
+  uploadingFieldId,
+  uploadError,
+  onUpload,
+  yandexAttachmentDeletingId,
+  setYandexAttachmentDeletingId,
+  onDeleteAttachmentError,
+  router
+}: {
+  boardId: string;
+  cardId: string;
+  fieldId: string;
+  fieldName: string;
+  reqLabel: string;
+  attachments: CardAttachmentListItem[];
+  boardMembers: NewCardMemberOption[];
+  canEditContent: boolean;
+  canOfferYandexUpload: boolean;
+  canDownloadThisField: boolean;
+  canDeleteThisField: boolean;
+  yandexNonActiveHint: string | null;
+  formPending: boolean;
+  uploadingFieldId: string | null;
+  uploadError: string | undefined;
+  onUpload: (files: File[]) => void | Promise<void>;
+  yandexAttachmentDeletingId: string | null;
+  setYandexAttachmentDeletingId: React.Dispatch<React.SetStateAction<string | null>>;
+  onDeleteAttachmentError: React.Dispatch<React.SetStateAction<string | null>>;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isDragOver, setIsDragOver] = React.useState(false);
+
+  const isThisFieldUploading = uploadingFieldId === fieldId;
+  const uploadBusyElsewhere = uploadingFieldId !== null && uploadingFieldId !== fieldId;
+  const uploadInteractionsDisabled = formPending || uploadBusyElsewhere;
+  const isUploading = isThisFieldUploading;
+
+  const runFilePick = (list: FileList | File[] | null) => {
+    if (!list || uploadInteractionsDisabled || isUploading) return;
+    const files = Array.from(list as ArrayLike<File>);
+    if (files.length === 0) return;
+    void onUpload(files);
+  };
+
+  return (
+    <div className="sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-start sm:gap-3">
+      <p className="pb-1 pt-2 text-xs font-medium text-app-secondary sm:pb-0">
+        {fieldName}
+        {reqLabel}
+      </p>
+      <div className="space-y-2 rounded-[var(--radius-control)] border border-app-divider bg-app-surface-muted p-3">
+        {uploadError ?
+          <p className="text-xs text-app-validation-error" role="alert">
+            {uploadError}
+          </p>
+        : null}
+
+        {attachments.length > 0 ?
+          <ul className="space-y-2">
+            {attachments.map((a) => (
+              <li
+                key={a.id}
+                className="border-b border-app-divider/70 pb-2 last:border-b-0 last:pb-0"
+              >
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="break-all text-sm text-app-primary">{a.original_file_name}</p>
+                    <p className="mt-0.5 text-xs text-app-tertiary">
+                      {formatAttachmentBytesRu(a.size_bytes)} ·{" "}
+                      {attachmentUploaderLabel(boardMembers, a.uploaded_by_user_id)} ·{" "}
+                      {new Date(a.uploaded_at).toLocaleString("ru-RU")}
+                    </p>
+                  </div>
+                  {(canDownloadThisField || canDeleteThisField) ?
+                    <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1">
+                      {canDownloadThisField ?
+                        <a
+                          href={cardAttachmentDownloadPath(boardId, cardId, a.id, fieldId)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-medium text-app-accent underline-offset-2 hover:underline"
+                        >
+                          Скачать
+                        </a>
+                      : null}
+                      {canDeleteThisField ?
+                        <button
+                          type="button"
+                          disabled={
+                            yandexAttachmentDeletingId !== null ||
+                            formPending ||
+                            uploadingFieldId !== null
+                          }
+                          onClick={() => {
+                            onDeleteAttachmentError(null);
+                            setYandexAttachmentDeletingId(a.id);
+                            void (async () => {
+                              const res = await deleteCardAttachmentAction(
+                                boardId,
+                                cardId,
+                                a.id,
+                                fieldId
+                              );
+                              setYandexAttachmentDeletingId(null);
+                              if (!res.ok) {
+                                onDeleteAttachmentError(res.message);
+                                return;
+                              }
+                              router.refresh();
+                            })();
+                          }}
+                          className="text-xs font-medium text-app-validation-error underline-offset-2 hover:underline disabled:opacity-50"
+                        >
+                          {yandexAttachmentDeletingId === a.id ? "Удаление…" : "Удалить"}
+                        </button>
+                      : null}
+                    </div>
+                  : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        : null}
+
+        {attachments.length === 0 && !canEditContent ?
+          <p className="text-xs text-app-tertiary">{YANDEX_DISK_CARD_FIELD_EMPTY_VIEWER}</p>
+        : attachments.length === 0 && !canOfferYandexUpload ?
+          <div className="space-y-1.5">
+            <p className="text-xs text-app-tertiary">{YANDEX_DISK_CARD_FIELD_EMPTY_VIEWER}</p>
+            {yandexNonActiveHint ?
+              <p className="text-xs text-app-secondary">{yandexNonActiveHint}</p>
+            : null}
+          </div>
+        : canOfferYandexUpload ?
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden
+              disabled={uploadInteractionsDisabled || isUploading}
+              onChange={(e) => {
+                runFilePick(e.target.files);
+                e.target.value = "";
+              }}
+            />
+            <div
+              role="region"
+              aria-label={`Загрузка файлов: ${fieldName}`}
+              onDragEnter={(e) => {
+                e.preventDefault();
+                if (uploadInteractionsDisabled || isUploading) return;
+                setIsDragOver(true);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                const rt = e.relatedTarget as Node | null;
+                if (rt && e.currentTarget.contains(rt)) return;
+                setIsDragOver(false);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = "copy";
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setIsDragOver(false);
+                if (uploadInteractionsDisabled || isUploading) return;
+                runFilePick(e.dataTransfer.files);
+              }}
+              className={cn(
+                "rounded-[var(--radius-control)] border border-dashed border-app-accent/35 bg-app-surface px-3 py-4 text-center transition-colors",
+                isDragOver && "border-app-accent bg-app-accent/[0.07]",
+                (uploadInteractionsDisabled || isUploading) && "pointer-events-none opacity-60"
+              )}
+            >
+              {isUploading ?
+                <p className="text-xs font-medium text-app-secondary">Загрузка…</p>
+              : <>
+                  <p className="text-xs leading-relaxed text-app-secondary">
+                    {attachments.length === 0 ?
+                      YANDEX_DISK_CARD_FIELD_EMPTY_UPLOAD_CTA
+                    : "Перетащите файлы сюда или нажмите кнопку ниже, чтобы добавить ещё."}
+                  </p>
+                  <div className="mt-3 flex justify-center">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={uploadInteractionsDisabled}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Добавить файлы
+                    </Button>
+                  </div>
+                </>
+              }
+            </div>
+          </>
+        : null}
+      </div>
+    </div>
+  );
+}
+
 type EditCardModalProps = {
   open: boolean;
   boardId: string;
@@ -135,6 +391,8 @@ type EditCardModalProps = {
   canEditOwnComment: boolean;
   canDeleteOwnComment: boolean;
   canModerate: boolean;
+  /** Просмотр карточки в модалке (спец.: скачивание — только с правом просмотра; здесь — `canOpenCardModal`). */
+  canDownloadAttachments: boolean;
   currentUserId: string;
   boardMembers: NewCardMemberOption[];
   fieldDefinitions: NewCardFieldDefinition[];
@@ -154,11 +412,13 @@ export function EditCardModal({
   canEditOwnComment,
   canDeleteOwnComment,
   canModerate,
+  canDownloadAttachments,
   currentUserId,
   boardMembers,
   fieldDefinitions,
   onClose
 }: EditCardModalProps) {
+  const yandexDiskIntegration = useBoardYandexDiskIntegration();
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState<"details" | "history">("details");
   const [title, setTitle] = React.useState("");
@@ -179,6 +439,17 @@ export function EditCardModal({
   const [openLabelMenuId, setOpenLabelMenuId] = React.useState<string | "new" | null>(null);
   const [isEditingTitle, setIsEditingTitle] = React.useState(false);
   const titleInputRef = React.useRef<HTMLInputElement>(null);
+  const [yandexAttachmentDeletingId, setYandexAttachmentDeletingId] = React.useState<string | null>(
+    null
+  );
+  const [yandexAttachmentDeleteError, setYandexAttachmentDeleteError] = React.useState<string | null>(
+    null
+  );
+  const [yandexAttachmentUploadingFieldId, setYandexAttachmentUploadingFieldId] = React.useState<
+    string | null
+  >(null);
+  const [yandexAttachmentUploadErrorByFieldId, setYandexAttachmentUploadErrorByFieldId] =
+    React.useState<Record<string, string>>({});
 
   const [fieldDrafts, setFieldDrafts] = React.useState<Record<string, FieldDraft>>({});
 
@@ -195,6 +466,10 @@ export function EditCardModal({
     setPending(false);
     setConfirmDelete(false);
     setIsEditingTitle(false);
+    setYandexAttachmentDeletingId(null);
+    setYandexAttachmentDeleteError(null);
+    setYandexAttachmentUploadingFieldId(null);
+    setYandexAttachmentUploadErrorByFieldId({});
   }, [open, card?.id, card?.title, card?.description]);
 
   React.useEffect(() => {
@@ -251,6 +526,39 @@ export function EditCardModal({
   React.useEffect(() => {
     if (!open) setOpenAssigneePanelUserId(null);
   }, [open]);
+
+  const handleYandexDiskFieldUpload = React.useCallback(
+    async (fieldId: string, files: File[]) => {
+      if (!card || files.length === 0) return;
+      setYandexAttachmentUploadErrorByFieldId((prev) => {
+        const next = { ...prev };
+        delete next[fieldId];
+        return next;
+      });
+      setYandexAttachmentUploadingFieldId(fieldId);
+      const fd = new FormData();
+      for (const file of files) {
+        fd.append("files", file);
+      }
+      const res = await cardAttachmentUploadAction(boardId, card.id, fieldId, fd);
+      setYandexAttachmentUploadingFieldId(null);
+      if (!res.ok) {
+        setYandexAttachmentUploadErrorByFieldId((prev) => ({ ...prev, [fieldId]: res.message }));
+        return;
+      }
+      const failures = res.files.filter((x): x is { ok: false; originalName: string; message: string } => !x.ok);
+      if (failures.length > 0) {
+        setYandexAttachmentUploadErrorByFieldId((prev) => ({
+          ...prev,
+          [fieldId]: failures.map((x) => `${x.originalName}: ${x.message}`).join("\n")
+        }));
+      }
+      if (res.files.some((x) => x.ok)) {
+        router.refresh();
+      }
+    },
+    [boardId, card, router]
+  );
 
   if (!card) return null;
 
@@ -629,6 +937,11 @@ export function EditCardModal({
               return (
                 <div className="space-y-4 border-t border-app-divider pt-4">
                   <p className="text-xs font-medium text-app-secondary">Поля доски</p>
+                  {yandexAttachmentDeleteError ?
+                    <p className="text-xs text-app-validation-error" role="alert">
+                      {yandexAttachmentDeleteError}
+                    </p>
+                  : null}
                   {sortedFields.map((f) => {
                     const d = fieldDrafts[f.id];
                     const reqLabel = f.isRequired ? " *" : "";
@@ -779,20 +1092,43 @@ export function EditCardModal({
                     }
 
                     if (f.fieldType === "yandex_disk" && d.fieldType === "yandex_disk") {
+                      const attachments: CardAttachmentListItem[] =
+                        card.readyAttachmentsByFieldId[f.id] ?? [];
+                      const yandexIntegrationActive = yandexDiskIntegration?.status === "active";
+                      const canOfferYandexUpload = canEditContent && yandexIntegrationActive;
+                      const canDownloadThisField =
+                        canDownloadAttachments && yandexIntegrationActive;
+                      const canDeleteThisField = canEditContent && yandexIntegrationActive;
+                      const yandexNonActiveHint =
+                        attachments.length === 0 && canEditContent && !canOfferYandexUpload ?
+                          yandexDiskCardFieldNonActiveIntegrationHint(yandexDiskIntegration)
+                        : null;
                       return (
-                        <div
+                        <YandexDiskCardFieldAttachmentsSection
                           key={f.id}
-                          className="sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-start sm:gap-3"
-                        >
-                          <p className="pb-1 pt-2 text-xs font-medium text-app-secondary sm:pb-0">
-                            {f.name}
-                            {reqLabel}
-                          </p>
-                          <p className="pt-2 text-xs text-app-tertiary">
-                            Файлы с Яндекс.Диска: интерфейс загрузки и списка подключается на следующем
-                            этапе.
-                          </p>
-                        </div>
+                          boardId={boardId}
+                          cardId={card.id}
+                          fieldId={f.id}
+                          fieldName={f.name}
+                          reqLabel={reqLabel}
+                          attachments={attachments}
+                          boardMembers={boardMembers}
+                          canEditContent={canEditContent}
+                          canOfferYandexUpload={canOfferYandexUpload}
+                          canDownloadThisField={canDownloadThisField}
+                          canDeleteThisField={canDeleteThisField}
+                          yandexNonActiveHint={yandexNonActiveHint}
+                          formPending={pending}
+                          uploadingFieldId={yandexAttachmentUploadingFieldId}
+                          uploadError={yandexAttachmentUploadErrorByFieldId[f.id]}
+                          onUpload={(files) => {
+                            void handleYandexDiskFieldUpload(f.id, files);
+                          }}
+                          yandexAttachmentDeletingId={yandexAttachmentDeletingId}
+                          setYandexAttachmentDeletingId={setYandexAttachmentDeletingId}
+                          onDeleteAttachmentError={setYandexAttachmentDeleteError}
+                          router={router}
+                        />
                       );
                     }
 

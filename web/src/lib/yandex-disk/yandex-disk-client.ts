@@ -368,6 +368,14 @@ export type DiskUploadLinkResult = {
   method: string;
 };
 
+export type DiskPutUploadResult = {
+  /**
+   * `true`, если uploader принял файл, но Яндекс ещё асинхронно переносит его в хранилище
+   * (`202 Accepted`).
+   */
+  acceptedAsync: boolean;
+};
+
 /**
  * Ссылка для загрузки файла (PUT тело на `href`).
  */
@@ -438,7 +446,7 @@ export async function diskPutUpload(
   uploadHref: string,
   body: Buffer | Uint8Array,
   init?: { contentType?: string }
-): Promise<void> {
+): Promise<DiskPutUploadResult> {
   const payload: Uint8Array = Buffer.isBuffer(body) ? new Uint8Array(body) : body;
   const arrayBuffer = payload.buffer.slice(
     payload.byteOffset,
@@ -458,7 +466,12 @@ export async function diskPutUpload(
       cause: e
     });
   }
-  if (res.status === 201 || res.status === 200) return;
+  if (res.status === 201 || res.status === 200) {
+    return { acceptedAsync: false };
+  }
+  if (res.status === 202) {
+    return { acceptedAsync: true };
+  }
   const parsed = await safeReadJson(res);
   if (parsed && typeof parsed === "object" && "error" in parsed) {
     assertDiskError(res, parsed);
