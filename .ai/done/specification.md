@@ -643,11 +643,14 @@
 - `id` (uuid, PK)
 - `board_id` (uuid, FK → `boards.id`, on delete cascade)
 - `name` (text, not null, 1..50)
-- `field_type` (text, not null, enum: `link` | `text` | `date` | `select`)
+- `field_type` (text, not null, enum: `link` | `text` | `date` | `select` | `yandex_disk`)
 - `is_required` (boolean, not null, default false)
 - `position` (double precision, not null)
 - `created_at`
 - `updated_at`
+
+Примечание:
+- для типа `yandex_disk` значение поля не хранится в `card_field_values`; файловые данные и метаданные живут в отдельной подсистеме вложений карточки.
 
 ### 11.14. `board_field_select_options`
 Опции для select‑поля.
@@ -673,7 +676,7 @@
 
 Ограничения:
 - unique(`card_id`,`field_definition_id`)
-- Ровно одно значение должно быть заполнено согласно типу поля (проверяется constraint’ами).
+- Ровно одно значение должно быть заполнено согласно типу поля (проверяется constraint’ами) для типов, которые действительно хранят значение в `card_field_values`.
 
 ### 11.16. `card_activity`
 Лог действий по карточке.
