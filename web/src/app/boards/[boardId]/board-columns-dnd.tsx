@@ -30,6 +30,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { cn } from "@/lib/utils";
+import type { CardAttachmentListItem } from "@/lib/card-attachment-ui-types";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { BoardColumnHeader } from "./board-column-header";
 import {
@@ -1517,6 +1518,25 @@ export function BoardColumnsDnD({
     }));
   }, [boardId, cardsByColumnId, cardSig]);
 
+  const handleYandexFieldReadyAttachmentsSynced = React.useCallback(
+    (cardId: string, fieldDefinitionId: string, attachments: CardAttachmentListItem[]) => {
+      setLocal((prev) => {
+        const existing = prev.cardsById.get(cardId);
+        if (!existing) return prev;
+        const cardsById = new Map(prev.cardsById);
+        cardsById.set(cardId, {
+          ...existing,
+          readyAttachmentsByFieldId: {
+            ...existing.readyAttachmentsByFieldId,
+            [fieldDefinitionId]: attachments
+          }
+        });
+        return { ...prev, cardsById };
+      });
+    },
+    []
+  );
+
   const editingCard =
     editingCardId != null ? (local.cardsById.get(editingCardId) ?? null) : null;
   const memberNamesById = React.useMemo(() => {
@@ -2439,6 +2459,7 @@ export function BoardColumnsDnD({
       boardMembers={membersForNewCard}
       fieldDefinitions={fieldDefinitions}
       onClose={() => setEditingCardId(null)}
+      onYandexFieldReadyAttachmentsSynced={handleYandexFieldReadyAttachmentsSynced}
     />
   );
 

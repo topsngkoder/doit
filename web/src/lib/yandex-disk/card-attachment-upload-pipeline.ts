@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { normalizeUuidParam } from "@/lib/board-id-param";
+import { getSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
 import { ensureBoardYandexDiskAccessToken } from "./board-yandex-disk-access-token";
 import {
@@ -42,14 +43,26 @@ function truncateOriginalName(name: string): string {
   return t.slice(0, ORIGINAL_NAME_MAX_LEN);
 }
 
-async function markAttachmentFailed(supabase: SupabaseClient, attachmentId: string): Promise<void> {
-  const { error } = await supabase
+async function updateAttachmentStatus(
+  attachmentId: string,
+  status: "ready" | "failed"
+): Promise<boolean> {
+  const admin = getSupabaseServiceRoleClient();
+  const { data, error } = await admin
     .from("card_attachments")
-    .update({ status: "failed" })
-    .eq("id", attachmentId);
-  if (error) {
-    console.error("card_attachments mark failed:", error.message, attachmentId);
+    .update({ status })
+    .eq("id", attachmentId)
+    .select("id")
+    .maybeSingle();
+  if (error || !data?.id) {
+    console.error(`card_attachments update ${status}:`, error?.message ?? "row not updated", attachmentId);
+    return false;
   }
+  return true;
+}
+
+async function markAttachmentFailed(attachmentId: string): Promise<void> {
+  await updateAttachmentStatus(attachmentId, "failed");
 }
 
 async function waitForUploadedObjectToAppear(
@@ -125,7 +138,7 @@ export async function uploadOneCardAttachmentFile(
 
   const tokenResult = await ensureBoardYandexDiskAccessToken(b);
   if (!tokenResult.ok) {
-    await markAttachmentFailed(supabase, attachmentId);
+    await markAttachmentFailed(attachmentId);
     return { ok: false, message: tokenResult.message };
   }
 
@@ -151,30 +164,25 @@ export async function uploadOneCardAttachmentFile(
           console.error("card attachment upload recovery:", recoveryError);
         }
         console.error("card attachment disk upload:", e.code, e.rawProviderMessage ?? e.message);
-        await markAttachmentFailed(supabase, attachmentId);
+        await markAttachmentFailed(attachmentId);
         return { ok: false, message: YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE };
       }
     } else if (e instanceof YandexDiskClientError) {
       const mapped =
         mapYandexDiskClientErrorToProductMessage(e, "upload") ?? YANDEX_DISK_MSG_UPLOAD_FAILED;
       console.error("card attachment disk upload:", e.code, e.rawProviderMessage ?? e.message);
-      await markAttachmentFailed(supabase, attachmentId);
+      await markAttachmentFailed(attachmentId);
       return { ok: false, message: mapped };
     } else {
       console.error("card attachment disk upload:", e);
-      await markAttachmentFailed(supabase, attachmentId);
+      await markAttachmentFailed(attachmentId);
       return { ok: false, message: YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE };
     }
   }
 
-  const { error: readyError } = await supabase
-    .from("card_attachments")
-    .update({ status: "ready" })
-    .eq("id", attachmentId);
-
-  if (readyError) {
-    console.error("card_attachments update ready:", readyError.message, attachmentId);
-    await markAttachmentFailed(supabase, attachmentId);
+  const readyUpdated = await updateAttachmentStatus(attachmentId, "ready");
+  if (!readyUpdated) {
+    await markAttachmentFailed(attachmentId);
     return { ok: false, message: "Не удалось завершить сохранение вложения." };
   }
 

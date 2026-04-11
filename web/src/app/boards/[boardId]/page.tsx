@@ -320,6 +320,7 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
           columns={columns}
           cardsByColumnId={cardsByColumnId}
           yandexDiskIntegration={snapshot.yandex_disk_integration}
+          canManageYandexDiskIntegration={canManageYandexDiskIntegration}
         />
       </div>
     </main>

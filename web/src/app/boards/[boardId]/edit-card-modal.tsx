@@ -27,15 +27,19 @@ import type { NewCardMemberOption } from "./create-card-modal";
 import type { BoardCardListItem, BoardLabelOption } from "./column-types";
 import type { CardAttachmentListItem } from "@/lib/card-attachment-ui-types";
 import {
+  getYandexDiskCardFieldUnavailableCopy,
   YANDEX_DISK_CARD_FIELD_EMPTY_UPLOAD_CTA,
-  YANDEX_DISK_CARD_FIELD_EMPTY_VIEWER,
-  yandexDiskCardFieldNonActiveIntegrationHint
+  YANDEX_DISK_CARD_FIELD_EMPTY_VIEWER
 } from "@/lib/yandex-disk/yandex-disk-card-field-empty-copy";
 import { cardAttachmentDownloadPath } from "@/lib/yandex-disk/yandex-disk-board-ui-endpoints";
-import { useBoardYandexDiskIntegration } from "./board-yandex-disk-integration-context";
+import {
+  useBoardYandexDiskIntegration,
+  useCanManageBoardYandexDiskIntegration
+} from "./board-yandex-disk-integration-context";
 import {
   cardAttachmentUploadAction,
-  deleteCardAttachmentAction
+  deleteCardAttachmentAction,
+  listReadyCardAttachmentsAction
 } from "./board-yandex-disk-ui-server-contract";
 
 const inputClass = "field-base";
@@ -167,7 +171,8 @@ function YandexDiskCardFieldAttachmentsSection({
   canOfferYandexUpload,
   canDownloadThisField,
   canDeleteThisField,
-  yandexNonActiveHint,
+  yandexUnavailableReason,
+  yandexOwnerActionHint,
   formPending,
   uploadingFieldId,
   uploadError,
@@ -175,6 +180,7 @@ function YandexDiskCardFieldAttachmentsSection({
   yandexAttachmentDeletingId,
   setYandexAttachmentDeletingId,
   onDeleteAttachmentError,
+  onAfterYandexAttachmentMutation,
   router
 }: {
   boardId: string;
@@ -188,7 +194,8 @@ function YandexDiskCardFieldAttachmentsSection({
   canOfferYandexUpload: boolean;
   canDownloadThisField: boolean;
   canDeleteThisField: boolean;
-  yandexNonActiveHint: string | null;
+  yandexUnavailableReason: string | null;
+  yandexOwnerActionHint: string | null;
   formPending: boolean;
   uploadingFieldId: string | null;
   uploadError: string | undefined;
@@ -196,6 +203,8 @@ function YandexDiskCardFieldAttachmentsSection({
   yandexAttachmentDeletingId: string | null;
   setYandexAttachmentDeletingId: React.Dispatch<React.SetStateAction<string | null>>;
   onDeleteAttachmentError: React.Dispatch<React.SetStateAction<string | null>>;
+  /** После успешного удаления: подтянуть актуальный список `ready` в локальный state доски (в обход кэша RSC). */
+  onAfterYandexAttachmentMutation?: () => void | Promise<void>;
   router: ReturnType<typeof useRouter>;
 }) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -224,6 +233,14 @@ function YandexDiskCardFieldAttachmentsSection({
           <p className="text-xs text-app-validation-error" role="alert">
             {uploadError}
           </p>
+        : null}
+        {yandexUnavailableReason ?
+          <div className="space-y-1">
+            <p className="text-xs text-app-secondary">{yandexUnavailableReason}</p>
+            {yandexOwnerActionHint ?
+              <p className="text-xs text-app-secondary">{yandexOwnerActionHint}</p>
+            : null}
+          </div>
         : null}
 
         {attachments.length > 0 ?
@@ -277,6 +294,7 @@ function YandexDiskCardFieldAttachmentsSection({
                                 onDeleteAttachmentError(res.message);
                                 return;
                               }
+                              await onAfterYandexAttachmentMutation?.();
                               router.refresh();
                             })();
                           }}
@@ -296,12 +314,7 @@ function YandexDiskCardFieldAttachmentsSection({
         {attachments.length === 0 && !canEditContent ?
           <p className="text-xs text-app-tertiary">{YANDEX_DISK_CARD_FIELD_EMPTY_VIEWER}</p>
         : attachments.length === 0 && !canOfferYandexUpload ?
-          <div className="space-y-1.5">
-            <p className="text-xs text-app-tertiary">{YANDEX_DISK_CARD_FIELD_EMPTY_VIEWER}</p>
-            {yandexNonActiveHint ?
-              <p className="text-xs text-app-secondary">{yandexNonActiveHint}</p>
-            : null}
-          </div>
+          <p className="text-xs text-app-tertiary">{YANDEX_DISK_CARD_FIELD_EMPTY_VIEWER}</p>
         : canOfferYandexUpload ?
           <>
             <input
@@ -397,6 +410,15 @@ type EditCardModalProps = {
   boardMembers: NewCardMemberOption[];
   fieldDefinitions: NewCardFieldDefinition[];
   onClose: () => void;
+  /**
+   * После загрузки/удаления вложений: синхронизировать `readyAttachmentsByFieldId` у карточки в клиентском state доски.
+   * Нужен, потому что `router.refresh()` может вернуть устаревший снимок до инвалидации кэша Next.js.
+   */
+  onYandexFieldReadyAttachmentsSynced?: (
+    cardId: string,
+    fieldDefinitionId: string,
+    attachments: CardAttachmentListItem[]
+  ) => void;
 };
 
 export function EditCardModal({
@@ -416,9 +438,11 @@ export function EditCardModal({
   currentUserId,
   boardMembers,
   fieldDefinitions,
-  onClose
+  onClose,
+  onYandexFieldReadyAttachmentsSynced
 }: EditCardModalProps) {
   const yandexDiskIntegration = useBoardYandexDiskIntegration();
+  const canManageYandexDiskIntegration = useCanManageBoardYandexDiskIntegration();
   const router = useRouter();
   const [activeTab, setActiveTab] = React.useState<"details" | "history">("details");
   const [title, setTitle] = React.useState("");
@@ -527,6 +551,17 @@ export function EditCardModal({
     if (!open) setOpenAssigneePanelUserId(null);
   }, [open]);
 
+  const pullYandexReadyAttachmentsForField = React.useCallback(
+    async (fieldId: string) => {
+      if (!card || !onYandexFieldReadyAttachmentsSynced) return;
+      const listed = await listReadyCardAttachmentsAction(boardId, card.id, fieldId);
+      if (listed.ok) {
+        onYandexFieldReadyAttachmentsSynced(card.id, fieldId, listed.attachments);
+      }
+    },
+    [boardId, card, onYandexFieldReadyAttachmentsSynced]
+  );
+
   const handleYandexDiskFieldUpload = React.useCallback(
     async (fieldId: string, files: File[]) => {
       if (!card || files.length === 0) return;
@@ -554,10 +589,11 @@ export function EditCardModal({
         }));
       }
       if (res.files.some((x) => x.ok)) {
+        await pullYandexReadyAttachmentsForField(fieldId);
         router.refresh();
       }
     },
-    [boardId, card, router]
+    [boardId, card, pullYandexReadyAttachmentsForField, router]
   );
 
   if (!card) return null;
@@ -1099,10 +1135,12 @@ export function EditCardModal({
                       const canDownloadThisField =
                         canDownloadAttachments && yandexIntegrationActive;
                       const canDeleteThisField = canEditContent && yandexIntegrationActive;
-                      const yandexNonActiveHint =
-                        attachments.length === 0 && canEditContent && !canOfferYandexUpload ?
-                          yandexDiskCardFieldNonActiveIntegrationHint(yandexDiskIntegration)
-                        : null;
+                      const unavailableCopy = getYandexDiskCardFieldUnavailableCopy(
+                        yandexDiskIntegration,
+                        {
+                          canManageIntegration: canManageYandexDiskIntegration
+                        }
+                      );
                       return (
                         <YandexDiskCardFieldAttachmentsSection
                           key={f.id}
@@ -1117,7 +1155,8 @@ export function EditCardModal({
                           canOfferYandexUpload={canOfferYandexUpload}
                           canDownloadThisField={canDownloadThisField}
                           canDeleteThisField={canDeleteThisField}
-                          yandexNonActiveHint={yandexNonActiveHint}
+                          yandexUnavailableReason={unavailableCopy?.reason ?? null}
+                          yandexOwnerActionHint={unavailableCopy?.ownerActionHint ?? null}
                           formPending={pending}
                           uploadingFieldId={yandexAttachmentUploadingFieldId}
                           uploadError={yandexAttachmentUploadErrorByFieldId[f.id]}
@@ -1127,6 +1166,9 @@ export function EditCardModal({
                           yandexAttachmentDeletingId={yandexAttachmentDeletingId}
                           setYandexAttachmentDeletingId={setYandexAttachmentDeletingId}
                           onDeleteAttachmentError={setYandexAttachmentDeleteError}
+                          onAfterYandexAttachmentMutation={() =>
+                            void pullYandexReadyAttachmentsForField(f.id)
+                          }
                           router={router}
                         />
                       );

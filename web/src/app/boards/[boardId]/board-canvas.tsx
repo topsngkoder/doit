@@ -43,6 +43,7 @@ type BoardCanvasProps = {
   }>;
   cardsByColumnId: Map<string, BoardCardListItem[]>;
   yandexDiskIntegration: BoardYandexDiskIntegrationSnapshot;
+  canManageYandexDiskIntegration: boolean;
 };
 
 export function BoardCanvas({
@@ -63,7 +64,8 @@ export function BoardCanvas({
   board,
   columns,
   cardsByColumnId,
-  yandexDiskIntegration
+  yandexDiskIntegration,
+  canManageYandexDiskIntegration
 }: BoardCanvasProps) {
   const columnsStageRef = React.useRef<HTMLDivElement | null>(null);
   const columnsSig = React.useMemo(
@@ -102,7 +104,12 @@ export function BoardCanvas({
         ref={columnsStageRef}
         className="board-columns-scroll min-h-0 flex-1 overflow-x-auto overflow-y-hidden overscroll-x-contain scroll-smooth"
       >
-        <BoardYandexDiskIntegrationProvider value={yandexDiskIntegration}>
+        <BoardYandexDiskIntegrationProvider
+          value={{
+            integration: yandexDiskIntegration,
+            canManageIntegration: canManageYandexDiskIntegration
+          }}
+        >
           <BoardColumnsDnD
             boardId={boardId}
             currentUserId={currentUserId}

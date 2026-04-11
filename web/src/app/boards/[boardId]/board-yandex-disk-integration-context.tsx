@@ -3,15 +3,20 @@
 import * as React from "react";
 import type { BoardYandexDiskIntegrationSnapshot } from "@/lib/board-snapshot-types";
 
+type BoardYandexDiskIntegrationContextValue = {
+  integration: BoardYandexDiskIntegrationSnapshot;
+  canManageIntegration: boolean;
+};
+
 const BoardYandexDiskIntegrationContext = React.createContext<
-  BoardYandexDiskIntegrationSnapshot | undefined
+  BoardYandexDiskIntegrationContextValue | undefined
 >(undefined);
 
 export function BoardYandexDiskIntegrationProvider({
   value,
   children
 }: {
-  value: BoardYandexDiskIntegrationSnapshot;
+  value: BoardYandexDiskIntegrationContextValue;
   children: React.ReactNode;
 }) {
   return (
@@ -29,5 +34,16 @@ export function useBoardYandexDiskIntegration(): BoardYandexDiskIntegrationSnaps
       "useBoardYandexDiskIntegration: ожидается BoardYandexDiskIntegrationProvider на странице доски"
     );
   }
-  return v;
+  return v.integration;
+}
+
+/** Может ли текущий пользователь управлять интеграцией из карточки/создания карточки. */
+export function useCanManageBoardYandexDiskIntegration(): boolean {
+  const v = React.useContext(BoardYandexDiskIntegrationContext);
+  if (v === undefined) {
+    throw new Error(
+      "useCanManageBoardYandexDiskIntegration: ожидается BoardYandexDiskIntegrationProvider на странице доски"
+    );
+  }
+  return v.canManageIntegration;
 }

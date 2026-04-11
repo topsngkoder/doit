@@ -16,8 +16,14 @@ import {
   type FieldDraft,
   type NewCardFieldDefinition
 } from "./card-field-drafts";
-import { yandexDiskCardFieldNonActiveIntegrationHint } from "@/lib/yandex-disk/yandex-disk-card-field-empty-copy";
-import { useBoardYandexDiskIntegration } from "./board-yandex-disk-integration-context";
+import {
+  getYandexDiskCardFieldUnavailableCopy,
+  yandexDiskCardFieldNonActiveIntegrationHint
+} from "@/lib/yandex-disk/yandex-disk-card-field-empty-copy";
+import {
+  useBoardYandexDiskIntegration,
+  useCanManageBoardYandexDiskIntegration
+} from "./board-yandex-disk-integration-context";
 
 export type NewCardMemberOption = {
   userId: string;
@@ -48,6 +54,7 @@ export function CreateCardModal({
   currentUserId
 }: CreateCardModalProps) {
   const yandexDiskIntegration = useBoardYandexDiskIntegration();
+  const canManageYandexDiskIntegration = useCanManageBoardYandexDiskIntegration();
   const router = useRouter();
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
@@ -276,10 +283,15 @@ export function CreateCardModal({
           }
 
           if (f.fieldType === "yandex_disk" && d.fieldType === "yandex_disk") {
+            const unavailableCopy = getYandexDiskCardFieldUnavailableCopy(yandexDiskIntegration, {
+              canManageIntegration: canManageYandexDiskIntegration
+            });
             const yandexInactiveHint =
               yandexDiskIntegration?.status === "active" ?
                 null
-              : yandexDiskCardFieldNonActiveIntegrationHint(yandexDiskIntegration);
+              : yandexDiskCardFieldNonActiveIntegrationHint(yandexDiskIntegration, {
+                  canManageIntegration: canManageYandexDiskIntegration
+                });
             return (
               <div
                 key={f.id}
@@ -295,6 +307,9 @@ export function CreateCardModal({
                 </p>
                 {yandexInactiveHint ?
                   <p className="text-xs text-app-secondary">{yandexInactiveHint}</p>
+                : null}
+                {unavailableCopy?.ownerActionHint ?
+                  <p className="text-xs text-app-secondary">{unavailableCopy.ownerActionHint}</p>
                 : null}
               </div>
             );
