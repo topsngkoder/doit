@@ -1,6 +1,6 @@
 # План реализации "Единая папка Яндекс.Диска на доску" (для AI-агента)
 
-Основано на `.ai/yandex-disk-board-storage-specification.md`.
+Основано на спецификации: `.ai/done/yandex-disk-board-storage-specification.md` (историческая ссылка: `.ai/yandex-disk-board-storage-specification.md`).
 
 Цель плана: дать AI-агенту исполняемую декомпозицию для внедрения интеграции Яндекс.Диска на уровне доски, хранения вложений карточек через приложение, server-side контроля доступа, поддержки типа поля `Яндекс диск` в `Поля доски` и UI файловых полей карточки без выхода за рамки спецификации.
 
@@ -22,6 +22,7 @@
 - Статусы интеграции фиксированы: `active | reauthorization_required | disconnected | error`.
 - Статусы вложения фиксированы: `uploading | ready | failed`.
 - В UI карточки показываются только вложения со статусом `ready`.
+- Во время активной загрузки в файловом поле карточки показываются **прогресс** (процент и/или передано из известного размера) и **скорость** передачи (сглаженная, человекочитаемые единицы); для пакета файлов — текущий файл по очереди. Постоянный список вложений по-прежнему только из `ready` (см. спец. 13.5).
 - `failed`-вложения и осиротевшие файлы должны очищаться служебной очисткой не позднее 24 часов.
 
 ## 1) Текущий технический контекст проекта
@@ -60,6 +61,7 @@
 - Нет server-side API для загрузки, скачивания и удаления файлов карточек.
 - Нет поддержки типа поля `yandex_disk` в `board_field_definitions`, UI `Поля доски` и связанных TS-типах.
 - Нет UI файловых полей `Яндекс диск` внутри блока пользовательских полей карточки.
+- Нет отображения **прогресса по байтам** и **скорости загрузки** в карточке во время upload (см. спец. 13.5, задача YDB8.7).
 - Нет фоновых служебных задач для очистки `failed`-вложений и осиротевших файлов.
 
 ### 1.3. Практический вывод для агента
@@ -91,6 +93,9 @@
 Статусы: `todo | doing | blocked | done`.
 
 ### Прогресс (журнал)
+
+**Лимит размера одного файла (спец. 10.2):** с 2026-04-11 — **1 ГБ** (в коде 1 ГиБ, `CARD_ATTACHMENT_UPLOAD_MAX_FILE_BYTES`). В записях YDB4.1 / YDB4.2 таблицы ниже описан этап внедрения при лимите **50 МБ**; актуальное значение — в строке **«лимит размера вложения»** и в журнале разд. 9.
+
 | Дата | Задача | Что сделано |
 |------|--------|-------------|
 | 2026-04-10 | YDB1.1 | Миграция `20260410180000_board_yandex_disk_integrations.sql`: таблица `board_yandex_disk_integrations`, поля по спец. 7.1, `UNIQUE(board_id)`, индекс по `status`, CHECK статусов, FK на `boards` CASCADE и `profiles` SET NULL, токены nullable для состояний без секрета, RLS включён без политик (политики — YDB1.4), триггер `updated_at`. `supabase db push` применён. |
@@ -151,6 +156,8 @@
 | 2026-04-11 | YDB9.2 | Миграция `20260412150000_ydb9_2_yandex_disk_orphan_attachment_paths.sql`: таблица `yandex_disk_orphan_attachment_paths` (`board_id`, `disk_path`, `first_detected_at`, UNIQUE пары), RLS + только `service_role`. `yandex-disk-client.ts`: `diskListDirectoryPage` / `diskListDirectoryAll` (пагинация). `cleanup-orphan-yandex-disk-card-attachment-files.ts`: обход `/doit/boards/<boardId>/cards/` (файлы у корня + в подпапках-UUID карточек), сопоставление с `card_attachments.storage_path`, учёт сирот с SLA 24 ч (`minAgeHours`), удаление с Диска + строки учёта; снятие учёта при появлении вложения в БД; удаление устаревших записей учёта, если файла на Диске уже нет. `npx supabase db push`, `npx tsc --noEmit` в `web/` — ок. Вызов по cron/endpoint — YDB9.3. |
 | 2026-04-11 | YDB9.3 | `GET|POST /api/cron/yandex-disk-cleanup`: авторизация `Authorization: Bearer` — `YANDEX_DISK_CLEANUP_CRON_SECRET` → `NOTIFICATION_OUTBOX_CRON_SECRET` → `CRON_SECRET` (как outbox + Vercel Cron). Подряд: `cleanupFailedCardAttachmentsOlderThan`, `cleanupOrphanYandexDiskCardAttachmentFiles` (service-role). Query: `minAgeHours` (оба шага), `boardId` (только сироты, UUID). `vercel.json`: cron `30 9 * * *`. `web/.env.local.example` — закомментированный `YANDEX_DISK_CLEANUP_CRON_SECRET`; `README.md` — строка про расписание. `maxDuration=60`, `nodejs`. Миграций нет; `npx supabase db push` — БД актуальна; `npx tsc --noEmit` в `web/` — ок. Структурированные логи cleanup — YDB9.4. |
 | 2026-04-11 | YDB9.4 | `yandex-disk-cleanup-logger.ts`: JSON-строки в stdout с `scope: yandex_disk_cleanup` + `event` + поля (без токенов). `cleanup-failed-card-attachments.ts` — `failed_attachments_rpc_error` / `failed_attachments_rpc_unexpected_payload`. `cleanup-orphan-yandex-disk-card-attachment-files.ts` — интеграции/БД/Диск (`orphan_integrations_list_failed`, `orphan_disk_list_*`, `orphan_disk_delete_failed`, `orphan_*_observation_*`, `orphan_attachment_*`), агрегат `orphan_cleanup_boards_skipped_aggregate`. `ensureBoardYandexDiskAccessToken(..., { cleanupDiagnostics: true })` из orphan-прохода: недействительная интеграция / отзыв refresh (`oauth_refresh_fatal_revoked_or_invalid` + `client_error_code`) / ошибки провайдера при refresh (`oauth_refresh_provider_error`), decrypt/persist/read. `yandex-disk-cleanup/route.ts` — предупреждения при `ok: false` шагов, `cron_run_unhandled_exception`. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB8.7 | Спец. 13.5: `card-attachment-upload-result-types.ts` + `card-attachment-upload-runner.ts` (общая логика с `runCardAttachmentUpload`); `cardAttachmentUploadAction` на раннере; POST `api/boards/[boardId]/cards/[cardId]/attachments/upload` (`maxDuration` 800), `FormData`: `field_definition_id`, `files`; `cardAttachmentUploadApiPath` в `yandex-disk-board-ui-endpoints.ts`. Клиент `upload-yandex-card-attachments-client.ts` — последовательные XHR, `upload.onprogress`, EMA скорости, фаза «Завершение на сервере…» после тела; `edit-card-modal` — процент/байты/скорость, пакет «файл i из n», indeterminate при неизвестном размере. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | лимит размера вложения | Максимальный размер **одного** файла: **1 ГиБ** (`CARD_ATTACHMENT_UPLOAD_MAX_FILE_BYTES` в `validate-card-attachment-upload-request.ts`); продуктовый текст «1 ГБ» — `YANDEX_DISK_MSG_FILE_TOO_LARGE`; строка прогресса — `formatByteProgressRu` с единицей **ГиБ**; комментарий в `next.config.mjs`. **Спецификация:** разд. 10.2 и 15.3 обновлены под 1 ГБ / 1 ГиБ в коде. |
 
 ### EPIC YDB1 - Подготовить модель данных и миграции
 - [x] **YDB1.1 (done)** Спроектировать таблицу привязки Яндекс.Диска к доске
@@ -245,7 +252,7 @@
 - [x] **YDB4.2 (done)** Реализовать pre-upload валидации по спецификации
   - максимум 20 файлов за операцию;
   - максимум 200 `ready`-вложений на карточку;
-  - максимум 50 МБ на файл;
+  - максимум 1 ГБ на файл (в коде 1 ГиБ, 1024³ байт; см. спец. 10.2);
   - пустой файл запрещён;
   - **DoD**: все фиксированные ограничения покрыты до обращения к Яндексу. *(Реализовано в `validate-card-attachment-upload-request.ts` в рамках YDB4.1; см. журнал YDB4.2.)*
 - [x] **YDB4.3 (done)** Реализовать создание подпапки карточки перед первой загрузкой
@@ -384,6 +391,12 @@
   - никакого rename attachment;
   - никакого preview внутри приложения;
   - **DoD**: UI не добавляет сценарии, запрещённые спецификацией. *(Проверено аудитом текущего UI: upload/DnD только внутри `edit-card-modal.tsx` и конкретного поля `yandex_disk`; иных entry-point'ов, rename и preview не найдено.)*
+- [x] **YDB8.7 (done)** Прогресс и скорость загрузки в карточке (спец. 13.5)
+  - в зоне поля `Яндекс диск` во время `cardAttachmentUploadAction` показывать по текущему файлу: прогресс (процент и/или `передано / всего`, если размер известен) и сглаженную скорость (например, скользящее среднее за 0,5–2 с);
+  - для этапа с неизвестным объёмом допускается indeterminate только для этого этапа; для тела файла с известным `File.size` — байтовый прогресс обязателен на стороне клиента;
+  - пакет: отображать имя текущего файла и переход к следующему после завершения/ошибки;
+  - **техническая ориентир**: отслеживать `XMLHttpRequest.upload.onprogress` / `fetch` + `ReadableStream` при отправке FormData на сервер; если серверный этап «сервер → Яндекс» не виден клиенту, продуктово достаточно прогресса клиент→сервер плюс явный индикатор «завершение на сервере» после 100% тела (короткий второй этап без байтов — допустим indeterminate по спец.);
+  - **DoD**: поведение соответствует разделу 13.5 и пункту 14 раздела 19 спецификации; не нарушены запреты на показ `uploading`/`failed` в постоянном списке.
 
 ### EPIC YDB9 - Реализовать cleanup и консистентность
 - [x] **YDB9.1 (done)** Подготовить cleanup `failed`-вложений
@@ -428,6 +441,7 @@
 - [ ] **YDB10.4 (todo)** Прогнать сценарии вложений
   - одиночная загрузка;
   - batch upload;
+  - проверка прогресса и скорости в UI поля (спец. 13.5 / YDB8.7);
   - частичный успех;
   - скачивание готового файла;
   - скачивание отсутствующего у провайдера файла;
@@ -452,7 +466,7 @@
 2. Затем закрыть `YDB2.*`.
 3. После этого реализовать `YDB3.*`.
 4. Затем собрать файловые операции в `YDB4.*` и `YDB5.*`.
-5. После этого расширить данные/UI через `YDB6.*`, `YDB7.*`, `YDB8.*`.
+5. После этого расширить данные/UI через `YDB6.*`, `YDB7.*`, `YDB8.*` (включая `YDB8.7` — прогресс и скорость загрузки в карточке).
 6. В конце завершить `YDB9.*` и `YDB10.*`.
 
 ## 6) Карта зависимостей
@@ -461,6 +475,7 @@
 - `YDB3` обязателен до production-ready `YDB4`, `YDB5`, `YDB7`, `YDB8`.
 - `YDB4` обязателен до полной готовности `YDB8`.
 - `YDB5` обязателен до полной готовности `YDB8`.
+- `YDB8.7` зависит от работающего upload-flow (`YDB4.*`, `YDB8.4`) и уточняет только клиентский слой отображения прогресса.
 - `YDB6` обязателен до SSR/UI-ready `YDB7` и `YDB8`.
 - `YDB9` зависит от `YDB1`, `YDB2`, `YDB3`, `YDB4`, `YDB5`.
 - `YDB10` завершает все эпики и не должен считаться закрытым до стабилизации cleanup и прав.
@@ -496,7 +511,7 @@
 - загрузка, скачивание и удаление работают только через приложение и только по правам карточки;
 - owner-only управление интеграцией соблюдается на сервере;
 - в `Поля доски` появился тип `Яндекс диск` и корректный UI управления интеграцией;
-- в карточке появились файловые поля `Яндекс диск` с корректными состояниями и разделением по полям;
+- в карточке появились файловые поля `Яндекс диск` с корректными состояниями и разделением по полям, а при загрузке — прогресс и скорость по спец. 13.5;
 - `failed`-вложения и orphan-файлы очищаются служебным сценарием;
 - соблюдены все критерии приёмки из раздела 19 спецификации без открытых дефектов.
 
@@ -504,5 +519,7 @@
 
 | Дата | Что сделано |
 |------|-------------|
+| 2026-04-11 | **Прогресс и скорость загрузки:** в спецификации расширены п. 13.2, 13.5 и критерий приёмки разд. 19 п. 14; в плане — разд. 0, 1.2, `YDB8.7`, 5–6, 8, карта зависимостей, `YDB10.4`; уточнена ссылка на файл спеки (`.ai/done/...`). Реализация UI — задача `YDB8.7` (todo). |
 | 2026-04-11 | **Регрессия UI вложений:** файл попадал на Яндекс.Диск и в БД (`ready`), но в открытой карточке список оставался пустым. Причина: список строится из `card.readyAttachmentsByFieldId` (снимок + локальный state `BoardColumnsDnD`); одного `router.refresh()` недостаточно, если RSC отдаёт устаревший `get_board_snapshot` до инвалидации кэша; дополнительно ранее помогал только merge вложений при несовпадении порядка карточек после DnD. **Исправление:** после успешной загрузки и после успешного удаления вызывается `listReadyCardAttachmentsAction`, результат записывается в локальный `cardsById` через колбэк `onYandexFieldReadyAttachmentsSynced` (`edit-card-modal.tsx` → `board-columns-dnd.tsx`). |
 | 2026-04-11 | **Регрессия upload status:** файл физически попадал на Яндекс.Диск, но запись `card_attachments` иногда оставалась в `uploading`, поэтому карточка его не показывала. Причина: финальный переход статуса выполнялся пользовательским клиентом под RLS/сессионным контекстом и мог тихо не завершиться; дополнительно Яндекс может принять файл асинхронно. **Исправление:** в `card-attachment-upload-pipeline.ts` принят `202 Accepted`, recovery после `network_error` проверяет наличие файла на Диске, а переходы `uploading -> ready|failed` переведены на `service_role` с явной проверкой обновления строки. **На будущее:** держать reconcile stale-`uploading` как служебный сценарий cleanup по `storage_path`. |
+| 2026-04-11 | **Лимит размера вложения (1 ГБ):** см. строку «лимит размера вложения» в журнале прогресса (разд. 4); спецификация `.ai/done/yandex-disk-board-storage-specification.md` — разд. 10.2, 15.3. |

@@ -9,7 +9,7 @@
  * |----------|----------------|
  * | Подключить / переподключить | навигация на URL из `yandexDiskOAuthStartPath(boardId)` (`@/lib/yandex-disk/yandex-disk-board-ui-endpoints`) |
  * | Отключить | `disconnectBoardYandexDiskIntegrationAction` |
- * | Загрузка | `cardAttachmentUploadAction(boardId, cardId, fieldDefinitionId, formData)` (опционально `cardAttachmentUploadPrecheckAction` с теми же первыми тремя аргументами); в `FormData` — поле `files` |
+ * | Загрузка | UI с прогрессом (спец. 13.5): POST `cardAttachmentUploadApiPath(boardId, cardId)` (`@/lib/yandex-disk/yandex-disk-board-ui-endpoints`), `FormData`: `field_definition_id`, по одному `files` за запрос; либо `cardAttachmentUploadAction` + `FormData` с несколькими `files` без прогресса; precheck — `cardAttachmentUploadPrecheckAction` |
  * | Скачать | GET `cardAttachmentDownloadPath(boardId, cardId, attachmentId, fieldDefinitionId)` (тот же модуль endpoints) |
  * | Удалить | `deleteCardAttachmentAction(boardId, cardId, attachmentId, fieldDefinitionId)` |
  * | Список вне snapshot | `listReadyCardAttachmentsAction(boardId, cardId, fieldDefinitionId)` |

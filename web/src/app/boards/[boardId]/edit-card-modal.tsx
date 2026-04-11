@@ -31,13 +31,21 @@ import {
   YANDEX_DISK_CARD_FIELD_EMPTY_UPLOAD_CTA,
   YANDEX_DISK_CARD_FIELD_EMPTY_VIEWER
 } from "@/lib/yandex-disk/yandex-disk-card-field-empty-copy";
-import { cardAttachmentDownloadPath } from "@/lib/yandex-disk/yandex-disk-board-ui-endpoints";
+import {
+  cardAttachmentDownloadPath,
+  cardAttachmentUploadApiPath
+} from "@/lib/yandex-disk/yandex-disk-board-ui-endpoints";
+import type { YandexCardAttachmentUploadProgress } from "@/lib/yandex-disk/upload-yandex-card-attachments-client";
+import {
+  formatByteProgressRu,
+  formatUploadSpeedRu,
+  uploadYandexCardAttachmentsWithProgress
+} from "@/lib/yandex-disk/upload-yandex-card-attachments-client";
 import {
   useBoardYandexDiskIntegration,
   useCanManageBoardYandexDiskIntegration
 } from "./board-yandex-disk-integration-context";
 import {
-  cardAttachmentUploadAction,
   deleteCardAttachmentAction,
   listReadyCardAttachmentsAction
 } from "./board-yandex-disk-ui-server-contract";
@@ -175,6 +183,7 @@ function YandexDiskCardFieldAttachmentsSection({
   yandexOwnerActionHint,
   formPending,
   uploadingFieldId,
+  uploadProgress,
   uploadError,
   onUpload,
   yandexAttachmentDeletingId,
@@ -198,6 +207,7 @@ function YandexDiskCardFieldAttachmentsSection({
   yandexOwnerActionHint: string | null;
   formPending: boolean;
   uploadingFieldId: string | null;
+  uploadProgress: YandexCardAttachmentUploadProgress | null;
   uploadError: string | undefined;
   onUpload: (files: File[]) => void | Promise<void>;
   yandexAttachmentDeletingId: string | null;
@@ -361,7 +371,82 @@ function YandexDiskCardFieldAttachmentsSection({
               )}
             >
               {isUploading ?
-                <p className="text-xs font-medium text-app-secondary">Загрузка…</p>
+                <div className="space-y-2 text-left">
+                  {uploadProgress ?
+                    <>
+                      <p className="text-xs text-app-secondary">
+                        Файл {uploadProgress.fileIndex + 1} из {uploadProgress.fileCount}
+                      </p>
+                      <p className="break-all text-xs font-medium text-app-primary">
+                        {uploadProgress.fileName}
+                      </p>
+                      <div
+                        className="h-1.5 w-full overflow-hidden rounded-full bg-app-divider"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={
+                          uploadProgress.total !== null && uploadProgress.total > 0 ?
+                            Math.min(
+                              100,
+                              Math.round((100 * uploadProgress.loaded) / uploadProgress.total)
+                            )
+                          : undefined
+                        }
+                        aria-label="Прогресс загрузки файла на сервер"
+                      >
+                        <div
+                          className={cn(
+                            "h-full rounded-full bg-app-accent transition-[width] duration-150 ease-out",
+                            uploadProgress.phase === "server" &&
+                              uploadProgress.total !== null &&
+                              uploadProgress.total > 0 &&
+                              "animate-pulse",
+                            uploadProgress.phase === "client" &&
+                              (uploadProgress.total === null || uploadProgress.total <= 0) &&
+                              "animate-pulse"
+                          )}
+                          style={{
+                            width:
+                              uploadProgress.total !== null && uploadProgress.total > 0 ?
+                                `${Math.min(100, (100 * uploadProgress.loaded) / uploadProgress.total)}%`
+                              : uploadProgress.phase === "server" ?
+                                "100%"
+                              : "42%"
+                          }}
+                        />
+                      </div>
+                      {uploadProgress.phase === "server" ?
+                        <p className="text-xs text-app-tertiary">Завершение на сервере…</p>
+                      : uploadProgress.total !== null && uploadProgress.total > 0 ?
+                        <p className="text-xs text-app-tertiary">
+                          {Math.min(
+                            100,
+                            Math.round((100 * uploadProgress.loaded) / uploadProgress.total)
+                          )}
+                          % ·{" "}
+                          {formatByteProgressRu(uploadProgress.loaded, uploadProgress.total)}
+                          {uploadProgress.smoothedSpeedBps !== null ?
+                            <>
+                              {" "}
+                              · {formatUploadSpeedRu(uploadProgress.smoothedSpeedBps)}
+                            </>
+                          : null}
+                        </p>
+                      : <p className="text-xs text-app-tertiary">
+                          Передано{" "}
+                          {formatAttachmentBytesRu(uploadProgress.loaded)}
+                          {uploadProgress.smoothedSpeedBps !== null ?
+                            <>
+                              {" "}
+                              · {formatUploadSpeedRu(uploadProgress.smoothedSpeedBps)}
+                            </>
+                          : null}
+                        </p>
+                      }
+                    </>
+                  : <p className="text-xs font-medium text-app-secondary">Загрузка…</p>}
+                </div>
               : <>
                   <p className="text-xs leading-relaxed text-app-secondary">
                     {attachments.length === 0 ?
@@ -472,6 +557,8 @@ export function EditCardModal({
   const [yandexAttachmentUploadingFieldId, setYandexAttachmentUploadingFieldId] = React.useState<
     string | null
   >(null);
+  const [yandexAttachmentUploadProgress, setYandexAttachmentUploadProgress] =
+    React.useState<YandexCardAttachmentUploadProgress | null>(null);
   const [yandexAttachmentUploadErrorByFieldId, setYandexAttachmentUploadErrorByFieldId] =
     React.useState<Record<string, string>>({});
 
@@ -493,6 +580,7 @@ export function EditCardModal({
     setYandexAttachmentDeletingId(null);
     setYandexAttachmentDeleteError(null);
     setYandexAttachmentUploadingFieldId(null);
+    setYandexAttachmentUploadProgress(null);
     setYandexAttachmentUploadErrorByFieldId({});
   }, [open, card?.id, card?.title, card?.description]);
 
@@ -571,12 +659,15 @@ export function EditCardModal({
         return next;
       });
       setYandexAttachmentUploadingFieldId(fieldId);
-      const fd = new FormData();
-      for (const file of files) {
-        fd.append("files", file);
-      }
-      const res = await cardAttachmentUploadAction(boardId, card.id, fieldId, fd);
+      setYandexAttachmentUploadProgress(null);
+      const uploadUrl = cardAttachmentUploadApiPath(boardId, card.id);
+      const res = await uploadYandexCardAttachmentsWithProgress(uploadUrl, {
+        fieldDefinitionId: fieldId,
+        files,
+        onProgress: setYandexAttachmentUploadProgress
+      });
       setYandexAttachmentUploadingFieldId(null);
+      setYandexAttachmentUploadProgress(null);
       if (!res.ok) {
         setYandexAttachmentUploadErrorByFieldId((prev) => ({ ...prev, [fieldId]: res.message }));
         return;
@@ -1159,6 +1250,11 @@ export function EditCardModal({
                           yandexOwnerActionHint={unavailableCopy?.ownerActionHint ?? null}
                           formPending={pending}
                           uploadingFieldId={yandexAttachmentUploadingFieldId}
+                          uploadProgress={
+                            yandexAttachmentUploadingFieldId === f.id ?
+                              yandexAttachmentUploadProgress
+                            : null
+                          }
                           uploadError={yandexAttachmentUploadErrorByFieldId[f.id]}
                           onUpload={(files) => {
                             void handleYandexDiskFieldUpload(f.id, files);

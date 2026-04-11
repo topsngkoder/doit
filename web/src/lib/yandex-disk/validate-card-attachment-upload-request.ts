@@ -19,7 +19,8 @@ import {
 /** Спецификация 10.2 */
 export const CARD_ATTACHMENT_UPLOAD_MAX_FILES_PER_OPERATION = 20;
 export const CARD_ATTACHMENT_UPLOAD_MAX_READY_PER_CARD = 200;
-export const CARD_ATTACHMENT_UPLOAD_MAX_FILE_BYTES = 50 * 1024 * 1024;
+/** Максимальный размер одного файла (1 ГиБ). Должен совпадать с текстом `YANDEX_DISK_MSG_FILE_TOO_LARGE`. */
+export const CARD_ATTACHMENT_UPLOAD_MAX_FILE_BYTES = 1024 * 1024 * 1024;
 
 export type CardAttachmentUploadFileMeta = {
   name: string;

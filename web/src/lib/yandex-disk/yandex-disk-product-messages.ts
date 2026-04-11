@@ -22,7 +22,7 @@ export const YANDEX_DISK_MSG_INVALID_YANDEX_DISK_FIELD =
 /** Раздел 15.3 — валидация файлов до обращения к Диску (спец. 10.2). */
 export const YANDEX_DISK_MSG_FILE_EMPTY = "Файл пустой." as const;
 export const YANDEX_DISK_MSG_FILE_TOO_LARGE =
-  "Файл слишком большой. Максимальный размер файла — 50 МБ." as const;
+  "Файл слишком большой. Максимальный размер файла — 1 ГБ." as const;
 export const YANDEX_DISK_MSG_TOO_MANY_FILES_IN_BATCH =
   "Нельзя загрузить больше 20 файлов за один раз." as const;
 export const YANDEX_DISK_MSG_CARD_ATTACHMENT_LIMIT =
