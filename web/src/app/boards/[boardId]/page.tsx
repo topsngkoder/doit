@@ -13,7 +13,7 @@ import type {
 import type { NewCardFieldDefinition } from "./card-field-drafts";
 import { BoardMembersPanel, type BoardMemberPublic, type BoardRoleOption } from "./board-members";
 import { BoardSettingsMenu } from "./board-settings-menu";
-import { YANDEX_DISK_MSG_CANNOT_CHANGE_DISK_WITH_FILES } from "@/lib/yandex-disk/yandex-disk-product-messages";
+import { yandexDiskOauthReturnBannerMessage } from "@/lib/yandex-disk/yandex-disk-product-messages";
 
 const AVATARS_BUCKET = "avatars";
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
@@ -26,11 +26,9 @@ type BoardPageProps = {
 export default async function BoardPage({ params, searchParams }: BoardPageProps) {
   const { boardId } = await params;
   const sp = searchParams ? await searchParams : {};
-  const oauthFlag = sp.yandex_disk_oauth;
-  const yandexDiskOauthBanner =
-    oauthFlag === "cannot_change_with_files"
-      ? YANDEX_DISK_MSG_CANNOT_CHANGE_DISK_WITH_FILES
-      : null;
+  const oauthRaw = sp.yandex_disk_oauth;
+  const oauthFlag = Array.isArray(oauthRaw) ? oauthRaw[0] : oauthRaw;
+  const yandexDiskOauthBanner = yandexDiskOauthReturnBannerMessage(oauthFlag);
   const supabase = await createSupabaseServerClient();
 
   const { data: snapshotRaw, error: snapshotError } = await supabase.rpc("get_board_snapshot", {

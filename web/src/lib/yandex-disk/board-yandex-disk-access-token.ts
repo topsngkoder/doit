@@ -8,6 +8,7 @@ import {
   YANDEX_DISK_MSG_INTEGRATION_DISCONNECTED,
   YANDEX_DISK_MSG_NOT_CONNECTED,
   YANDEX_DISK_MSG_REAUTHORIZATION_REQUIRED,
+  YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE,
   mapYandexDiskClientErrorToProductMessage
 } from "./yandex-disk-product-messages";
 
@@ -221,7 +222,7 @@ export async function ensureBoardYandexDiskAccessToken(
     return {
       ok: false,
       kind: "refresh_transient",
-      message: "Сервис Яндекс.Диска временно недоступен. Попробуйте позже."
+      message: YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE
     };
   }
 }

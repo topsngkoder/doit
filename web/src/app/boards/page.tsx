@@ -6,9 +6,10 @@ import { buildBoardsWithPermissions } from "./board-permissions";
 import type { BoardsPageData } from "./types";
 import { createBoardWithDefaultsAction } from "./actions";
 import { BoardsDefaultSelector } from "./boards-default-selector";
+import { yandexDiskOauthReturnBannerMessage } from "@/lib/yandex-disk/yandex-disk-product-messages";
 
 type BoardsPageProps = {
-  searchParams: Promise<{ boardError?: string }>;
+  searchParams: Promise<{ boardError?: string; yandex_disk_oauth?: string | string[] }>;
 };
 
 export default async function BoardsPage({ searchParams }: BoardsPageProps) {
@@ -31,6 +32,9 @@ export default async function BoardsPage({ searchParams }: BoardsPageProps) {
 
   const sp = await searchParams;
   const boardError = sp.boardError;
+  const oauthRaw = sp.yandex_disk_oauth;
+  const oauthFlag = Array.isArray(oauthRaw) ? oauthRaw[0] : oauthRaw;
+  const yandexDiskOauthBanner = yandexDiskOauthReturnBannerMessage(oauthFlag);
 
   const { data: boards, error: boardsError } = await supabase
     .from("boards")
@@ -70,6 +74,15 @@ export default async function BoardsPage({ searchParams }: BoardsPageProps) {
           Доски
         </h1>
       </header>
+
+      {yandexDiskOauthBanner ? (
+        <div
+          className="rounded-md border border-app-divider bg-app-surface-muted px-3 py-2 text-sm text-app-secondary"
+          role="status"
+        >
+          {yandexDiskOauthBanner}
+        </div>
+      ) : null}
 
       {boardError ? (
         <Toast title="Не удалось создать доску" message={boardError} variant="error" />

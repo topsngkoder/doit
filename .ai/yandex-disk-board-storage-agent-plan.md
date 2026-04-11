@@ -121,6 +121,10 @@
 | 2026-04-11 | YDB6.4 | Единый контракт для UI: `web/src/app/boards/[boardId]/board-yandex-disk-ui-server-contract.ts` (`"use server"`) — реэкспорт `disconnectBoardYandexDiskIntegrationAction`, `cardAttachmentUploadAction` / `cardAttachmentUploadPrecheckAction`, `deleteCardAttachmentAction`, `listReadyCardAttachmentsAction` + JSDoc-таблица сценариев. `web/src/lib/yandex-disk/yandex-disk-board-ui-endpoints.ts` — `yandexDiskOAuthStartPath`, `cardAttachmentDownloadPath` (подключение/переподключение и скачивание без дублирования путей в компонентах). Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
 | 2026-04-11 | fix | Пункт «Яндекс.Диск» не показывался: `canViewYandexDiskIntegration = has("board.view")` всегда false — в `get_board_snapshot` право `board.view` не входит в `v_ui_perm_list`, в `allowed_permissions` не отдаётся. На странице доски после успешного RPC доступ к доске уже подразумевает `board.view` → `canViewYandexDiskIntegration = true` в `page.tsx`. |
 | 2026-04-11 | YDB7.1 | `web/src/app/boards/[boardId]/board-yandex-disk-button.tsx`: кнопка «Яндекс.Диск» + модалка (как `BoardBackgroundButton`), краткий текст, статус из `snapshot.yandex_disk_integration`, логин/путь/`last_error_text` только при деталях из RPC; владелец/sysadmin — ссылка «Подключить или обновить доступ» на `yandexDiskOAuthStartPath`. `board-settings-menu.tsx`: пункт виден при `board.view` (`canViewYandexDiskIntegration`), временная прямая ссылка OAuth убрана. `page.tsx`: прокидывание `yandex_disk_integration`, `canManageYandexDiskIntegration`. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB7.2 | `web/src/lib/yandex-disk/yandex-disk-integration-modal-presentation.ts`: `getYandexDiskIntegrationModalPresentation` — пять различимых вариантов (`none` / `active` / `reauthorization_required` / `disconnected` / `error`): цветная панель (success/warning/danger/accent dashed vs нейтраль), бейдж с заголовком состояния, публичное описание (строки 15.2 дублируются комментарием для клиента без `server-only`). `board-yandex-disk-button.tsx`: модалка и `title`/`aria-label` кнопки по состоянию. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB7.3 | Спец. 14.3: для не-владельца `getYandexDiskIntegrationModalPresentation(..., { forIntegrationManager: false })` — только бинарный срез: `status === active` → панель «Подключено» + нейтральный текст без логина/пути; иначе единая панель «Не подключено» + «не подключён или недоступен» (без различия reauth/error/disconnected). Владелец/sysadmin — прежние пять состояний (14.1–14.2). `board-yandex-disk-button.tsx`: опции из `canManageIntegration`; строка «Аккаунт» только при `canManageIntegration`. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB7.4 | `board-yandex-disk-button.tsx`: для `canManageIntegration` — раздельные действия: «Подключить» (нет строки или `disconnected`) → OAuth; «Повторить авторизацию» (`reauthorization_required` / `error`); «Обновить доступ в Яндексе» (`active`) → тот же OAuth; «Отключить» (`active` / `reauthorization_required` / `error`) → `disconnectBoardYandexDiskIntegrationAction`, ошибка в модалке, успех — `router.refresh()` + закрытие. Не-владелец без кнопок управления. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB7.5 | Продуктово безопасные тексты интеграции: `yandex-disk-product-messages.ts` — константа спец. 15.1 `YANDEX_DISK_MSG_NO_BOARD_YANDEX_CONNECT_PERMISSION`, сообщения для всех `?yandex_disk_oauth=` + `yandexDiskOauthReturnBannerMessage()`; `boards/[boardId]/page.tsx` и `boards/page.tsx` — баннер по флагу (включая `success`, `provider` → `YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE`). `requireBoardYandexDiskIntegrationManagement`: вместо `rpcError.message` → лог + `YANDEX_DISK_MSG_INTEGRATION_PERMISSION_CHECK_FAILED`; `disconnectBoardYandexDiskIntegrationAction` — то же для RPC/неизвестного кода (`YANDEX_DISK_MSG_DISCONNECT_FAILED`). OAuth `start`: ошибка env — 503 с `YANDEX_DISK_MSG_OAUTH_SERVER_MISCONFIGURED` (детали в лог); отказ в праве — редирект с `yandex_disk_oauth=forbidden`. `safeYandexDiskIntegrationLastErrorTextForOwner` в `yandex-disk-integration-modal-presentation.ts` + модалка доски. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
 
 ### EPIC YDB1 - Подготовить модель данных и миграции
 - [x] **YDB1.1 (done)** Спроектировать таблицу привязки Яндекс.Диска к доске
@@ -293,24 +297,24 @@
   - по аналогии с существующими `BoardBackgroundButton`/`BoardFieldsButton`;
   - entry-point должен быть на уровне конкретной доски;
   - **DoD**: у доски появляется отдельный UI-сценарий интеграции Яндекс.Диска.
-- [ ] **YDB7.2 (todo)** Отрисовать состояния интеграции по спецификации
+- [x] **YDB7.2 (done)** Отрисовать состояния интеграции по спецификации
   - `не подключено`;
   - `подключено`;
   - `требуется повторная авторизация`;
   - `отключено`;
   - `ошибка`;
   - **DoD**: все продуктовые состояния различимы в UI.
-- [ ] **YDB7.3 (todo)** Развести owner-view и non-owner-view
+- [x] **YDB7.3 (done)** Развести owner-view и non-owner-view
   - owner видит управляющие действия и детали;
   - не-owner видит только факт наличия/отсутствия интеграции;
   - токены и служебные OAuth-ошибки не показывать;
   - **DoD**: UI соответствует разделу 14.2 и 14.3.
-- [ ] **YDB7.4 (todo)** Отрисовать owner-only действия
+- [x] **YDB7.4 (done)** Отрисовать owner-only действия
   - подключить;
   - повторно авторизовать;
   - отключить;
   - **DoD**: все управляющие действия доступны только владельцу доски.
-- [ ] **YDB7.5 (todo)** Показать product-safe ошибки интеграции
+- [x] **YDB7.5 (done)** Показать product-safe ошибки интеграции
   - использовать фиксированные тексты спецификации там, где они заданы;
   - не пробрасывать сырые provider secrets/errors в интерфейс;
   - **DoD**: пользователь получает понятное и безопасное сообщение.

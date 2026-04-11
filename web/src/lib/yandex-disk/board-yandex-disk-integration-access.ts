@@ -2,7 +2,11 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { YANDEX_DISK_MSG_INTEGRATION_OWNER_ONLY } from "./yandex-disk-product-messages";
+import {
+  YANDEX_DISK_MSG_AUTH_REQUIRED,
+  YANDEX_DISK_MSG_INTEGRATION_OWNER_ONLY,
+  YANDEX_DISK_MSG_INTEGRATION_PERMISSION_CHECK_FAILED
+} from "./yandex-disk-product-messages";
 
 export type RequireBoardYandexDiskIntegrationManagementResult =
   | { ok: true; userId: string }
@@ -22,14 +26,15 @@ export async function requireBoardYandexDiskIntegrationManagement(
     error: userError
   } = await supabase.auth.getUser();
   if (userError || !user) {
-    return { ok: false, message: "Нужна авторизация." };
+    return { ok: false, message: YANDEX_DISK_MSG_AUTH_REQUIRED };
   }
 
   const { data: allowed, error: rpcError } = await supabase.rpc("can_manage_board_yandex_disk_integration", {
     p_board_id: boardId
   });
   if (rpcError) {
-    return { ok: false, message: rpcError.message };
+    console.error("can_manage_board_yandex_disk_integration:", rpcError.message);
+    return { ok: false, message: YANDEX_DISK_MSG_INTEGRATION_PERMISSION_CHECK_FAILED };
   }
   if (allowed !== true) {
     return { ok: false, message: YANDEX_DISK_MSG_INTEGRATION_OWNER_ONLY };

@@ -8,6 +8,9 @@ export const YANDEX_DISK_MSG_INTEGRATION_OWNER_ONLY =
 
 /** Раздел 15.1 — авторизация и права (вложения карточек). */
 export const YANDEX_DISK_MSG_AUTH_REQUIRED = "Нужна авторизация." as const;
+/** Раздел 15.1 — право на подключение интеграции к доске (OAuth callback / баннер доски). */
+export const YANDEX_DISK_MSG_NO_BOARD_YANDEX_CONNECT_PERMISSION =
+  "У вас нет права подключать Яндекс.Диск для этой доски." as const;
 export const YANDEX_DISK_MSG_NO_UPLOAD_PERMISSION =
   "У вас нет права загружать файлы в эту карточку." as const;
 export const YANDEX_DISK_MSG_NO_DELETE_PERMISSION =
@@ -33,6 +36,30 @@ export const YANDEX_DISK_MSG_BOARD_FOLDER_CREATE_FAILED =
   "Не удалось создать папку доски в Яндекс.Диске." as const;
 export const YANDEX_DISK_MSG_CANNOT_CHANGE_DISK_WITH_FILES =
   "Нельзя сменить Яндекс.Диск для доски, пока в карточках есть файлы." as const;
+
+/**
+ * Сообщения после редиректа с OAuth callback (`?yandex_disk_oauth=…`).
+ * Там, где в разд. 15.2 нет отдельной строки, используются нейтральные формулировки без деталей провайдера и БД.
+ */
+export const YANDEX_DISK_MSG_OAUTH_SUCCESS =
+  "Яндекс.Диск для доски успешно подключён." as const;
+export const YANDEX_DISK_MSG_OAUTH_USER_DENIED =
+  "Подключение Яндекс.Диска отменено." as const;
+export const YANDEX_DISK_MSG_OAUTH_CALLBACK_INCOMPLETE =
+  "Не удалось завершить подключение. Попробуйте начать заново из настроек доски." as const;
+export const YANDEX_DISK_MSG_OAUTH_STATE_EXPIRED =
+  "Сессия подключения устарела. Откройте настройки доски и начните подключение заново." as const;
+/** Неверная конфигурация сервера; в UI не перечисляем имена переменных окружения. */
+export const YANDEX_DISK_MSG_OAUTH_SERVER_MISCONFIGURED =
+  "Подключение Яндекс.Диска временно недоступно. Обратитесь к администратору." as const;
+export const YANDEX_DISK_MSG_OAUTH_SESSION_USER_MISMATCH =
+  "Войдите под той же учётной записью, с которой начали подключение Яндекс.Диска." as const;
+export const YANDEX_DISK_MSG_OAUTH_DB_PERSIST_FAILED =
+  "Не удалось сохранить настройки интеграции. Попробуйте позже." as const;
+export const YANDEX_DISK_MSG_DISCONNECT_FAILED =
+  "Не удалось отключить интеграцию Яндекс.Диска. Попробуйте позже." as const;
+export const YANDEX_DISK_MSG_INTEGRATION_PERMISSION_CHECK_FAILED =
+  "Не удалось проверить право управления интеграцией. Попробуйте позже." as const;
 
 /** Раздел 15.3 — ошибки файлов (ответы API Диска при upload/download/delete). */
 export const YANDEX_DISK_MSG_FILE_NOT_FOUND_ON_DISK = "Файл не найден в Яндекс.Диске." as const;
@@ -126,4 +153,50 @@ function fallbackGenericDisk(err: YandexDiskClientError): string {
     return YANDEX_DISK_MSG_DOWNLOAD_FAILED;
   }
   return YANDEX_DISK_MSG_DOWNLOAD_FAILED;
+}
+
+/** Значение query `yandex_disk_oauth` после редиректа из `api/yandex-disk/oauth/callback`. */
+export type YandexDiskOauthReturnFlag =
+  | "success"
+  | "denied"
+  | "invalid"
+  | "invalid_state"
+  | "config"
+  | "session_mismatch"
+  | "forbidden"
+  | "provider"
+  | "db_error"
+  | "cannot_change_with_files";
+
+/**
+ * Текст баннера на странице доски; `null` — не показывать (в т.ч. неизвестный флаг).
+ */
+export function yandexDiskOauthReturnBannerMessage(
+  flag: string | null | undefined
+): string | null {
+  if (flag == null || flag === "") return null;
+  switch (flag as YandexDiskOauthReturnFlag) {
+    case "success":
+      return YANDEX_DISK_MSG_OAUTH_SUCCESS;
+    case "denied":
+      return YANDEX_DISK_MSG_OAUTH_USER_DENIED;
+    case "invalid":
+      return YANDEX_DISK_MSG_OAUTH_CALLBACK_INCOMPLETE;
+    case "invalid_state":
+      return YANDEX_DISK_MSG_OAUTH_STATE_EXPIRED;
+    case "config":
+      return YANDEX_DISK_MSG_OAUTH_SERVER_MISCONFIGURED;
+    case "session_mismatch":
+      return YANDEX_DISK_MSG_OAUTH_SESSION_USER_MISMATCH;
+    case "forbidden":
+      return YANDEX_DISK_MSG_NO_BOARD_YANDEX_CONNECT_PERMISSION;
+    case "provider":
+      return YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE;
+    case "db_error":
+      return YANDEX_DISK_MSG_OAUTH_DB_PERSIST_FAILED;
+    case "cannot_change_with_files":
+      return YANDEX_DISK_MSG_CANNOT_CHANGE_DISK_WITH_FILES;
+    default:
+      return null;
+  }
 }

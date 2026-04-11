@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { requireBoardYandexDiskIntegrationManagement } from "@/lib/yandex-disk/board-yandex-disk-integration-access";
 import { getYandexDiskIntegrationEnv } from "@/lib/yandex-disk/integration-env";
 import { signYandexDiskOAuthState } from "@/lib/yandex-disk/oauth-state";
+import { YANDEX_DISK_MSG_OAUTH_SERVER_MISCONFIGURED } from "@/lib/yandex-disk/yandex-disk-product-messages";
 
 /**
  * Права на Диск по документации Яндекса (отдельные scope; значения вроде cloud_api:disk.read_write не существуют → invalid_scope).
@@ -30,8 +31,11 @@ export async function GET(request: Request) {
   try {
     env = getYandexDiskIntegrationEnv();
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Яндекс.Диск: ошибка конфигурации сервера.";
-    return new Response(msg, { status: 503 });
+    console.error("Yandex Disk OAuth start: env validation failed", e);
+    return new Response(YANDEX_DISK_MSG_OAUTH_SERVER_MISCONFIGURED, {
+      status: 503,
+      headers: { "Content-Type": "text/plain; charset=utf-8" }
+    });
   }
 
   const supabase = await createSupabaseServerClient();
@@ -45,7 +49,9 @@ export async function GET(request: Request) {
 
   const access = await requireBoardYandexDiskIntegrationManagement(supabase, boardId);
   if (!access.ok) {
-    return NextResponse.redirect(new URL(`/boards/${boardId}`, request.url));
+    const back = new URL(`/boards/${boardId}`, request.url);
+    back.searchParams.set("yandex_disk_oauth", "forbidden");
+    return NextResponse.redirect(back);
   }
 
   const state = signYandexDiskOAuthState(boardId, access.userId);
