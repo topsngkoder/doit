@@ -3,7 +3,9 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 let cached: SupabaseClient | null = null;
 
 /**
- * Клиент с `service_role` для фоновых задач (RLS обходится). Не использовать в пользовательских запросах.
+ * Клиент с `service_role` (RLS обходится).
+ * Использовать только на сервере: фоновые задачи, либо узкие сценарии вроде чтения токенов интеграции Яндекс.Диска
+ * после того, как в вызывающем коде уже проверены права пользователя.
  */
 export function getSupabaseServiceRoleClient(): SupabaseClient {
   if (cached) return cached;

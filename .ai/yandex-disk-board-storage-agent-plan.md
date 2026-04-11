@@ -94,6 +94,26 @@
 | 2026-04-11 | YDB2.1 | `web/src/lib/yandex-disk/integration-env.ts`: `getYandexDiskIntegrationEnv()` с `import "server-only"`, ленивая валидация `YANDEX_DISK_OAUTH_*` и `YANDEX_DISK_TOKEN_ENCRYPTION_KEY` (мин. длина ключа 32), проверка абсолютного http(s) redirect URI; понятные `Error` на русском. Зависимость `server-only`. Пример переменных в `web/.env.local.example`. Миграций нет. |
 | 2026-04-11 | YDB2.2 | `web/src/lib/yandex-disk/token-crypto.ts`: `encryptSecret` / `decryptSecret`, `server-only`, ключ из `getYandexDiskIntegrationEnv()`, производный AES-256 ключ через SHA-256 от passphrase; хранение `v1.` + base64url(iv12 ‖ tag16 ‖ ct), AES-256-GCM; пустой plaintext запрещён; v2 можно добавить отдельным префиксом. Комментарий в `.env.local.example` про неизменность ключа. Миграций нет. |
 | 2026-04-11 | YDB2.3 | `web/src/lib/yandex-disk/yandex-disk-client.ts`: server-only клиент OAuth (`exchangeAuthorizationCodeForTokens`, `refreshAccessToken` → `oauth.yandex.com/token`) и REST Диска (`cloud-api.yandex.net/v1/disk`): `fetchLoginProfile`, `getDiskResourceMeta`, `diskResourceExists`, `diskCreateFolder`, `diskEnsureFolder`, `diskEnsureFolderChain`, `diskGetUploadLink`, `diskGetDownloadLink`, `diskDeleteResource`, `diskPutUpload`. Ошибки через `YandexDiskClientError` + коды (`oauth_invalid_grant`, `unauthorized`, `not_found`, `already_exists`, и т.д.) для YDB2.4. Миграций нет. |
+| 2026-04-11 | YDB2.4 | `web/src/lib/yandex-disk/yandex-disk-product-messages.ts`: константы текстов разд. 15.2–15.3 спеки + безопасная заглушка для сетевых сбоев OAuth/login; `mapYandexDiskClientErrorToProductMessage(err, operation)` (`oauth_authorize` \| `oauth_refresh` \| `integration_folder` \| `upload` \| `download` \| `delete` \| `profile` \| `generic_disk`). В `yandex-disk-client.ts`: в `message` больше не подставляются сырые `message`/`error_description` API; добавлены `rawProviderMessage`, `oauthGrantType`; `postOAuthForm` принимает grant_type; ошибки профиля login.yandex.ru маппятся по HTTP через `diskStatusToCode`. Миграций нет. |
+| 2026-04-11 | YDB3.1 | `web/src/lib/yandex-disk/board-yandex-disk-integration-access.ts`: `requireBoardYandexDiskIntegrationManagement(supabase, boardId)` — сессия, затем `is_system_admin` (как RLS), иначе `boards.owner_user_id` без ролевых прав; сообщение отказа через `YANDEX_DISK_MSG_INTEGRATION_OWNER_ONLY` в `yandex-disk-product-messages.ts` (спец. 8.1). Миграций нет. |
+| 2026-04-11 | YDB3.2scope | OAuth `scope`: Яндекс не знает `cloud_api:disk.read_write` → `invalid_scope`; в `oauth/start` задано `cloud_api:disk.read cloud_api:disk.write` (пробел). В кабинете oauth.yandex.ru у приложения должны быть отмечены те же права на Диск. |
+| 2026-04-11 | YDB3.2fix | Миграция `20260411193000_can_manage_board_yandex_disk_integration.sql`: RPC `can_manage_board_yandex_disk_integration` (SECURITY DEFINER) — владелец или sysadmin без зависимости от RLS `boards` SELECT. `requireBoardYandexDiskIntegrationManagement` переведён на RPC. OAuth start: `normalizeBoardIdQueryParam` (`web/src/lib/board-id-param.ts`), алиас `board_id`, снята строгая regex-версия UUID. `supabase db push` применён. |
+| 2026-04-11 | YDB3.2 | `web/src/lib/yandex-disk/oauth-state.ts`: подписанный state (HMAC-SHA256 от ключа, производного от `YANDEX_DISK_TOKEN_ENCRYPTION_KEY`): `boardId`, `userId`, `exp` (10 мин), `nonce`; `verifyYandexDiskOAuthState` для callback (YDB3.3). `GET web/src/app/api/yandex-disk/oauth/start/route.ts`: валидация UUID доски, env, сессия Supabase, только владелец/sysadmin через `requireBoardYandexDiskIntegrationManagement`, редирект на `https://oauth.yandex.com/authorize` с `scope=cloud_api:disk.read cloud_api:disk.write`, `state`, `redirect_uri` из env. Без сессии → `/login`, не владелец → `/boards/{id}`. Миграций нет. |
+| 2026-04-11 | YDB3.3 | `GET web/src/app/api/yandex-disk/oauth/callback/route.ts`: проверка `state`, сессии (`user.id === state.uid`), `requireBoardYandexDiskIntegrationManagement`; обмен кода → `fetchLoginProfile`; `diskEnsureFolderChain` для `/doit/boards/<boardId>/cards`; `upsert` в `board_yandex_disk_integrations` (`onConflict: board_id`): токены через `encryptSecret`, `root_folder_path=/doit/boards/<boardId>`, `status=active`, `last_authorized_at`, `last_error_text=null`. Ошибки OAuth/Диска → редирект на доску с `yandex_disk_oauth=…` (без утечки текста в URL); логи с продуктовым маппингом. `LoginForm`: после входа редирект на безопасный `?next=` (для возврата с `/login` после OAuth). Миграций нет. |
+| 2026-04-11 | YDB3.4 | Повторное подключение: инвариант «одна строка на доску» уже из `UNIQUE(board_id)` (YDB1.1) + `upsert` по `board_id`. Вынесено в `web/src/lib/yandex-disk/board-yandex-disk-integration-oauth-persist.ts` (`upsertBoardYandexDiskIntegrationAfterOAuth`) с JSDoc YDB3.4/YDB3.5; callback вызывает хелпер. Новых миграций нет. |
+| 2026-04-11 | YDB3.5 | Миграция `20260411204500_yandex_disk_oauth_account_change_allowed.sql`: RPC `yandex_disk_oauth_account_change_allowed(board_id, new_yandex_account_id)` (SECURITY DEFINER, `can_manage` + чтение интеграции/вложений) — `false`, если аккаунт меняется и есть `card_attachments.status = 'ready'` на доске. OAuth callback: после `fetchLoginProfile` вызов RPC; при `false` — редирект `yandex_disk_oauth=cannot_change_with_files`, в лог — `YANDEX_DISK_MSG_CANNOT_CHANGE_DISK_WITH_FILES`. `boards/[boardId]/page.tsx`: баннер с тем же текстом из константы. `npx supabase db push` применён. |
+| 2026-04-11 | YDB3.6 | Миграция `20260411220000_disconnect_board_yandex_disk_integration.sql`: RPC `disconnect_board_yandex_disk_integration(board_id)` (SECURITY DEFINER) — проверка `can_manage`, затем `UPDATE`: `status=disconnected`, обнуление зашифрованных токенов и `access_token_expires_at`/`last_error_text`; строки вложений и файлы на Диске не трогаются. `web/src/app/boards/[boardId]/yandex-disk-integration-actions.ts`: server action `disconnectBoardYandexDiskIntegrationAction` (двойная проверка прав через `requireBoardYandexDiskIntegrationManagement` + RPC), ответы `forbidden`/`not_found`/`ok`, `revalidatePath` доски. `npx supabase db push` применён. UI кнопки «Отключить» — в YDB7.4. |
+| 2026-04-11 | YDB3.7 | `web/src/lib/yandex-disk/board-yandex-disk-access-token.ts`: `ensureBoardYandexDiskAccessToken(boardId, { skewSeconds? })` — чтение строки интеграции через `getSupabaseServiceRoleClient` (обход REVOKE SELECT); при свежем access (запас по умолчанию 120 с) возврат токена; иначе `refreshAccessToken`; успех → шифрование и `UPDATE` (`active`, срок access, очистка `last_error_text`). Фатальный OAuth (`oauth_invalid_grant`, `oauth_invalid_client`, `unauthorized`) и отсутствие/битые токены → `reauthorization_required`, обнуление секретов, `last_error_text = YANDEX_DISK_MSG_REAUTHORIZATION_REQUIRED`. Сетевые/прочие сбои refresh → ответ `refresh_transient` без смены статуса. `disconnected` / нет строки — отдельные ветки. Константа `YANDEX_DISK_MSG_INTEGRATION_DISCONNECTED` в `yandex-disk-product-messages.ts`; уточнён комментарий к `service-role.ts`. Миграций нет; вызов из upload/download — в YDB4/YDB5. |
+| 2026-04-11 | YDB4.1 | Контракт загрузки: `web/src/lib/yandex-disk/validate-card-attachment-upload-request.ts` — `validateCardAttachmentUploadRequest(supabase, { boardId, cardId, files: { name, size }[] })` (спец. 10.2–10.4 п. 1–2): сессия, UUID через `normalizeUuidParam`, лимиты 20 файлов / 50 МБ / непустой файл / 200 `ready` на карточку, карточка на доске, RPC `can_edit_card_content`, интеграция только `active` (иначе тексты из `yandex-disk-product-messages.ts`). Константы лимитов экспортированы. `web/src/app/boards/[boardId]/card-attachment-upload-actions.ts`: `cardAttachmentUploadPrecheckAction(boardId, cardId, formData)` — точка входа, поле `files`. В `board-id-param.ts` добавлен `normalizeUuidParam` (доска — алиас). Новые строки разд. 15.1/15.3 в `yandex-disk-product-messages.ts`. Миграций нет. Реальная загрузка в Диск — YDB4.3+. |
+| 2026-04-11 | YDB4.2 | Pre-upload по спец. 10.2 закрыт тем же модулем, что и YDB4.1: до вызовов API Диска проверяются ≤20 файлов за операцию, `ready + batch ≤ 200`, размер ≤50 МиБ (`CARD_ATTACHMENT_UPLOAD_MAX_FILE_BYTES`), `size > 0`, плюс п. 10.4(1–2) (права, активная интеграция). Типы файлов: спец. 10.3 — без ограничений. Отдельного кода/миграций не добавлялось; чеклист YDB4.2 помечен `done`. |
+| 2026-04-11 | YDB4.3 | `yandex-disk-card-attachment-paths.ts`: `yandexDiskCardAttachmentDirectoryPath` → `/doit/boards/<boardId>/cards/<cardId>`. `ensure-yandex-disk-card-attachment-folder.ts`: `ensureBoardYandexDiskAccessToken` + `diskEnsureFolderChain` (идемпотентно, в т.ч. если нет родителя `cards`). `cardAttachmentUploadPrecheckAction`: после успешного `validateCardAttachmentUploadRequest` вызывает ensure папки; ошибки Диска → `mapYandexDiskClientErrorToProductMessage(..., integration_folder)`. Миграций нет. |
+| 2026-04-11 | YDB4.4 | `yandex-disk-card-attachment-paths.ts`: `yandexDiskCardAttachmentObjectPath`. `card-attachment-upload-pipeline.ts`: суффикс файла на Диске из безопасного расширения; `uploadOneCardAttachmentFile` — INSERT `uploading` (явный `id` = UUID), `ensureBoardYandexDiskAccessToken`, `diskGetUploadLink` + `diskPutUpload`, UPDATE `ready`; после INSERT при любой ошибке — UPDATE `failed`. `cardAttachmentUploadAction`: валидация + папка + цикл по файлам, `revalidatePath` при любом успехе; ответ по файлам для YDB4.5. Миграций нет; `npx supabase db push` — без изменений. |
+| 2026-04-11 | YDB4.5 | Частичный успех batch уже обеспечивается циклом без сквозной транзакции + `CardAttachmentUploadFileItemResult` на файл. Зафиксирован контракт в JSDoc: верхний уровень `ok: true` = batch обработан, детали в `files[]`; успехи не откатываются при ошибке соседа. Миграций нет. |
+| 2026-04-11 | YDB4.6 | `web/src/lib/yandex-disk/list-card-attachments.ts`: `listReadyCardAttachmentsForViewer` — сессия, проверка пары доска/карточка, SELECT только `ready` + поля для UI (без `storage_path`); RLS дублирует ограничение. `listCardAttachmentsAllStatusesForServiceRole` — service-role, все статусы для cleanup YDB9 (без проверки прав пользователя, JSDoc). `web/src/app/boards/[boardId]/card-attachment-list-actions.ts`: `listReadyCardAttachmentsAction`. Миграций нет. |
+| 2026-04-11 | YDB5.1 | `require-active-board-yandex-disk-integration.ts` — общая проверка `active` для загрузки/скачивания; `validate-card-attachment-upload-request.ts` переведён на неё. `resolve-card-attachment-temporary-download-url.ts`: сессия, SELECT `ready`+`storage_path` под RLS (`board.view`), активная интеграция, `ensureBoardYandexDiskAccessToken`, `diskGetDownloadLink` → временный URL. `GET .../api/boards/[boardId]/cards/[cardId]/attachments/[attachmentId]/download` — 302 на URL Яндекса или JSON `{ message }` с кодом ошибки. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB5.2 | Спец. 11.3: каждый GET скачивания по-прежнему запрашивает новый URL у Диска (без серверного кэша). `download/route.ts`: `dynamic = "force-dynamic"`, заголовки `Cache-Control: private, no-store, no-cache, max-age=0, must-revalidate` и `Pragma: no-cache` на JSON и на 302. Константа `CARD_ATTACHMENT_DOWNLOAD_TEMPORARY_URL_MAX_APP_CACHE_SECONDS = 300` в `resolve-card-attachment-temporary-download-url.ts` как верхняя граница прикладного кэша при будущем UI. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB5.3 | Спец. 11.4: при `YandexDiskClientError` с `code === "not_found"` после `diskGetDownloadLink` ответ HTTP 404 и текст `YANDEX_DISK_MSG_FILE_NOT_FOUND_ON_DISK`; мутаций `card_attachments` нет. Явная ветка в `resolve-card-attachment-temporary-download-url.ts`, JSDoc (11.4 + отсутствие удаления строки). В `yandex-disk-client.ts` у `diskGetDownloadLink` — привязка 404/`DiskNotFoundError` к `not_found`. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB5.4 | `web/src/lib/yandex-disk/delete-card-attachment.ts`: `deleteCardAttachment` — сессия, `can_edit_card_content`, только `status=ready`, активная интеграция + `ensureBoardYandexDiskAccessToken`, `diskDeleteResource` затем `DELETE` строки; `not_found` от Диска → удаление строки (спец. 12.3). Константа `YANDEX_DISK_MSG_NO_DELETE_PERMISSION` (спец. 15.1). `web/src/app/boards/[boardId]/card-attachment-delete-actions.ts`: `deleteCardAttachmentAction` + `revalidatePath`. RLS DELETE уже в YDB1.4. Новых миграций нет; `npx tsc --noEmit` в `web/` — ок. |
 
 ### EPIC YDB1 - Подготовить модель данных и миграции
 - [x] **YDB1.1 (done)** Спроектировать таблицу привязки Яндекс.Диска к доске
@@ -140,61 +160,61 @@
   - удаление файла;
   - проверка существования ресурса;
   - **DoD**: весь Yandex API инкапсулирован в одном серверном слое с нормализованными ошибками.
-- [ ] **YDB2.4 (todo)** Нормализовать маппинг ошибок провайдера
+- [x] **YDB2.4 (done)** Нормализовать маппинг ошибок провайдера
   - отдельно обработать: invalid token, revoked refresh token, missing file, create folder failure, upload failure, download failure, delete failure;
   - маппить в фиксированные сообщения спецификации там, где текст жёстко задан;
   - **DoD**: UI не зависит от сырых текстов Yandex API.
 
 ### EPIC YDB3 - Реализовать жизненный цикл интеграции доски
-- [ ] **YDB3.1 (todo)** Подготовить owner-only server-side проверку управления интеграцией
+- [x] **YDB3.1 (done)** Подготовить owner-only server-side проверку управления интеграцией
   - источник истины: `boards.owner_user_id = current_user`;
   - не смешивать это правило с board roles;
   - **DoD**: администратор доски без владения не может подключать/переподключать/отключать интеграцию.
-- [ ] **YDB3.2 (todo)** Реализовать start OAuth flow для конкретной доски
+- [x] **YDB3.2 (done)** Реализовать start OAuth flow для конкретной доски
   - вход только из настроек конкретной доски;
   - state должен быть привязан к `boardId` и защищён от подмены;
   - **DoD**: можно безопасно начать подключение к конкретной доске.
-- [ ] **YDB3.3 (todo)** Реализовать OAuth callback и первичную запись интеграции
+- [x] **YDB3.3 (done)** Реализовать OAuth callback и первичную запись интеграции
   - обменять код на токены;
   - получить данные аккаунта Яндекса;
   - создать или обновить существующую запись интеграции;
   - создать структуру `/doit/`, `/doit/boards/`, `/doit/boards/<boardId>/`, `/doit/boards/<boardId>/cards/`;
   - **DoD**: после первого успешного подключения у доски есть `active`-интеграция и готовая папочная структура.
-- [ ] **YDB3.4 (todo)** Реализовать сценарий повторного подключения без создания второй активной записи
+- [x] **YDB3.4 (done)** Реализовать сценарий повторного подключения без создания второй активной записи
   - при уже существующей активной интеграции обновлять токены текущей записи;
   - не создавать новый `active` row;
   - **DoD**: инвариант "одна активная интеграция на доску" соблюдается.
-- [ ] **YDB3.5 (todo)** Реализовать запрет смены аккаунта при наличии ready-вложений
+- [x] **YDB3.5 (done)** Реализовать запрет смены аккаунта при наличии ready-вложений
   - проверять наличие хотя бы одного готового вложения по доске;
   - возвращать точный текст: `Нельзя сменить Яндекс.Диск для доски, пока в карточках есть файлы.`
   - **DoD**: переподключение к другому аккаунту блокируется, если на доске уже есть готовые файлы.
-- [ ] **YDB3.6 (todo)** Реализовать отключение интеграции
+- [x] **YDB3.6 (done)** Реализовать отключение интеграции
   - менять статус на `disconnected`;
   - не удалять файлы из Яндекс.Диска;
   - не удалять записи вложений автоматически;
   - **DoD**: после disconnect новые загрузки/скачивания запрещены, но данные не теряются.
-- [ ] **YDB3.7 (todo)** Реализовать refresh token flow и перевод в `reauthorization_required`
+- [x] **YDB3.7 (done)** Реализовать refresh token flow и перевод в `reauthorization_required`
   - перед сетевой операцией пробовать refresh access token;
   - при инвалидном refresh token переводить интеграцию в `reauthorization_required`;
   - сохранять `last_error_text`;
   - **DoD**: приложение умеет автоматически обновлять access token и корректно деградирует при окончательной потере авторизации.
 
 ### EPIC YDB4 - Реализовать server-side операции вложений карточек
-- [ ] **YDB4.1 (todo)** Определить серверный контракт загрузки файлов карточки
+- [x] **YDB4.1 (done)** Определить серверный контракт загрузки файлов карточки
   - вход: `boardId`, `cardId`, список `File`;
   - валидации: авторизация, право редактирования карточки, активность интеграции, лимиты количества/размера, непустой файл;
   - **DoD**: есть единая серверная точка входа для upload-flow.
-- [ ] **YDB4.2 (todo)** Реализовать pre-upload валидации по спецификации
+- [x] **YDB4.2 (done)** Реализовать pre-upload валидации по спецификации
   - максимум 20 файлов за операцию;
   - максимум 200 `ready`-вложений на карточку;
   - максимум 50 МБ на файл;
   - пустой файл запрещён;
-  - **DoD**: все фиксированные ограничения покрыты до обращения к Яндексу.
-- [ ] **YDB4.3 (todo)** Реализовать создание подпапки карточки перед первой загрузкой
+  - **DoD**: все фиксированные ограничения покрыты до обращения к Яндексу. *(Реализовано в `validate-card-attachment-upload-request.ts` в рамках YDB4.1; см. журнал YDB4.2.)*
+- [x] **YDB4.3 (done)** Реализовать создание подпапки карточки перед первой загрузкой
   - путь `/doit/boards/<boardId>/cards/<cardId>/`;
   - создавать только если её ещё нет;
   - **DoD**: первая успешная загрузка в карточку гарантированно происходит в правильную папку.
-- [ ] **YDB4.4 (todo)** Реализовать per-file upload pipeline
+- [x] **YDB4.4 (done)** Реализовать per-file upload pipeline
   - создать запись вложения со статусом `uploading`;
   - определить extension;
   - собрать путь `<attachmentId><extension>`;
@@ -203,32 +223,32 @@
   - перевести запись в `ready` после подтверждённого успеха;
   - переводить запись в `failed` при любой ошибке после создания записи;
   - **DoD**: порядок шагов совпадает с разделом 10.4 спецификации.
-- [ ] **YDB4.5 (todo)** Реализовать частичный успех batch-загрузки
+- [x] **YDB4.5 (done)** Реализовать частичный успех batch-загрузки
   - успешные файлы сохраняются;
   - неуспешные не попадают в список готовых;
   - UI получает отдельную ошибку по каждому проваленному файлу;
   - **DoD**: batch upload не откатывает успешные файлы из-за соседних ошибок.
-- [ ] **YDB4.6 (todo)** Реализовать получение списка вложений карточки
+- [x] **YDB4.6 (done)** Реализовать получение списка вложений карточки
   - в UI отдавать только `ready`;
   - для internal/admin cleanup при необходимости иметь отдельный серверный доступ ко всем статусам;
   - **DoD**: `uploading` и `failed` не попадают в постоянный список файлов карточки.
 
 ### EPIC YDB5 - Реализовать скачивание и удаление файлов
-- [ ] **YDB5.1 (todo)** Реализовать server-side скачивание через временный URL
+- [x] **YDB5.1 (done)** Реализовать server-side скачивание через временный URL
   - проверять авторизацию и право просмотра карточки;
   - проверять доступность интеграции;
   - получать у Яндекса временный URL;
   - не сохранять и не показывать пользователю постоянную ссылку;
   - **DoD**: скачивание идёт только через приложение и не раскрывает постоянный URL.
-- [ ] **YDB5.2 (todo)** Ограничить время жизни прикладного доступа к скачиванию
+- [x] **YDB5.2 (done)** Ограничить время жизни прикладного доступа к скачиванию
   - приложение не должно кэшировать download URL дольше 5 минут;
   - предпочтительно вообще не кэшировать между запросами UI;
   - **DoD**: правило раздела 11.3 соблюдено.
-- [ ] **YDB5.3 (todo)** Реализовать сценарий "файл есть в БД, но отсутствует у провайдера"
+- [x] **YDB5.3 (done)** Реализовать сценарий "файл есть в БД, но отсутствует у провайдера"
   - скачивание возвращает `Файл не найден в Яндекс.Диске.`;
   - запись вложения не удаляется автоматически;
   - **DoD**: поведение строго соответствует разделу 11.4.
-- [ ] **YDB5.4 (todo)** Реализовать удаление одного вложения карточки
+- [x] **YDB5.4 (done)** Реализовать удаление одного вложения карточки
   - проверять право редактирования карточки;
   - удалять файл из Яндекс.Диска;
   - затем удалять запись из БД;

@@ -14,6 +14,8 @@ type BoardSettingsMenuProps = {
   canManageCardFields: boolean;
   canManageCardPreview: boolean;
   canChangeBoardBackground: boolean;
+  /** Временно: старт OAuth Яндекс.Диска (владелец доски или sysadmin). Убрать при готовом UI YDB7.x. */
+  canStartYandexDiskOAuth: boolean;
   boardLabels: BoardLabelOption[];
   fieldDefinitions: NewCardFieldDefinition[];
   previewItems: BoardCardPreviewItem[];
@@ -26,6 +28,7 @@ export function BoardSettingsMenu({
   canManageCardFields,
   canManageCardPreview,
   canChangeBoardBackground,
+  canStartYandexDiskOAuth,
   boardLabels,
   fieldDefinitions,
   previewItems,
@@ -36,7 +39,13 @@ export function BoardSettingsMenu({
   const menuRootRef = React.useRef<HTMLDivElement>(null);
   const suppressOpenUntilRef = React.useRef(0);
   const hasAnySettings =
-    canManageBoardLabels || canManageCardFields || canManageCardPreview || canChangeBoardBackground;
+    canManageBoardLabels ||
+    canManageCardFields ||
+    canManageCardPreview ||
+    canChangeBoardBackground ||
+    canStartYandexDiskOAuth;
+
+  const yandexDiskOAuthStartHref = `/api/yandex-disk/oauth/start?boardId=${encodeURIComponent(boardId)}`;
 
   const clearCloseTimer = React.useCallback(() => {
     if (!closeTimerRef.current) return;
@@ -159,6 +168,17 @@ export function BoardSettingsMenu({
               onTriggerClick={closeMenuFromAction}
             />
           </div>
+          {canStartYandexDiskOAuth ? (
+            <div className={itemRevealClass()} style={{ transitionDelay: menuOpen ? "180ms" : "0ms" }}>
+              <a
+                href={yandexDiskOAuthStartHref}
+                className="focus-ring-app inline-flex w-full items-center justify-start rounded-md px-3 py-2 text-left text-xs font-medium text-app-primary hover:bg-app-surface-muted"
+                onClick={closeMenuFromAction}
+              >
+                Яндекс.Диск — OAuth (временно)
+              </a>
+            </div>
+          ) : null}
         </div>
       </div>
     </div>

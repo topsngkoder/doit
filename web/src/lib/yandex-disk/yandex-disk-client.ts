@@ -20,16 +20,27 @@ export type YandexDiskClientErrorCode =
   | "provider_error"
   | "network_error";
 
+/** Для текста в UI — `mapYandexDiskClientErrorToProductMessage` в `yandex-disk-product-messages.ts` (не показывать `message` / `rawProviderMessage`). */
 export class YandexDiskClientError extends Error {
   readonly code: YandexDiskClientErrorCode;
   readonly httpStatus?: number;
   readonly oauthError?: string;
   readonly diskError?: string;
+  /** Сырой текст/описание от API (только для логов; в UI — через mapYandexDiskClientErrorToProductMessage). */
+  readonly rawProviderMessage?: string;
+  readonly oauthGrantType?: "authorization_code" | "refresh_token";
 
   constructor(
     message: string,
     code: YandexDiskClientErrorCode,
-    init?: { httpStatus?: number; oauthError?: string; diskError?: string; cause?: unknown }
+    init?: {
+      httpStatus?: number;
+      oauthError?: string;
+      diskError?: string;
+      rawProviderMessage?: string;
+      oauthGrantType?: "authorization_code" | "refresh_token";
+      cause?: unknown;
+    }
   ) {
     super(message, init?.cause ? { cause: init.cause } : undefined);
     this.name = "YandexDiskClientError";
@@ -37,6 +48,8 @@ export class YandexDiskClientError extends Error {
     this.httpStatus = init?.httpStatus;
     this.oauthError = init?.oauthError;
     this.diskError = init?.diskError;
+    this.rawProviderMessage = init?.rawProviderMessage;
+    this.oauthGrantType = init?.oauthGrantType;
   }
 }
 
@@ -119,13 +132,14 @@ function assertDiskError(res: Response, body: unknown): void {
   const d = body && typeof body === "object" ? (body as DiskErrorJson) : {};
   const diskError = typeof d.error === "string" ? d.error : undefined;
   const code = diskStatusToCode(res.status, diskError);
-  const msg =
+  const raw =
     (typeof d.message === "string" && d.message) ||
     (typeof d.description === "string" && d.description) ||
-    `Яндекс.Диск: запрос завершился с кодом ${res.status}.`;
-  throw new YandexDiskClientError(msg, code, {
+    undefined;
+  throw new YandexDiskClientError(`Яндекс.Диск: ошибка API (${res.status}).`, code, {
     httpStatus: res.status,
-    diskError
+    diskError,
+    rawProviderMessage: raw
   });
 }
 
@@ -152,7 +166,10 @@ async function fetchDisk(
   }
 }
 
-async function postOAuthForm(body: URLSearchParams): Promise<OAuthTokenJson> {
+async function postOAuthForm(
+  body: URLSearchParams,
+  oauthGrantType: "authorization_code" | "refresh_token"
+): Promise<OAuthTokenJson> {
   let res: Response;
   try {
     res = await fetch(OAUTH_TOKEN_URL, {
@@ -165,26 +182,28 @@ async function postOAuthForm(body: URLSearchParams): Promise<OAuthTokenJson> {
     });
   } catch (e) {
     throw new YandexDiskClientError("Яндекс.Диск: сетевая ошибка при обмене OAuth-токена.", "network_error", {
-      cause: e
+      cause: e,
+      oauthGrantType
     });
   }
 
   const json = (await safeReadJson(res)) as OAuthTokenJson | null;
   if (!res.ok || !json || typeof json !== "object") {
     const oauthError = json && typeof json.error === "string" ? json.error : undefined;
-    const desc =
-      json && typeof json.error_description === "string"
-        ? json.error_description
-        : `OAuth: ответ ${res.status}`;
-    throw new YandexDiskClientError(desc, oauthErrorToCode(oauthError), {
+    const rawDesc =
+      json && typeof json.error_description === "string" ? json.error_description : undefined;
+    throw new YandexDiskClientError(`Яндекс.Диск: ошибка OAuth (${res.status}).`, oauthErrorToCode(oauthError), {
       httpStatus: res.status,
-      oauthError
+      oauthError,
+      oauthGrantType,
+      rawProviderMessage: rawDesc
     });
   }
 
   if (typeof json.access_token !== "string" || typeof json.expires_in !== "number") {
     throw new YandexDiskClientError("Яндекс.Диск: неожиданный ответ OAuth.", "provider_error", {
-      httpStatus: res.status
+      httpStatus: res.status,
+      oauthGrantType
     });
   }
 
@@ -203,12 +222,12 @@ export async function exchangeAuthorizationCodeForTokens(code: string): Promise<
     client_secret: env.oauthClientSecret,
     redirect_uri: env.oauthRedirectUri
   });
-  const json = await postOAuthForm(body);
+  const json = await postOAuthForm(body, "authorization_code");
   if (typeof json.refresh_token !== "string") {
     throw new YandexDiskClientError(
       "Яндекс.Диск: OAuth не вернул refresh_token.",
       "provider_error",
-      { httpStatus: 200 }
+      { httpStatus: 200, oauthGrantType: "authorization_code" }
     );
   }
   return {
@@ -229,7 +248,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<YandexOA
     client_id: env.oauthClientId,
     client_secret: env.oauthClientSecret
   });
-  const json = await postOAuthForm(body);
+  const json = await postOAuthForm(body, "refresh_token");
   return {
     accessToken: json.access_token,
     refreshToken: typeof json.refresh_token === "string" ? json.refresh_token : refreshToken,
@@ -256,7 +275,8 @@ export async function fetchLoginProfile(accessToken: string): Promise<YandexLogi
   }
   const json = (await safeReadJson(res)) as Record<string, unknown> | null;
   if (!res.ok || !json || typeof json !== "object") {
-    throw new YandexDiskClientError("Яндекс.Диск: не удалось получить профиль аккаунта.", "provider_error", {
+    const code = diskStatusToCode(res.status);
+    throw new YandexDiskClientError("login.yandex.ru: ошибка запроса профиля.", code, {
       httpStatus: res.status
     });
   }
@@ -374,7 +394,8 @@ export async function diskGetUploadLink(
 }
 
 /**
- * Ссылка для скачивания (временный URL; не кэшировать долго — см. спецификацию 11.3).
+ * Ссылка для скачивания (временный URL; не кэшировать долго — спец. 11.3).
+ * Отсутствие ресурса по пути — HTTP 404 или `DiskNotFoundError` → {@link YandexDiskClientError} с `code: "not_found"` (спец. 11.4).
  */
 export async function diskGetDownloadLink(accessToken: string, path: string): Promise<string> {
   const p = normalizeDiskPath(path);

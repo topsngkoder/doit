@@ -11,16 +11,24 @@ import type {
 import type { NewCardFieldDefinition } from "./card-field-drafts";
 import { BoardMembersPanel, type BoardMemberPublic, type BoardRoleOption } from "./board-members";
 import { BoardSettingsMenu } from "./board-settings-menu";
+import { YANDEX_DISK_MSG_CANNOT_CHANGE_DISK_WITH_FILES } from "@/lib/yandex-disk/yandex-disk-product-messages";
 
 const AVATARS_BUCKET = "avatars";
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
 type BoardPageProps = {
   params: Promise<{ boardId: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function BoardPage({ params }: BoardPageProps) {
+export default async function BoardPage({ params, searchParams }: BoardPageProps) {
   const { boardId } = await params;
+  const sp = searchParams ? await searchParams : {};
+  const oauthFlag = sp.yandex_disk_oauth;
+  const yandexDiskOauthBanner =
+    oauthFlag === "cannot_change_with_files"
+      ? YANDEX_DISK_MSG_CANNOT_CHANGE_DISK_WITH_FILES
+      : null;
   const supabase = await createSupabaseServerClient();
 
   const { data: snapshotRaw, error: snapshotError } = await supabase.rpc("get_board_snapshot", {
@@ -149,6 +157,11 @@ export default async function BoardPage({ params }: BoardPageProps) {
   const canManageCardFields = has("card_fields.manage");
   const canManageCardPreview = has("card_preview.manage");
   const canChangeBoardBackground = has("board.change_background");
+  const canStartYandexDiskOAuth =
+    snapshot.is_system_admin ||
+    (snapshot.members ?? []).some(
+      (m) => m.user_id === snapshot.current_user_id && m.is_owner
+    );
 
   const boardRoles: BoardRoleOption[] = (snapshot.roles ?? []).map((r) => ({
     id: r.id,
@@ -314,6 +327,14 @@ export default async function BoardPage({ params }: BoardPageProps) {
 
   return (
     <main className="-mx-4 grid h-full min-h-0 w-[calc(100%+2rem)] grid-rows-[auto_minmax(0,1fr)] gap-3 overflow-hidden pb-0 md:gap-4">
+      {yandexDiskOauthBanner ? (
+        <div
+          className="shrink-0 rounded-md border border-app-divider bg-app-surface-muted px-3 py-2 text-sm text-app-secondary"
+          role="status"
+        >
+          {yandexDiskOauthBanner}
+        </div>
+      ) : null}
       <div className="shrink-0">
         <div className="flex min-w-0 items-center justify-between gap-3">
         <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -335,6 +356,7 @@ export default async function BoardPage({ params }: BoardPageProps) {
             canManageCardFields={canManageCardFields}
             canManageCardPreview={canManageCardPreview}
             canChangeBoardBackground={canChangeBoardBackground}
+            canStartYandexDiskOAuth={canStartYandexDiskOAuth}
             boardLabels={boardLabels}
             fieldDefinitions={fieldDefinitions}
             previewItems={previewItems}

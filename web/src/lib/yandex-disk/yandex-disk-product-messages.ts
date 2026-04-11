@@ -1,0 +1,129 @@
+import "server-only";
+
+import type { YandexDiskClientError } from "./yandex-disk-client";
+
+/** Раздел 8.1 спецификации — управление интеграцией только у владельца доски (не через роли). */
+export const YANDEX_DISK_MSG_INTEGRATION_OWNER_ONLY =
+  "Подключать, отключать и переподключать Яндекс.Диск может только владелец доски." as const;
+
+/** Раздел 15.1 — авторизация и права (вложения карточек). */
+export const YANDEX_DISK_MSG_AUTH_REQUIRED = "Нужна авторизация." as const;
+export const YANDEX_DISK_MSG_NO_UPLOAD_PERMISSION =
+  "У вас нет права загружать файлы в эту карточку." as const;
+export const YANDEX_DISK_MSG_NO_DELETE_PERMISSION =
+  "У вас нет права удалять файлы этой карточки." as const;
+
+/** Раздел 15.3 — валидация файлов до обращения к Диску (спец. 10.2). */
+export const YANDEX_DISK_MSG_FILE_EMPTY = "Файл пустой." as const;
+export const YANDEX_DISK_MSG_FILE_TOO_LARGE =
+  "Файл слишком большой. Максимальный размер файла — 50 МБ." as const;
+export const YANDEX_DISK_MSG_TOO_MANY_FILES_IN_BATCH =
+  "Нельзя загрузить больше 20 файлов за один раз." as const;
+export const YANDEX_DISK_MSG_CARD_ATTACHMENT_LIMIT =
+  "Для этой карточки достигнут лимит вложений." as const;
+
+/** Раздел 15.2 спецификации — ошибки интеграции (провайдер / OAuth). */
+export const YANDEX_DISK_MSG_NOT_CONNECTED = "Для этой доски не подключён Яндекс.Диск." as const;
+/** Интеграция в статусе `disconnected` (YDB3.6 / YDB3.7). */
+export const YANDEX_DISK_MSG_INTEGRATION_DISCONNECTED =
+  "Интеграция Яндекс.Диска для этой доски отключена." as const;
+export const YANDEX_DISK_MSG_REAUTHORIZATION_REQUIRED =
+  "Подключение к Яндекс.Диску требует повторной авторизации владельца доски." as const;
+export const YANDEX_DISK_MSG_BOARD_FOLDER_CREATE_FAILED =
+  "Не удалось создать папку доски в Яндекс.Диске." as const;
+export const YANDEX_DISK_MSG_CANNOT_CHANGE_DISK_WITH_FILES =
+  "Нельзя сменить Яндекс.Диск для доски, пока в карточках есть файлы." as const;
+
+/** Раздел 15.3 — ошибки файлов (ответы API Диска при upload/download/delete). */
+export const YANDEX_DISK_MSG_FILE_NOT_FOUND_ON_DISK = "Файл не найден в Яндекс.Диске." as const;
+export const YANDEX_DISK_MSG_UPLOAD_FAILED = "Не удалось загрузить файл в Яндекс.Диск." as const;
+export const YANDEX_DISK_MSG_DOWNLOAD_FAILED = "Не удалось скачать файл из Яндекс.Диска." as const;
+export const YANDEX_DISK_MSG_DELETE_FAILED = "Не удалось удалить файл из Яндекс.Диска." as const;
+
+/**
+ * Нет отдельной строки в разделе 15 для сетевых/неизвестных сбоев OAuth и login.yandex.ru;
+ * используется вместо сырого текста провайдера.
+ */
+export const YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE =
+  "Сервис Яндекс.Диска временно недоступен. Попробуйте позже." as const;
+
+/**
+ * Контекст вызова: по нему выбирается фиксированный текст из раздела 15,
+ * без использования rawProviderMessage / message от API.
+ */
+export type YandexDiskProductOperation =
+  | "oauth_authorize"
+  | "oauth_refresh"
+  | "integration_folder"
+  | "upload"
+  | "download"
+  | "delete"
+  | "profile"
+  | "generic_disk";
+
+/**
+ * Возвращает продуктовое сообщение для UI или `null`, если пользователю ничего показывать не нужно
+ * (например, удаление уже отсутствующего файла — обрабатывается на уровне сценария).
+ */
+export function mapYandexDiskClientErrorToProductMessage(
+  err: YandexDiskClientError,
+  operation: YandexDiskProductOperation
+): string | null {
+  if (operation === "delete" && err.code === "not_found") {
+    return null;
+  }
+
+  if (operation === "download" && err.code === "not_found") {
+    return YANDEX_DISK_MSG_FILE_NOT_FOUND_ON_DISK;
+  }
+
+  if (err.code === "oauth_invalid_grant" || err.code === "unauthorized") {
+    return YANDEX_DISK_MSG_REAUTHORIZATION_REQUIRED;
+  }
+
+  switch (operation) {
+    case "oauth_authorize":
+    case "oauth_refresh":
+      if (err.code === "oauth_invalid_client") {
+        return YANDEX_DISK_MSG_REAUTHORIZATION_REQUIRED;
+      }
+      if (err.code === "network_error" || err.code === "provider_error" || err.code === "rate_limited") {
+        return YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE;
+      }
+      return YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE;
+
+    case "profile":
+      if (err.code === "network_error" || err.code === "provider_error") {
+        return YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE;
+      }
+      return YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE;
+
+    case "integration_folder":
+      return YANDEX_DISK_MSG_BOARD_FOLDER_CREATE_FAILED;
+
+    case "upload":
+      return YANDEX_DISK_MSG_UPLOAD_FAILED;
+
+    case "download":
+      return YANDEX_DISK_MSG_DOWNLOAD_FAILED;
+
+    case "delete":
+      return YANDEX_DISK_MSG_DELETE_FAILED;
+
+    case "generic_disk":
+      return fallbackGenericDisk(err);
+  }
+}
+
+function fallbackGenericDisk(err: YandexDiskClientError): string {
+  if (err.code === "not_found") {
+    return YANDEX_DISK_MSG_FILE_NOT_FOUND_ON_DISK;
+  }
+  if (err.code === "insufficient_storage") {
+    return YANDEX_DISK_MSG_UPLOAD_FAILED;
+  }
+  if (err.code === "network_error") {
+    return YANDEX_DISK_MSG_DOWNLOAD_FAILED;
+  }
+  return YANDEX_DISK_MSG_DOWNLOAD_FAILED;
+}

@@ -1,13 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
+function safeAppPathAfterLogin(next: string | null): string {
+  if (!next || !next.startsWith("/") || next.startsWith("//")) return "/go";
+  return next;
+}
+
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -36,7 +42,7 @@ export function LoginForm() {
       }
 
       router.refresh();
-      router.push("/go");
+      router.push(safeAppPathAfterLogin(searchParams.get("next")));
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Неизвестная ошибка");
       setLoading(false);
