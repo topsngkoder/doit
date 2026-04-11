@@ -12,7 +12,21 @@ export type YandexCardAttachmentUploadProgress = {
   total: number | null;
   /** Сглаженная скорость передачи на клиент→сервер, байт/с (скользящее сглаживание). */
   smoothedSpeedBps: number | null;
+  /**
+   * 0–100: заполнение полосы. На клиенте — до ~88% по реальным байтам тела запроса;
+   * после отправки тела — плавное приближение к 99% на время обработки на сервере (не равно байтам на Яндекс.Диск).
+   */
+  barPercent: number;
+  /** Только `phase === "server"`: успокаивающий текст для пользователя. */
+  serverStatusText?: string;
 };
+
+/** Сообщение на фазе ожидания ответа сервера (после отправки тела запроса). */
+export const YANDEX_CARD_ATTACHMENT_UPLOAD_SERVER_PHASE_MESSAGE =
+  "Файл скоро появится. Можно закрыть окно.";
+
+/** Верхняя доля полосы до завершения передачи тела (остальное — визуализация ожидания сервера). */
+const BAR_CLIENT_MAX_PERCENT = 88;
 
 export type YandexCardAttachmentUploadClientFileResult =
   | { originalName: string; ok: true }
@@ -29,6 +43,33 @@ type XhrJson = {
 };
 
 const EMA_ALPHA = 0.35;
+
+function clientBarPercent(
+  loaded: number,
+  total: number | null,
+  knownFileSize: number | null
+): number {
+  const denom =
+    total !== null && total > 0 ? total
+    : knownFileSize !== null && knownFileSize > 0 ? knownFileSize
+    : null;
+  if (denom !== null) {
+    return Math.min(
+      BAR_CLIENT_MAX_PERCENT,
+      Math.round((BAR_CLIENT_MAX_PERCENT * loaded) / denom)
+    );
+  }
+  if (loaded <= 0) return 8;
+  const eased = 1 - Math.exp(-loaded / (4 * 1024 * 1024));
+  return Math.min(BAR_CLIENT_MAX_PERCENT - 6, Math.round(12 + 70 * eased));
+}
+
+function serverBarPercent(elapsedMs: number): number {
+  const span = 99 - BAR_CLIENT_MAX_PERCENT;
+  const t = elapsedMs / 1000;
+  const ease = 1 - Math.exp(-t / 3.2);
+  return Math.min(99, BAR_CLIENT_MAX_PERCENT + span * ease);
+}
 
 function postFormDataWithProgress(
   url: string,
@@ -48,8 +89,18 @@ function postFormDataWithProgress(
     let lastT = performance.now();
     let lastLoaded = 0;
     let emaSpeed: number | null = null;
+    let serverWaitInterval: ReturnType<typeof setInterval> | null = null;
+    const serverWaitStartedAt = { t: 0 as number };
+
+    const clearServerWaitInterval = () => {
+      if (serverWaitInterval !== null) {
+        clearInterval(serverWaitInterval);
+        serverWaitInterval = null;
+      }
+    };
 
     const abort = () => {
+      clearServerWaitInterval();
       xhr.abort();
     };
     options.signal?.addEventListener("abort", abort, { once: true });
@@ -74,7 +125,8 @@ function postFormDataWithProgress(
         phase: "client",
         loaded,
         total,
-        smoothedSpeedBps: emaSpeed
+        smoothedSpeedBps: emaSpeed,
+        barPercent: clientBarPercent(loaded, total, options.knownFileSize)
       });
     };
 
@@ -82,28 +134,41 @@ function postFormDataWithProgress(
       if (options.signal?.aborted) return;
       const total = options.knownFileSize && options.knownFileSize > 0 ? options.knownFileSize : null;
       const loaded = total !== null ? total : lastLoaded;
-      options.onProgress({
-        fileIndex: options.fileIndex,
-        fileCount: options.fileCount,
-        fileName: options.fileName,
-        phase: "server",
-        loaded,
-        total,
-        smoothedSpeedBps: null
-      });
+      clearServerWaitInterval();
+      serverWaitStartedAt.t = performance.now();
+      const emitServerWait = () => {
+        if (options.signal?.aborted) return;
+        const elapsed = performance.now() - serverWaitStartedAt.t;
+        options.onProgress({
+          fileIndex: options.fileIndex,
+          fileCount: options.fileCount,
+          fileName: options.fileName,
+          phase: "server",
+          loaded,
+          total,
+          smoothedSpeedBps: null,
+          barPercent: serverBarPercent(elapsed),
+          serverStatusText: YANDEX_CARD_ATTACHMENT_UPLOAD_SERVER_PHASE_MESSAGE
+        });
+      };
+      emitServerWait();
+      serverWaitInterval = setInterval(emitServerWait, 180);
     };
 
     xhr.onload = () => {
+      clearServerWaitInterval();
       options.signal?.removeEventListener("abort", abort);
       resolve({ status: xhr.status, text: xhr.responseText ?? "" });
     };
 
     xhr.onerror = () => {
+      clearServerWaitInterval();
       options.signal?.removeEventListener("abort", abort);
       reject(new Error("network"));
     };
 
     xhr.onabort = () => {
+      clearServerWaitInterval();
       options.signal?.removeEventListener("abort", abort);
       reject(new Error("aborted"));
     };

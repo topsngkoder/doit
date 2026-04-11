@@ -35,11 +35,12 @@ import {
   cardAttachmentDownloadPath,
   cardAttachmentUploadApiPath
 } from "@/lib/yandex-disk/yandex-disk-board-ui-endpoints";
-import type { YandexCardAttachmentUploadProgress } from "@/lib/yandex-disk/upload-yandex-card-attachments-client";
 import {
   formatByteProgressRu,
   formatUploadSpeedRu,
-  uploadYandexCardAttachmentsWithProgress
+  uploadYandexCardAttachmentsWithProgress,
+  YANDEX_CARD_ATTACHMENT_UPLOAD_SERVER_PHASE_MESSAGE,
+  type YandexCardAttachmentUploadProgress
 } from "@/lib/yandex-disk/upload-yandex-card-attachments-client";
 import {
   useBoardYandexDiskIntegration,
@@ -385,12 +386,11 @@ function YandexDiskCardFieldAttachmentsSection({
                         role="progressbar"
                         aria-valuemin={0}
                         aria-valuemax={100}
-                        aria-valuenow={
-                          uploadProgress.total !== null && uploadProgress.total > 0 ?
-                            Math.min(
-                              100,
-                              Math.round((100 * uploadProgress.loaded) / uploadProgress.total)
-                            )
+                        aria-valuenow={Math.round(uploadProgress.barPercent)}
+                        aria-valuetext={
+                          uploadProgress.phase === "server" ?
+                            uploadProgress.serverStatusText ??
+                            YANDEX_CARD_ATTACHMENT_UPLOAD_SERVER_PHASE_MESSAGE
                           : undefined
                         }
                         aria-label="Прогресс загрузки файла на сервер"
@@ -398,26 +398,21 @@ function YandexDiskCardFieldAttachmentsSection({
                         <div
                           className={cn(
                             "h-full rounded-full bg-app-accent transition-[width] duration-150 ease-out",
-                            uploadProgress.phase === "server" &&
-                              uploadProgress.total !== null &&
-                              uploadProgress.total > 0 &&
-                              "animate-pulse",
+                            uploadProgress.phase === "server" && "animate-pulse",
                             uploadProgress.phase === "client" &&
                               (uploadProgress.total === null || uploadProgress.total <= 0) &&
                               "animate-pulse"
                           )}
                           style={{
-                            width:
-                              uploadProgress.total !== null && uploadProgress.total > 0 ?
-                                `${Math.min(100, (100 * uploadProgress.loaded) / uploadProgress.total)}%`
-                              : uploadProgress.phase === "server" ?
-                                "100%"
-                              : "42%"
+                            width: `${Math.min(100, uploadProgress.barPercent)}%`
                           }}
                         />
                       </div>
                       {uploadProgress.phase === "server" ?
-                        <p className="text-xs text-app-tertiary">Завершение на сервере…</p>
+                        <p className="text-xs font-medium text-[color:var(--success-strong)]">
+                          {uploadProgress.serverStatusText ??
+                            YANDEX_CARD_ATTACHMENT_UPLOAD_SERVER_PHASE_MESSAGE}
+                        </p>
                       : uploadProgress.total !== null && uploadProgress.total > 0 ?
                         <p className="text-xs text-app-tertiary">
                           {Math.min(
