@@ -764,8 +764,7 @@ function BoardCardRow({
                 {canClickDownloadOnTile ?
                   <a
                     href={cardAttachmentDownloadPath(boardId, card.id, a.id, a.field_definition_id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    download={a.original_file_name}
                     title={a.original_file_name}
                     className="inline-block max-w-full min-w-0 truncate text-left align-top text-[11px] font-normal text-blue-600 underline-offset-2 hover:underline hover:text-blue-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring)] dark:text-blue-400 dark:hover:text-blue-300"
                     onClick={(e) => e.stopPropagation()}

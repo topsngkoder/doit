@@ -275,8 +275,7 @@ function YandexDiskCardFieldAttachmentsSection({
                       {canDownloadThisField ?
                         <a
                           href={cardAttachmentDownloadPath(boardId, cardId, a.id, fieldId)}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                          download={a.original_file_name}
                           className="text-xs font-medium text-app-accent underline-offset-2 hover:underline"
                         >
                           Скачать
