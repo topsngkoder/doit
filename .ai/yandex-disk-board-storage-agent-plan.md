@@ -133,6 +133,10 @@
 | 2026-04-11 | YDB7.4 | `board-yandex-disk-button.tsx`: для `canManageIntegration` — раздельные действия: «Подключить» (нет строки или `disconnected`) → OAuth; «Повторить авторизацию» (`reauthorization_required` / `error`); «Обновить доступ в Яндексе» (`active`) → тот же OAuth; «Отключить» (`active` / `reauthorization_required` / `error`) → `disconnectBoardYandexDiskIntegrationAction`, ошибка в модалке, успех — `router.refresh()` + закрытие. Не-владелец без кнопок управления. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
 | 2026-04-11 | YDB7.5 | Продуктово безопасные тексты интеграции: `yandex-disk-product-messages.ts` — константа спец. 15.1 `YANDEX_DISK_MSG_NO_BOARD_YANDEX_CONNECT_PERMISSION`, сообщения для всех `?yandex_disk_oauth=` + `yandexDiskOauthReturnBannerMessage()`; `boards/[boardId]/page.tsx` и `boards/page.tsx` — баннер по флагу (включая `success`, `provider` → `YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE`). `requireBoardYandexDiskIntegrationManagement`: вместо `rpcError.message` → лог + `YANDEX_DISK_MSG_INTEGRATION_PERMISSION_CHECK_FAILED`; `disconnectBoardYandexDiskIntegrationAction` — то же для RPC/неизвестного кода (`YANDEX_DISK_MSG_DISCONNECT_FAILED`). OAuth `start`: ошибка env — 503 с `YANDEX_DISK_MSG_OAUTH_SERVER_MISCONFIGURED` (детали в лог); отказ в праве — редирект с `yandex_disk_oauth=forbidden`. `safeYandexDiskIntegrationLastErrorTextForOwner` в `yandex-disk-integration-modal-presentation.ts` + модалка доски. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
 | 2026-04-11 | scope-correction | Уточнено требование: entry-point должен идти через `Поля доски` и тип поля `Яндекс диск`, а не через отдельную кнопку/модалку `Яндекс.Диск`. Также на одной доске должно поддерживаться несколько таких полей, поэтому вложения обязаны быть привязаны к `field_definition_id`. Ранее выполненные YDB7.1–YDB7.5 фиксируют промежуточную button-based реализацию и не считаются целевым UI относительно обновлённой спеки. |
+| 2026-04-11 | YDB4.7 | Миграция `20260412100000_ydb4_7_card_attachments_field_definition.sql`: CHECK `board_field_definitions.field_type` + `yandex_disk`; колонка `card_attachments.field_definition_id` NOT NULL FK → `board_field_definitions` ON DELETE CASCADE; очистка старых строк вложений; индексы; RLS INSERT/UPDATE с проверкой поля `yandex_disk` на доске карточки; `get_board_snapshot.card_ready_attachments` с `field_definition_id`. TS: `assert-card-yandex-disk-field-definition.ts`; лимит 200 `ready` на пару (карточка, поле); `validateCardAttachmentUploadRequest` / upload / list с `fieldDefinitionId`; `CardAttachmentListItem.field_definition_id`; константа `YANDEX_DISK_MSG_INVALID_YANDEX_DISK_FIELD`. `npx supabase db push`, `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB5.6 | Скачивание и удаление привязаны к `field_definition_id`: `resolveCardAttachmentTemporaryDownloadUrl` и `deleteCardAttachment` принимают `fieldDefinitionId`, SELECT/DELETE с `.eq("field_definition_id", …)`; GET download — обязательный query `field_definition_id`; `cardAttachmentDownloadPath(..., fieldDefinitionId)`; `deleteCardAttachmentAction` — четвёртый аргумент; JSDoc в `board-yandex-disk-ui-server-contract.ts`. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB6.5 | Плоский `card_ready_attachments` в RPC без изменений. Тип `CardReadyAttachmentsByFieldId` в `card-attachment-ui-types.ts`; `mapCardReadyAttachmentsRowsByCardId` в `board-snapshot-types.ts` — группировка по карточке и `field_definition_id`. `BoardCardListItem.readyAttachmentsByFieldId` вместо плоского `readyAttachments`; `page.tsx` и realtime-merge в `board-columns-dnd.tsx` обновлены. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB7.1 (каталог) | Тип `yandex_disk` в каталоге полей: `web/src/app/boards/[boardId]/board-field-types.ts` (`BOARD_FIELD_TYPES`, `BOARD_FIELD_TYPE_OPTIONS`, `isBoardFieldType`); `actions.ts` валидирует тип через импорт; `board-fields-button.tsx` — пункт «Яндекс диск» в списке «Тип». `card-field-drafts.ts`: `BoardCatalogFieldType`, черновик `{ fieldType: "yandex_disk" }`, пропуск в `buildFieldValuesPayload` и обязательности (до YDB8). Заглушки в `create-card-modal.tsx` / `edit-card-modal.tsx`. Миграция `20260412103000_ydb7_1_catalog_yandex_disk_field_rpc.sql`: в `create_card_with_details` и `update_card_body_and_custom_fields` ветка `ELSIF v_ftype = 'yandex_disk'` без записи в `card_field_values`. `npx supabase db push`, `npx tsc --noEmit` в `web/` — ок. |
 
 ### EPIC YDB1 - Подготовить модель данных и миграции
 - [x] **YDB1.1 (done)** Спроектировать таблицу привязки Яндекс.Диска к доске
@@ -252,7 +256,7 @@
   - в UI отдавать только `ready`;
   - для internal/admin cleanup при необходимости иметь отдельный серверный доступ ко всем статусам;
   - **DoD**: `uploading` и `failed` не попадают в постоянный список файлов карточки.
-- [ ] **YDB4.7 (todo)** Привязать upload/list контракты к конкретному полю `Яндекс диск`
+- [x] **YDB4.7 (done)** Привязать upload/list контракты к конкретному полю `Яндекс диск`
   - `precheck`, upload action и list action должны принимать `field_definition_id`;
   - сервер обязан проверить, что поле принадлежит доске, доступно в карточке и имеет тип `yandex_disk`;
   - **DoD**: загрузка и выдача списка файлов работают в разрезе конкретного файлового поля, а не карточки целиком.
@@ -283,7 +287,7 @@
   - попытаться очистить файлы в Яндекс.Диске;
   - при отсутствии части файлов у провайдера не валить удаление карточки;
   - **DoD**: удаление карточки убирает записи вложений и пытается очистить provider-side ресурсы без ложных фейлов.
-- [ ] **YDB5.6 (todo)** Довести download/delete до модели нескольких файловых полей
+- [x] **YDB5.6 (done)** Довести download/delete до модели нескольких файловых полей
   - скачивание и удаление должны сохранять привязку attachment ↔ `field_definition_id`;
   - UI и server-side контракты не должны позволять смешать или подменить файлы соседнего поля;
   - **DoD**: download/delete корректно работают для нескольких полей `Яндекс диск` в одной карточке.
@@ -296,7 +300,7 @@
 - [x] **YDB6.2 (done)** Расширить snapshot или отдельный серверный loader данными вложений карточек
   - для каждой карточки нужен список `ready`-вложений с привязкой к `field_definition_id`;
   - при необходимости добавить агрегаты/флаги доступности интеграции;
-  - **DoD**: `edit-card-modal` получает все нужные данные для рендера нескольких полей типа `Яндекс диск`. *(Текущая реализация с `card.readyAttachments` требует доработки под группировку по `field_definition_id`.)*
+  - **DoD**: `edit-card-modal` получает все нужные данные для рендера нескольких полей типа `Яндекс диск`. *(Группировка по полю — `BoardCardListItem.readyAttachmentsByFieldId`, YDB6.5.)*
 - [x] **YDB6.3 (done)** Обновить TS-типы board/card snapshot
   - добавить `BoardYandexDiskIntegrationSnapshot`;
   - добавить `CardAttachmentListItem`;
@@ -308,13 +312,13 @@
   - `download attachment`;
   - `delete attachment`;
   - **DoD**: все UI-сценарии вызывают единый server-side контракт. *(Barrel `board-yandex-disk-ui-server-contract.ts` + endpoints `yandex-disk-board-ui-endpoints.ts`; OAuth start и GET download остаются route handlers, см. JSDoc в barrel.)*
-- [ ] **YDB6.5 (todo)** Пересобрать snapshot и клиентские модели вокруг файловых полей
+- [x] **YDB6.5 (done)** Пересобрать snapshot и клиентские модели вокруг файловых полей
   - данные ready-вложений должны приходить так, чтобы клиент мог быстро сгруппировать их по `field_definition_id`;
   - `BoardCardListItem` и сопутствующие типы не должны предполагать один общий список файлов на карточку;
   - **DoD**: клиент без ad-hoc логики понимает, какие файлы относятся к какому полю `Яндекс диск`.
 
 ### EPIC YDB7 - Перенести интеграцию в `Поля доски`
-- [ ] **YDB7.1 (todo)** Добавить тип поля `Яндекс диск` в каталог полей доски
+- [x] **YDB7.1 (done)** Добавить тип поля `Яндекс диск` в каталог полей доски
   - обновить `BOARD_FIELD_TYPES`, клиентские union-типы и выпадающий список `Тип` в `BoardFieldsButton`;
   - не ломать существующие типы `text | date | select | link`;
   - **DoD**: в `Поля доски` можно создать/редактировать поле с типом `Яндекс диск`.

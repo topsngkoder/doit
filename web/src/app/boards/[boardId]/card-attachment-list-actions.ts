@@ -12,8 +12,9 @@ export type { CardAttachmentReadyListItem, ListReadyCardAttachmentsResult };
 /** YDB4.6: список `ready`-вложений для UI; `uploading`/`failed` отсекаются RLS и явным фильтром. */
 export async function listReadyCardAttachmentsAction(
   boardId: string,
-  cardId: string
+  cardId: string,
+  fieldDefinitionId: string
 ): Promise<ListReadyCardAttachmentsResult> {
   const supabase = await createSupabaseServerClient();
-  return listReadyCardAttachmentsForViewer(supabase, { boardId, cardId });
+  return listReadyCardAttachmentsForViewer(supabase, { boardId, cardId, fieldDefinitionId });
 }

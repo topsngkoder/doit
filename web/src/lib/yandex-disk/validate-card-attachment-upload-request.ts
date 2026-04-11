@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeUuidParam } from "@/lib/board-id-param";
 import { getSupabaseServiceRoleClient } from "@/lib/supabase/service-role";
 
+import { assertCardYandexDiskFieldDefinition } from "./assert-card-yandex-disk-field-definition";
 import { requireActiveBoardYandexDiskIntegration } from "./require-active-board-yandex-disk-integration";
 import {
   YANDEX_DISK_MSG_AUTH_REQUIRED,
@@ -28,6 +29,8 @@ export type CardAttachmentUploadFileMeta = {
 export type ValidateCardAttachmentUploadRequestInput = {
   boardId: string;
   cardId: string;
+  /** Поле доски типа `yandex_disk` на этой доске (YDB4.7). */
+  fieldDefinitionId: string;
   files: CardAttachmentUploadFileMeta[];
 };
 
@@ -36,7 +39,7 @@ export type ValidateCardAttachmentUploadRequestResult =
   | { ok: false; message: string };
 
 function invalidIdsResult(): ValidateCardAttachmentUploadRequestResult {
-  return { ok: false, message: "Некорректный идентификатор доски или карточки." };
+  return { ok: false, message: "Некорректный идентификатор доски, карточки или поля." };
 }
 
 /**
@@ -49,7 +52,8 @@ export async function validateCardAttachmentUploadRequest(
 ): Promise<ValidateCardAttachmentUploadRequestResult> {
   const boardId = normalizeUuidParam(input.boardId);
   const cardId = normalizeUuidParam(input.cardId);
-  if (!boardId || !cardId) {
+  const fieldDefinitionId = normalizeUuidParam(input.fieldDefinitionId);
+  if (!boardId || !cardId || !fieldDefinitionId) {
     return invalidIdsResult();
   }
 
@@ -75,18 +79,13 @@ export async function validateCardAttachmentUploadRequest(
     }
   }
 
-  const { data: cardRow, error: cardError } = await supabase
-    .from("cards")
-    .select("id, board_id")
-    .eq("id", cardId)
-    .maybeSingle();
-
-  if (cardError) {
-    console.error("validateCardAttachmentUploadRequest cards read:", cardError.message);
-    return { ok: false, message: "Не удалось проверить карточку." };
-  }
-  if (!cardRow || cardRow.board_id !== boardId) {
-    return { ok: false, message: "Карточка не найдена на этой доске." };
+  const fieldOk = await assertCardYandexDiskFieldDefinition(supabase, {
+    boardId,
+    cardId,
+    fieldDefinitionId
+  });
+  if (!fieldOk.ok) {
+    return fieldOk;
   }
 
   const { data: canEdit, error: editRpcError } = await supabase.rpc("can_edit_card_content", {
@@ -115,6 +114,7 @@ export async function validateCardAttachmentUploadRequest(
     .select("*", { count: "exact", head: true })
     .eq("card_id", cardId)
     .eq("board_id", boardId)
+    .eq("field_definition_id", fieldDefinitionId)
     .eq("status", "ready");
 
   if (countError) {

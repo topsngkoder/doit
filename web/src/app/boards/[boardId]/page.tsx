@@ -1,13 +1,12 @@
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BoardCanvas } from "./board-canvas";
-import { toBoardSnapshotPayload } from "@/lib/board-snapshot-types";
+import { mapCardReadyAttachmentsRowsByCardId, toBoardSnapshotPayload } from "@/lib/board-snapshot-types";
 import type {
   BoardLabelOption,
   BoardCardListItem,
   BoardCardPreviewItem,
   CardActivityEntry,
-  CardAttachmentListItem,
   CardFieldValueSnapshot
 } from "./column-types";
 import type { NewCardFieldDefinition } from "./card-field-drafts";
@@ -171,21 +170,7 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
     activityByCard.set(a.card_id, cur);
   }
 
-  const readyAttachmentsByCardId = new Map<string, CardAttachmentListItem[]>();
-  for (const row of snapshot.card_ready_attachments ?? []) {
-    if (!row?.card_id || !row?.id) continue;
-    const item: CardAttachmentListItem = {
-      id: String(row.id),
-      original_file_name: String(row.original_file_name ?? ""),
-      mime_type: String(row.mime_type ?? ""),
-      size_bytes: Number(row.size_bytes ?? 0),
-      uploaded_at: String(row.uploaded_at ?? ""),
-      uploaded_by_user_id: String(row.uploaded_by_user_id ?? "")
-    };
-    const cur = readyAttachmentsByCardId.get(row.card_id) ?? [];
-    cur.push(item);
-    readyAttachmentsByCardId.set(row.card_id, cur);
-  }
+  const readyAttachmentsByCardId = mapCardReadyAttachmentsRowsByCardId(snapshot.card_ready_attachments);
 
   const cardsByColumnId = new Map<string, BoardCardListItem[]>();
 
@@ -208,7 +193,7 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
         commentsCount: commentsCountByCard.get(row.id) ?? 0,
         fieldValues: fieldValuesByCard.get(row.id) ?? {},
         activityEntries: activityByCard.get(row.id) ?? [],
-        readyAttachments: readyAttachmentsByCardId.get(row.id) ?? []
+        readyAttachmentsByFieldId: readyAttachmentsByCardId.get(row.id) ?? {}
       });
     }
   }

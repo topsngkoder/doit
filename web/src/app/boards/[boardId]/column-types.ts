@@ -1,4 +1,8 @@
-import type { CardAttachmentListItem, CardAttachmentReadyListItem } from "@/lib/card-attachment-ui-types";
+import type {
+  CardAttachmentListItem,
+  CardAttachmentReadyListItem,
+  CardReadyAttachmentsByFieldId
+} from "@/lib/card-attachment-ui-types";
 
 export const COLUMN_TYPES = ["queue", "in_work", "done", "info"] as const;
 
@@ -54,7 +58,7 @@ export type CardActivityEntry = {
   actorDisplayName: string;
 };
 
-export type { CardAttachmentListItem, CardAttachmentReadyListItem };
+export type { CardAttachmentListItem, CardAttachmentReadyListItem, CardReadyAttachmentsByFieldId };
 
 export type BoardCardListItem = {
   id: string;
@@ -74,8 +78,11 @@ export type BoardCardListItem = {
   fieldValues: Record<string, CardFieldValueSnapshot>;
   /** История карточки (новые сверху). */
   activityEntries: CardActivityEntry[];
-  /** Готовые вложения из snapshot (YDB6.2); `uploading`/`failed` не включаются. */
-  readyAttachments: CardAttachmentListItem[];
+  /**
+   * Готовые вложения из snapshot по полям `Яндекс диск` (YDB6.5).
+   * Ключ — `field_definition_id`; `uploading`/`failed` не включаются.
+   */
+  readyAttachmentsByFieldId: CardReadyAttachmentsByFieldId;
 };
 
 export function canEditCardContent(

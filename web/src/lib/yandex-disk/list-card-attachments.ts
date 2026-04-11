@@ -6,6 +6,7 @@ import { normalizeUuidParam } from "@/lib/board-id-param";
 
 import type { CardAttachmentReadyListItem } from "@/lib/card-attachment-ui-types";
 
+import { assertCardYandexDiskFieldDefinition } from "./assert-card-yandex-disk-field-definition";
 import { YANDEX_DISK_MSG_AUTH_REQUIRED } from "./yandex-disk-product-messages";
 
 export type { CardAttachmentReadyListItem };
@@ -21,6 +22,7 @@ export type CardAttachmentAllStatusesRow = {
   id: string;
   board_id: string;
   card_id: string;
+  field_definition_id: string;
   storage_provider: string;
   storage_path: string;
   original_file_name: string;
@@ -36,7 +38,7 @@ export type ListCardAttachmentsAllStatusesResult =
   | { ok: false; message: string };
 
 function invalidIdsResult(): ListReadyCardAttachmentsResult {
-  return { ok: false, message: "Некорректный идентификатор доски или карточки." };
+  return { ok: false, message: "Некорректный идентификатор доски, карточки или поля." };
 }
 
 /**
@@ -45,11 +47,12 @@ function invalidIdsResult(): ListReadyCardAttachmentsResult {
  */
 export async function listReadyCardAttachmentsForViewer(
   supabase: SupabaseClient,
-  input: { boardId: string; cardId: string }
+  input: { boardId: string; cardId: string; fieldDefinitionId: string }
 ): Promise<ListReadyCardAttachmentsResult> {
   const boardId = normalizeUuidParam(input.boardId);
   const cardId = normalizeUuidParam(input.cardId);
-  if (!boardId || !cardId) {
+  const fieldDefinitionId = normalizeUuidParam(input.fieldDefinitionId);
+  if (!boardId || !cardId || !fieldDefinitionId) {
     return invalidIdsResult();
   }
 
@@ -58,27 +61,23 @@ export async function listReadyCardAttachmentsForViewer(
     return { ok: false, message: YANDEX_DISK_MSG_AUTH_REQUIRED };
   }
 
-  const { data: cardRow, error: cardError } = await supabase
-    .from("cards")
-    .select("id, board_id")
-    .eq("id", cardId)
-    .maybeSingle();
-
-  if (cardError) {
-    console.error("listReadyCardAttachmentsForViewer cards read:", cardError.message);
-    return { ok: false, message: "Не удалось проверить карточку." };
-  }
-  if (!cardRow || cardRow.board_id !== boardId) {
-    return { ok: false, message: "Карточка не найдена на этой доске." };
+  const fieldOk = await assertCardYandexDiskFieldDefinition(supabase, {
+    boardId,
+    cardId,
+    fieldDefinitionId
+  });
+  if (!fieldOk.ok) {
+    return fieldOk;
   }
 
   const { data: rows, error: attError } = await supabase
     .from("card_attachments")
     .select(
-      "id, original_file_name, mime_type, size_bytes, uploaded_at, uploaded_by_user_id"
+      "id, field_definition_id, original_file_name, mime_type, size_bytes, uploaded_at, uploaded_by_user_id"
     )
     .eq("board_id", boardId)
     .eq("card_id", cardId)
+    .eq("field_definition_id", fieldDefinitionId)
     .eq("status", "ready")
     .order("uploaded_at", { ascending: true });
 
@@ -89,6 +88,7 @@ export async function listReadyCardAttachmentsForViewer(
 
   const attachments: CardAttachmentReadyListItem[] = (rows ?? []).map((r) => ({
     id: r.id,
+    field_definition_id: String(r.field_definition_id ?? fieldDefinitionId),
     original_file_name: r.original_file_name,
     mime_type: r.mime_type,
     size_bytes: r.size_bytes,

@@ -21,17 +21,19 @@ function invalidIdsResult(): DeleteCardAttachmentResult {
 }
 
 /**
- * YDB5.4 / спец. 12.2–12.3: право редактирования содержимого карточки, затем удаление на Диске,
+ * YDB5.4 / YDB5.6 / спец. 12.2–12.3: право редактирования содержимого карточки, затем удаление на Диске,
  * затем строка в БД. Отсутствие файла у провайдера (`not_found`) — успешная очистка, запись всё равно удаляется.
+ * `fieldDefinitionId` обязателен: удаление только если вложение привязано к этому полю `Яндекс диск`.
  */
 export async function deleteCardAttachment(
   supabase: SupabaseClient,
-  input: { boardId: string; cardId: string; attachmentId: string }
+  input: { boardId: string; cardId: string; attachmentId: string; fieldDefinitionId: string }
 ): Promise<DeleteCardAttachmentResult> {
   const boardId = normalizeUuidParam(input.boardId);
   const cardId = normalizeUuidParam(input.cardId);
   const attachmentId = normalizeUuidParam(input.attachmentId);
-  if (!boardId || !cardId || !attachmentId) {
+  const fieldDefinitionId = normalizeUuidParam(input.fieldDefinitionId);
+  if (!boardId || !cardId || !attachmentId || !fieldDefinitionId) {
     return invalidIdsResult();
   }
 
@@ -57,6 +59,7 @@ export async function deleteCardAttachment(
     .eq("id", attachmentId)
     .eq("board_id", boardId)
     .eq("card_id", cardId)
+    .eq("field_definition_id", fieldDefinitionId)
     .eq("status", "ready")
     .maybeSingle();
 
@@ -105,7 +108,8 @@ export async function deleteCardAttachment(
     .delete()
     .eq("id", attachmentId)
     .eq("board_id", boardId)
-    .eq("card_id", cardId);
+    .eq("card_id", cardId)
+    .eq("field_definition_id", fieldDefinitionId);
 
   if (delError) {
     console.error("deleteCardAttachment delete:", delError.message);

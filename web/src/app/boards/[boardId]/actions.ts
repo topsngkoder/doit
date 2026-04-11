@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { bestEffortDeleteYandexDiskObjectsForCard } from "@/lib/yandex-disk/best-effort-delete-yandex-disk-objects-on-card-delete";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isBoardFieldType } from "./board-field-types";
 import {
   COLUMN_TYPES,
   type ColumnType
@@ -694,13 +695,6 @@ export async function deleteBoardCardPreviewItemAction(
 
   revalidatePath(`/boards/${boardId}`);
   return { ok: true };
-}
-
-const BOARD_FIELD_TYPES = ["text", "date", "select", "link"] as const;
-type BoardFieldType = (typeof BOARD_FIELD_TYPES)[number];
-
-function isBoardFieldType(v: string): v is BoardFieldType {
-  return (BOARD_FIELD_TYPES as readonly string[]).includes(v);
 }
 
 function normalizeBoardFieldName(raw: string): string {

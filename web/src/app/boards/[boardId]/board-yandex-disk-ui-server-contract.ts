@@ -9,10 +9,10 @@
  * |----------|----------------|
  * | Подключить / переподключить | навигация на URL из `yandexDiskOAuthStartPath(boardId)` (`@/lib/yandex-disk/yandex-disk-board-ui-endpoints`) |
  * | Отключить | `disconnectBoardYandexDiskIntegrationAction` |
- * | Загрузка | `cardAttachmentUploadAction` (опционально `cardAttachmentUploadPrecheckAction`) |
- * | Скачать | GET `cardAttachmentDownloadPath(boardId, cardId, attachmentId)` (тот же модуль endpoints) |
- * | Удалить | `deleteCardAttachmentAction` |
- * | Список вне snapshot | `listReadyCardAttachmentsAction` |
+ * | Загрузка | `cardAttachmentUploadAction(boardId, cardId, fieldDefinitionId, formData)` (опционально `cardAttachmentUploadPrecheckAction` с теми же первыми тремя аргументами); в `FormData` — поле `files` |
+ * | Скачать | GET `cardAttachmentDownloadPath(boardId, cardId, attachmentId, fieldDefinitionId)` (тот же модуль endpoints) |
+ * | Удалить | `deleteCardAttachmentAction(boardId, cardId, attachmentId, fieldDefinitionId)` |
+ * | Список вне snapshot | `listReadyCardAttachmentsAction(boardId, cardId, fieldDefinitionId)` |
  */
 
 export {

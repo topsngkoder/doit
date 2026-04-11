@@ -1,4 +1,7 @@
-import type { CardAttachmentListItem } from "@/lib/card-attachment-ui-types";
+import type {
+  CardAttachmentListItem,
+  CardReadyAttachmentsByFieldId
+} from "@/lib/card-attachment-ui-types";
 
 /** Статус интеграции Яндекс.Диска в snapshot (совпадает с CHECK в БД, YDB1.1). */
 export type BoardYandexDiskIntegrationStatus =
@@ -114,10 +117,43 @@ export type GetBoardSnapshotActivity = {
   created_at: string;
 };
 
-/** Элемент плоского массива `card_ready_attachments` в RPC (YDB6.2). */
+/** Элемент плоского массива `card_ready_attachments` в RPC (YDB6.2 / YDB4.7). */
 export type CardReadyAttachmentSnapshotRow = CardAttachmentListItem & {
   card_id: string;
 };
+
+/**
+ * Строит для каждой карточки словарь вложений по `field_definition_id` из плоского массива snapshot.
+ * Единая точка группировки для SSR и тестов (YDB6.5).
+ */
+export function mapCardReadyAttachmentsRowsByCardId(
+  rows: CardReadyAttachmentSnapshotRow[] | null | undefined
+): Map<string, CardReadyAttachmentsByFieldId> {
+  const byCard = new Map<string, CardReadyAttachmentsByFieldId>();
+  for (const row of rows ?? []) {
+    if (!row?.card_id || !row?.id || !row.field_definition_id) continue;
+    const item: CardAttachmentListItem = {
+      id: String(row.id),
+      field_definition_id: String(row.field_definition_id),
+      original_file_name: String(row.original_file_name ?? ""),
+      mime_type: String(row.mime_type ?? ""),
+      size_bytes: Number(row.size_bytes ?? 0),
+      uploaded_at: String(row.uploaded_at ?? ""),
+      uploaded_by_user_id: String(row.uploaded_by_user_id ?? "")
+    };
+    const cardId = String(row.card_id);
+    const fieldId = item.field_definition_id;
+    let byField = byCard.get(cardId);
+    if (!byField) {
+      byField = {};
+      byCard.set(cardId, byField);
+    }
+    const list = byField[fieldId] ?? [];
+    list.push(item);
+    byField[fieldId] = list;
+  }
+  return byCard;
+}
 
 /**
  * Тело ответа `get_board_snapshot` после успешного RPC.

@@ -10,14 +10,20 @@ import {
 
 export type { DeleteCardAttachmentResult };
 
-/** YDB5.4: удаление одного `ready`-вложения (Диск → БД; отсутствие файла на Диске — успех). */
+/** YDB5.4 / YDB5.6: удаление одного `ready`-вложения в разрезе поля (Диск → БД; отсутствие файла на Диске — успех). */
 export async function deleteCardAttachmentAction(
   boardId: string,
   cardId: string,
-  attachmentId: string
+  attachmentId: string,
+  fieldDefinitionId: string
 ): Promise<DeleteCardAttachmentResult> {
   const supabase = await createSupabaseServerClient();
-  const result = await deleteCardAttachment(supabase, { boardId, cardId, attachmentId });
+  const result = await deleteCardAttachment(supabase, {
+    boardId,
+    cardId,
+    attachmentId,
+    fieldDefinitionId
+  });
   if (result.ok) {
     revalidatePath(`/boards/${boardId}`);
   }

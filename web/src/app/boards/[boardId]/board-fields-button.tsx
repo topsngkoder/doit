@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import type { NewCardFieldDefinition } from "./card-field-drafts";
 import {
+  BOARD_FIELD_TYPE_OPTIONS,
+  type BoardCatalogFieldType
+} from "./board-field-types";
+import {
   createBoardFieldDefinitionAction,
   createBoardFieldSelectOptionAction,
   deleteBoardFieldDefinitionAction,
@@ -28,16 +32,9 @@ type BoardFieldsButtonProps = {
   onTriggerClick?: () => void;
 };
 
-const FIELD_TYPE_OPTIONS = [
-  { value: "text", label: "Текст" },
-  { value: "date", label: "Дата" },
-  { value: "select", label: "Список" },
-  { value: "link", label: "Ссылка" }
-] as const;
-
 type FormState = {
   name: string;
-  fieldType: "text" | "date" | "select" | "link";
+  fieldType: BoardCatalogFieldType;
   isRequired: boolean;
 };
 
@@ -179,7 +176,7 @@ export function BoardFieldsButton({
                   }
                   disabled={pending}
                 >
-                  {FIELD_TYPE_OPTIONS.map((opt) => (
+                  {BOARD_FIELD_TYPE_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
@@ -240,7 +237,8 @@ export function BoardFieldsButton({
                           </p>
                           <p className="text-xs text-app-secondary">
                             {
-                              FIELD_TYPE_OPTIONS.find((o) => o.value === field.fieldType)?.label
+                              BOARD_FIELD_TYPE_OPTIONS.find((o) => o.value === field.fieldType)
+                                ?.label
                             }{" "}
                             · {field.isRequired ? "обязательное" : "необязательное"}
                           </p>

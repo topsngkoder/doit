@@ -272,6 +272,23 @@ export function CreateCardModal({
             );
           }
 
+          if (f.fieldType === "yandex_disk" && d.fieldType === "yandex_disk") {
+            return (
+              <div
+                key={f.id}
+                className="rounded-[var(--radius-control)] border border-app-divider bg-app-surface-muted p-3"
+              >
+                <p className="text-xs font-medium text-app-secondary">
+                  {f.name}
+                  {reqLabel}
+                </p>
+                <p className="mt-1 text-xs text-app-tertiary">
+                  Файлы с Яндекс.Диска можно будет добавить после создания карточки.
+                </p>
+              </div>
+            );
+          }
+
           return null;
         })}
 

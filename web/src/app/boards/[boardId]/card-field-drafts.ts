@@ -1,10 +1,12 @@
 import type { CreateCardFieldValuePayload } from "./actions";
 import type { CardFieldValueSnapshot } from "./column-types";
 
+import type { BoardCatalogFieldType } from "./board-field-types";
+
 export type NewCardFieldDefinition = {
   id: string;
   name: string;
-  fieldType: "link" | "text" | "date" | "select";
+  fieldType: BoardCatalogFieldType;
   isRequired: boolean;
   position: number;
   selectOptions: Array<{ id: string; name: string; color: string; position: number }>;
@@ -14,7 +16,8 @@ export type FieldDraft =
   | { fieldType: "text"; value: string }
   | { fieldType: "date"; value: string }
   | { fieldType: "link"; url: string; text: string }
-  | { fieldType: "select"; optionId: string };
+  | { fieldType: "select"; optionId: string }
+  | { fieldType: "yandex_disk" };
 
 export function buildEmptyFieldDrafts(
   defs: NewCardFieldDefinition[]
@@ -24,6 +27,7 @@ export function buildEmptyFieldDrafts(
     if (f.fieldType === "text") out[f.id] = { fieldType: "text", value: "" };
     else if (f.fieldType === "date") out[f.id] = { fieldType: "date", value: "" };
     else if (f.fieldType === "link") out[f.id] = { fieldType: "link", url: "", text: "" };
+    else if (f.fieldType === "yandex_disk") out[f.id] = { fieldType: "yandex_disk" };
     else out[f.id] = { fieldType: "select", optionId: "" };
   }
   return out;
@@ -50,6 +54,8 @@ export function snapshotsToFieldDrafts(
         url: s?.linkUrl?.trim() ?? "",
         text: s?.linkText?.trim() ?? ""
       };
+    } else if (f.fieldType === "yandex_disk") {
+      out[f.id] = { fieldType: "yandex_disk" };
     } else {
       out[f.id] = { fieldType: "select", optionId: s?.selectOptionId ?? "" };
     }
@@ -65,6 +71,7 @@ export function buildFieldValuesPayload(
   for (const f of defs) {
     const d = drafts[f.id];
     if (!d) continue;
+    if (f.fieldType === "yandex_disk") continue;
     if (f.fieldType === "text" && d.fieldType === "text") {
       fieldValues.push({
         field_definition_id: f.id,
@@ -98,6 +105,8 @@ export function validateRequiredCustomFields(
   const sorted = [...defs].sort((a, b) => a.position - b.position);
   for (const f of sorted) {
     if (!f.isRequired) continue;
+    // Обязательность файлового поля — в YDB8 (проверка вложений), не через card_field_values.
+    if (f.fieldType === "yandex_disk") continue;
     const d = drafts[f.id];
     if (!d) {
       return `Заполните обязательное поле «${f.name}».`;

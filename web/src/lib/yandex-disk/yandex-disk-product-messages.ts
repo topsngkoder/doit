@@ -15,6 +15,9 @@ export const YANDEX_DISK_MSG_NO_UPLOAD_PERMISSION =
   "У вас нет права загружать файлы в эту карточку." as const;
 export const YANDEX_DISK_MSG_NO_DELETE_PERMISSION =
   "У вас нет права удалять файлы этой карточки." as const;
+/** Поле не является файловым полем Яндекс.Диска на этой доске (YDB4.7). */
+export const YANDEX_DISK_MSG_INVALID_YANDEX_DISK_FIELD =
+  "Указано недопустимое поле для файлов Яндекс.Диска." as const;
 
 /** Раздел 15.3 — валидация файлов до обращения к Диску (спец. 10.2). */
 export const YANDEX_DISK_MSG_FILE_EMPTY = "Файл пустой." as const;
@@ -23,7 +26,7 @@ export const YANDEX_DISK_MSG_FILE_TOO_LARGE =
 export const YANDEX_DISK_MSG_TOO_MANY_FILES_IN_BATCH =
   "Нельзя загрузить больше 20 файлов за один раз." as const;
 export const YANDEX_DISK_MSG_CARD_ATTACHMENT_LIMIT =
-  "Для этой карточки достигнут лимит вложений." as const;
+  "Для этого файлового поля достигнут лимит вложений (не более 200 файлов)." as const;
 
 /** Раздел 15.2 спецификации — ошибки интеграции (провайдер / OAuth). */
 export const YANDEX_DISK_MSG_NOT_CONNECTED = "Для этой доски не подключён Яндекс.Диск." as const;

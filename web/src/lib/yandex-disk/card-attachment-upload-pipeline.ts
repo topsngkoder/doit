@@ -65,12 +65,14 @@ export async function uploadOneCardAttachmentFile(
   userId: string,
   boardId: string,
   cardId: string,
+  fieldDefinitionId: string,
   file: File
 ): Promise<UploadOneCardAttachmentFileResult> {
   const b = normalizeUuidParam(boardId);
   const c = normalizeUuidParam(cardId);
-  if (!b || !c) {
-    return { ok: false, message: "Некорректный идентификатор доски или карточки." };
+  const f = normalizeUuidParam(fieldDefinitionId);
+  if (!b || !c || !f) {
+    return { ok: false, message: "Некорректный идентификатор доски, карточки или поля." };
   }
 
   const attachmentId = crypto.randomUUID();
@@ -82,6 +84,7 @@ export async function uploadOneCardAttachmentFile(
     id: attachmentId,
     board_id: b,
     card_id: c,
+    field_definition_id: f,
     storage_provider: "yandex_disk",
     storage_path: storagePath,
     original_file_name: truncateOriginalName(file.name),

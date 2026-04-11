@@ -778,6 +778,24 @@ export function EditCardModal({
                       );
                     }
 
+                    if (f.fieldType === "yandex_disk" && d.fieldType === "yandex_disk") {
+                      return (
+                        <div
+                          key={f.id}
+                          className="sm:grid sm:grid-cols-[11rem_minmax(0,1fr)] sm:items-start sm:gap-3"
+                        >
+                          <p className="pb-1 pt-2 text-xs font-medium text-app-secondary sm:pb-0">
+                            {f.name}
+                            {reqLabel}
+                          </p>
+                          <p className="pt-2 text-xs text-app-tertiary">
+                            Файлы с Яндекс.Диска: интерфейс загрузки и списка подключается на следующем
+                            этапе.
+                          </p>
+                        </div>
+                      );
+                    }
+
                     return null;
                   })}
                 </div>

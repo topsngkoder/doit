@@ -9,11 +9,14 @@ export function yandexDiskOAuthStartPath(boardId: string): string {
   return `/api/yandex-disk/oauth/start?${q.toString()}`;
 }
 
-/** GET — 302 на временный URL Яндекса (спец. 11.3: без прикладного кэша между запросами). */
+/** GET — 302 на временный URL Яндекса (спец. 11.3: без прикладного кэша между запросами). YDB5.6: `fieldDefinitionId` в query. */
 export function cardAttachmentDownloadPath(
   boardId: string,
   cardId: string,
-  attachmentId: string
+  attachmentId: string,
+  fieldDefinitionId: string
 ): string {
-  return `/api/boards/${encodeURIComponent(boardId)}/cards/${encodeURIComponent(cardId)}/attachments/${encodeURIComponent(attachmentId)}/download`;
+  const base = `/api/boards/${encodeURIComponent(boardId)}/cards/${encodeURIComponent(cardId)}/attachments/${encodeURIComponent(attachmentId)}/download`;
+  const q = new URLSearchParams({ field_definition_id: fieldDefinitionId });
+  return `${base}?${q.toString()}`;
 }

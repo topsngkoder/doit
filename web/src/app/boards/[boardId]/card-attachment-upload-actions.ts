@@ -33,6 +33,7 @@ export type CardAttachmentUploadPrecheckResult = ValidateCardAttachmentUploadReq
 export async function cardAttachmentUploadPrecheckAction(
   boardId: string,
   cardId: string,
+  fieldDefinitionId: string,
   formData: FormData
 ): Promise<CardAttachmentUploadPrecheckResult> {
   const supabase = await createSupabaseServerClient();
@@ -41,6 +42,7 @@ export async function cardAttachmentUploadPrecheckAction(
   const validated = await validateCardAttachmentUploadRequest(supabase, {
     boardId,
     cardId,
+    fieldDefinitionId,
     files: filesToAttachmentUploadMetaList(files)
   });
   if (!validated.ok) {
@@ -63,6 +65,7 @@ export async function cardAttachmentUploadPrecheckAction(
 export async function cardAttachmentUploadAction(
   boardId: string,
   cardId: string,
+  fieldDefinitionId: string,
   formData: FormData
 ): Promise<CardAttachmentUploadActionResult> {
   const supabase = await createSupabaseServerClient();
@@ -72,6 +75,7 @@ export async function cardAttachmentUploadAction(
   const validated = await validateCardAttachmentUploadRequest(supabase, {
     boardId,
     cardId,
+    fieldDefinitionId,
     files: filesToAttachmentUploadMetaList(files)
   });
   if (!validated.ok) {
@@ -93,7 +97,14 @@ export async function cardAttachmentUploadAction(
 
   // Каждый файл — отдельная цепочка БД/Диска; частичный успех (YDB4.5).
   for (const file of files) {
-    const one = await uploadOneCardAttachmentFile(supabase, userId, boardId, cardId, file);
+    const one = await uploadOneCardAttachmentFile(
+      supabase,
+      userId,
+      boardId,
+      cardId,
+      fieldDefinitionId,
+      file
+    );
     if (one.ok) {
       results.push({ originalName: file.name, ok: true });
     } else {

@@ -26,19 +26,21 @@ function invalidIdsResult(): ResolveCardAttachmentTemporaryDownloadUrlResult {
 }
 
 /**
- * YDB5.1 / YDB5.2 / YDB5.3: на каждый вызов — новая временная ссылка у API Диска; URL не сохраняем в приложении.
+ * YDB5.1 / YDB5.2 / YDB5.3 / YDB5.6: на каждый вызов — новая временная ссылка у API Диска; URL не сохраняем в приложении.
  * Спец. 11.4: если строка `ready` есть, а файла на Диске нет (`not_found` от API) — ответ с
  * {@link YANDEX_DISK_MSG_FILE_NOT_FOUND_ON_DISK}, запись вложения в БД не изменяем и не удаляем.
  * Лимит прикладного кэша URL — {@link CARD_ATTACHMENT_DOWNLOAD_TEMPORARY_URL_MAX_APP_CACHE_SECONDS}.
+ * `fieldDefinitionId` обязателен: выдача ссылки только если вложение относится к этому файловому полю.
  */
 export async function resolveCardAttachmentTemporaryDownloadUrl(
   supabase: SupabaseClient,
-  input: { boardId: string; cardId: string; attachmentId: string }
+  input: { boardId: string; cardId: string; attachmentId: string; fieldDefinitionId: string }
 ): Promise<ResolveCardAttachmentTemporaryDownloadUrlResult> {
   const boardId = normalizeUuidParam(input.boardId);
   const cardId = normalizeUuidParam(input.cardId);
   const attachmentId = normalizeUuidParam(input.attachmentId);
-  if (!boardId || !cardId || !attachmentId) {
+  const fieldDefinitionId = normalizeUuidParam(input.fieldDefinitionId);
+  if (!boardId || !cardId || !attachmentId || !fieldDefinitionId) {
     return invalidIdsResult();
   }
 
@@ -53,6 +55,7 @@ export async function resolveCardAttachmentTemporaryDownloadUrl(
     .eq("id", attachmentId)
     .eq("board_id", boardId)
     .eq("card_id", cardId)
+    .eq("field_definition_id", fieldDefinitionId)
     .eq("status", "ready")
     .maybeSingle();
 
