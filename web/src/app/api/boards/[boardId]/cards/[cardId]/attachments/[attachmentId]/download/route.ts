@@ -11,8 +11,8 @@ const DOWNLOAD_ROUTE_CACHE_CONTROL =
 
 export const dynamic = "force-dynamic";
 
-/** Прокси до 1 GiB на файл; как у POST upload (спец. 10.2). */
-export const maxDuration = 800;
+/** Hobby Vercel допускает максимум 300 с на Serverless Function. */
+export const maxDuration = 300;
 
 /**
  * Скачивание вложения карточки (YDB5.1, YDB5.2, YDB5.6, спец. 11.5): на каждый GET — новый временный URL у API Диска,

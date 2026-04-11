@@ -8,8 +8,8 @@ import { YANDEX_DISK_MSG_AUTH_REQUIRED } from "@/lib/yandex-disk/yandex-disk-pro
 
 export const dynamic = "force-dynamic";
 
-/** До 1 GiB на файл + этап сервер→Яндекс; на Vercel Pro до ~800 с. */
-export const maxDuration = 800;
+/** Hobby Vercel допускает максимум 300 с на Serverless Function. */
+export const maxDuration = 300;
 
 /**
  * POST multipart: `field_definition_id` (string), `files` — один `File` за запрос (YDB8.7: прогресс XHR).
