@@ -767,14 +767,14 @@ function BoardCardRow({
                     target="_blank"
                     rel="noopener noreferrer"
                     title={a.original_file_name}
-                    className="block w-full min-w-0 truncate text-left text-[11px] font-normal text-blue-600 underline-offset-2 hover:underline hover:text-blue-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring)] dark:text-blue-400 dark:hover:text-blue-300"
+                    className="inline-block max-w-full min-w-0 truncate text-left align-top text-[11px] font-normal text-blue-600 underline-offset-2 hover:underline hover:text-blue-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[color:var(--focus-ring)] dark:text-blue-400 dark:hover:text-blue-300"
                     onClick={(e) => e.stopPropagation()}
                     onPointerDown={(e) => e.stopPropagation()}
                   >
                     {a.original_file_name}
                   </a>
                 : <span
-                    className="block w-full min-w-0 truncate text-[11px] text-blue-600 dark:text-blue-400"
+                    className="inline-block max-w-full min-w-0 truncate align-top text-[11px] text-blue-600 dark:text-blue-400"
                     title={a.original_file_name}
                   >
                     {a.original_file_name}
