@@ -1564,7 +1564,8 @@ export function BoardColumnsDnD({
             labelIds: existing?.labelIds ?? [],
             commentsCount: existing?.commentsCount ?? 0,
             fieldValues: existing?.fieldValues ?? {},
-            activityEntries: existing?.activityEntries ?? []
+            activityEntries: existing?.activityEntries ?? [],
+            readyAttachments: existing?.readyAttachments ?? []
           };
           cardsById.set(merged.id, merged);
 
@@ -1596,7 +1597,8 @@ export function BoardColumnsDnD({
               labelIds: [],
               commentsCount: 0,
               fieldValues: {},
-              activityEntries: []
+              activityEntries: [],
+              readyAttachments: []
             };
             cardsById.set(merged.id, merged);
           } else {

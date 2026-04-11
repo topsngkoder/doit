@@ -116,6 +116,11 @@
 | 2026-04-11 | YDB5.4 | `web/src/lib/yandex-disk/delete-card-attachment.ts`: `deleteCardAttachment` — сессия, `can_edit_card_content`, только `status=ready`, активная интеграция + `ensureBoardYandexDiskAccessToken`, `diskDeleteResource` затем `DELETE` строки; `not_found` от Диска → удаление строки (спец. 12.3). Константа `YANDEX_DISK_MSG_NO_DELETE_PERMISSION` (спец. 15.1). `web/src/app/boards/[boardId]/card-attachment-delete-actions.ts`: `deleteCardAttachmentAction` + `revalidatePath`. RLS DELETE уже в YDB1.4. Новых миграций нет; `npx tsc --noEmit` в `web/` — ок. |
 | 2026-04-11 | YDB5.5 | `web/src/lib/yandex-disk/best-effort-delete-yandex-disk-objects-on-card-delete.ts`: `bestEffortDeleteYandexDiskObjectsForCard` — service-role список вложений (`listCardAttachmentsAllStatusesForServiceRole`), пути `yandex_disk` с дедупом; `ensureBoardYandexDiskAccessToken`; цикл `diskDeleteResource` (`not_found` — ок, прочие ошибки — `console.warn`, удаление карточки не блокируется). `deleteCardAction` в `actions.ts`: вызов до `DELETE cards`. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
 | 2026-04-11 | YDB6.1 | Миграция `20260411231500_ydb6_1_get_board_snapshot_yandex_disk_integration.sql`: `get_board_snapshot` дополнен ключом `yandex_disk_integration` — при отсутствии строки интеграции `null`; иначе объект с `status` для всех с `board.view`, а `yandex_login`, `root_folder_path`, `last_authorized_at`, `last_error_text` только если `boards.owner_user_id = auth.uid()` или `is_system_admin` (без токенов). `npx supabase db push` применён. TS-типы snapshot — в YDB6.3. |
+| 2026-04-11 | YDB6.2 | Миграция `20260411233000_ydb6_2_get_board_snapshot_card_ready_attachments.sql`: в `get_board_snapshot` добавлен массив `card_ready_attachments` — только `status = 'ready'`, поля как у UI-списка + `card_id`, JOIN с `cards` по `(id, board_id)`, без `storage_path`. На странице доски snapshot маппится в `BoardCardListItem.readyAttachments`; realtime-merge в `board-columns-dnd` сохраняет поле. Общий тип `CardAttachmentReadyListItem` вынесен в `web/src/lib/card-attachment-ui-types.ts` (клиент + server). `npx supabase db push` и `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB6.3 | `web/src/lib/board-snapshot-types.ts`: `BoardYandexDiskIntegrationStatus`, `BoardYandexDiskIntegrationSnapshot`/`Row`, полный `GetBoardSnapshotResult`, `CardReadyAttachmentSnapshotRow`, `toBoardSnapshotPayload` (единственный узкий cast с RPC). `CardAttachmentListItem` в `card-attachment-ui-types.ts` (каноническое имя YDB6.3), `CardAttachmentReadyListItem` — синоним. `BoardCardListItem.readyAttachments: CardAttachmentListItem[]`. `page.tsx`: убраны локальные типы snapshot, используется `toBoardSnapshotPayload`. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | YDB6.4 | Единый контракт для UI: `web/src/app/boards/[boardId]/board-yandex-disk-ui-server-contract.ts` (`"use server"`) — реэкспорт `disconnectBoardYandexDiskIntegrationAction`, `cardAttachmentUploadAction` / `cardAttachmentUploadPrecheckAction`, `deleteCardAttachmentAction`, `listReadyCardAttachmentsAction` + JSDoc-таблица сценариев. `web/src/lib/yandex-disk/yandex-disk-board-ui-endpoints.ts` — `yandexDiskOAuthStartPath`, `cardAttachmentDownloadPath` (подключение/переподключение и скачивание без дублирования путей в компонентах). Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-11 | fix | Пункт «Яндекс.Диск» не показывался: `canViewYandexDiskIntegration = has("board.view")` всегда false — в `get_board_snapshot` право `board.view` не входит в `v_ui_perm_list`, в `allowed_permissions` не отдаётся. На странице доски после успешного RPC доступ к доске уже подразумевает `board.view` → `canViewYandexDiskIntegration = true` в `page.tsx`. |
+| 2026-04-11 | YDB7.1 | `web/src/app/boards/[boardId]/board-yandex-disk-button.tsx`: кнопка «Яндекс.Диск» + модалка (как `BoardBackgroundButton`), краткий текст, статус из `snapshot.yandex_disk_integration`, логин/путь/`last_error_text` только при деталях из RPC; владелец/sysadmin — ссылка «Подключить или обновить доступ» на `yandexDiskOAuthStartPath`. `board-settings-menu.tsx`: пункт виден при `board.view` (`canViewYandexDiskIntegration`), временная прямая ссылка OAuth убрана. `page.tsx`: прокидывание `yandex_disk_integration`, `canManageYandexDiskIntegration`. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
 
 ### EPIC YDB1 - Подготовить модель данных и миграции
 - [x] **YDB1.1 (done)** Спроектировать таблицу привязки Яндекс.Диска к доске
@@ -267,24 +272,24 @@
   - добавить безопасный срез состояния интеграции без токенов;
   - вернуть: статус, логин аккаунта, путь корневой папки, дату последней успешной авторизации, last_error_text при необходимости для owner-only UI;
   - **DoD**: SSR может отрисовать раздел интеграции без дополнительных клиентских запросов.
-- [ ] **YDB6.2 (todo)** Расширить snapshot или отдельный серверный loader данными вложений карточек
+- [x] **YDB6.2 (done)** Расширить snapshot или отдельный серверный loader данными вложений карточек
   - для каждой карточки нужен список `ready`-вложений;
   - при необходимости добавить агрегаты/флаги доступности интеграции;
-  - **DoD**: `edit-card-modal` получает все нужные данные для блока `Файлы`.
-- [ ] **YDB6.3 (todo)** Обновить TS-типы board/card snapshot
+  - **DoD**: `edit-card-modal` получает все нужные данные для блока `Файлы`. *(Реализовано: плоский `card_ready_attachments` в RPC + `card.readyAttachments`; флаг интеграции уже в `yandex_disk_integration`.)*
+- [x] **YDB6.3 (done)** Обновить TS-типы board/card snapshot
   - добавить `BoardYandexDiskIntegrationSnapshot`;
   - добавить `CardAttachmentListItem`;
   - встроить список вложений в `BoardCardListItem` или в сопутствующую структуру;
   - **DoD**: UI типизирован без `any` и ad-hoc cast'ов.
-- [ ] **YDB6.4 (todo)** Создать server actions / route handlers для UI
+- [x] **YDB6.4 (done)** Создать server actions / route handlers для UI
   - `connect/reconnect/disconnect`;
   - `upload attachments`;
   - `download attachment`;
   - `delete attachment`;
-  - **DoD**: все UI-сценарии вызывают единый server-side контракт.
+  - **DoD**: все UI-сценарии вызывают единый server-side контракт. *(Barrel `board-yandex-disk-ui-server-contract.ts` + endpoints `yandex-disk-board-ui-endpoints.ts`; OAuth start и GET download остаются route handlers, см. JSDoc в barrel.)*
 
 ### EPIC YDB7 - Реализовать UI настроек доски для интеграции
-- [ ] **YDB7.1 (todo)** Создать кнопку/модалку интеграции в `BoardSettingsMenu`
+- [x] **YDB7.1 (done)** Создать кнопку/модалку интеграции в `BoardSettingsMenu`
   - по аналогии с существующими `BoardBackgroundButton`/`BoardFieldsButton`;
   - entry-point должен быть на уровне конкретной доски;
   - **DoD**: у доски появляется отдельный UI-сценарий интеграции Яндекс.Диска.

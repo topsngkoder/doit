@@ -1,11 +1,13 @@
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { BoardCanvas } from "./board-canvas";
+import { toBoardSnapshotPayload } from "@/lib/board-snapshot-types";
 import type {
   BoardLabelOption,
   BoardCardListItem,
   BoardCardPreviewItem,
   CardActivityEntry,
+  CardAttachmentListItem,
   CardFieldValueSnapshot
 } from "./column-types";
 import type { NewCardFieldDefinition } from "./card-field-drafts";
@@ -43,94 +45,7 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
     notFound();
   }
 
-  type SnapshotBoard = {
-    id: string;
-    name: string;
-    background_type: "none" | "image";
-    background_color: string | null;
-    background_image_path: string | null;
-  };
-
-  type SnapshotRole = { id: string; key: string; name: string };
-  type SnapshotMember = {
-    user_id: string;
-    board_role_id: string;
-    is_owner: boolean;
-    display_name: string;
-    email: string;
-    avatar_url: string | null;
-    role_name: string;
-    role_key: string;
-  };
-  type SnapshotColumn = { id: string; name: string; column_type: string; position: number };
-  type SnapshotCard = {
-    id: string;
-    column_id: string;
-    title: string;
-    description: string;
-    position: number;
-    created_by_user_id: string;
-    responsible_user_id: string | null;
-  };
-  type SnapshotLabel = { id: string; name: string; color: string; position: number };
-  type SnapshotFieldOption = { id: string; name: string; color: string; position: number };
-  type SnapshotFieldDefinition = {
-    id: string;
-    name: string;
-    field_type: string;
-    is_required: boolean;
-    position: number;
-    select_options: SnapshotFieldOption[];
-  };
-  type SnapshotPreviewItem = {
-    id: string;
-    item_type: string;
-    field_definition_id: string | null;
-    enabled: boolean;
-    position: number;
-  };
-  type SnapshotCardAssignee = { card_id: string; user_id: string };
-  type SnapshotCardLabel = { card_id: string; label_id: string };
-  type SnapshotCardFieldValue = {
-    card_id: string;
-    field_definition_id: string;
-    text_value: string | null;
-    date_value: string | null;
-    link_url: string | null;
-    link_text: string | null;
-    select_option_id: string | null;
-  };
-  type SnapshotActivity = {
-    id: string;
-    card_id: string;
-    actor_user_id: string;
-    actor_display_name: string;
-    activity_type: string;
-    message: string;
-    created_at: string;
-  };
-
-  type Snapshot = {
-    current_user_id: string;
-    board: SnapshotBoard;
-    is_system_admin: boolean;
-    my_role_id: string | null;
-    allowed_permissions: string[];
-    roles: SnapshotRole[];
-    members: SnapshotMember[];
-    columns: SnapshotColumn[];
-    cards: SnapshotCard[];
-    labels: SnapshotLabel[];
-    field_definitions: SnapshotFieldDefinition[];
-    preview_items: SnapshotPreviewItem[];
-    card_assignees: SnapshotCardAssignee[];
-    card_labels: SnapshotCardLabel[];
-    card_field_values: SnapshotCardFieldValue[];
-    comments_count_by_card: Record<string, number>;
-    activity: SnapshotActivity[];
-  };
-
-  const snapshot = snapshotRaw as unknown as Snapshot;
+  const snapshot = toBoardSnapshotPayload(snapshotRaw);
 
   const board = snapshot.board;
   const allowed = new Set(snapshot.allowed_permissions ?? []);
@@ -157,7 +72,10 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
   const canManageCardFields = has("card_fields.manage");
   const canManageCardPreview = has("card_preview.manage");
   const canChangeBoardBackground = has("board.change_background");
-  const canStartYandexDiskOAuth =
+  // get_board_snapshot уже отсекает вызовы без board.view; в JSON allowed_permissions право
+  // board.view не попадает — его нет в v_ui_perm_list RPC, поэтому has("board.view") всегда false.
+  const canViewYandexDiskIntegration = true;
+  const canManageYandexDiskIntegration =
     snapshot.is_system_admin ||
     (snapshot.members ?? []).some(
       (m) => m.user_id === snapshot.current_user_id && m.is_owner
@@ -255,6 +173,22 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
     activityByCard.set(a.card_id, cur);
   }
 
+  const readyAttachmentsByCardId = new Map<string, CardAttachmentListItem[]>();
+  for (const row of snapshot.card_ready_attachments ?? []) {
+    if (!row?.card_id || !row?.id) continue;
+    const item: CardAttachmentListItem = {
+      id: String(row.id),
+      original_file_name: String(row.original_file_name ?? ""),
+      mime_type: String(row.mime_type ?? ""),
+      size_bytes: Number(row.size_bytes ?? 0),
+      uploaded_at: String(row.uploaded_at ?? ""),
+      uploaded_by_user_id: String(row.uploaded_by_user_id ?? "")
+    };
+    const cur = readyAttachmentsByCardId.get(row.card_id) ?? [];
+    cur.push(item);
+    readyAttachmentsByCardId.set(row.card_id, cur);
+  }
+
   const cardsByColumnId = new Map<string, BoardCardListItem[]>();
 
   for (const col of columns) {
@@ -275,7 +209,8 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
         labelIds: labelIdsByCard.get(row.id) ?? [],
         commentsCount: commentsCountByCard.get(row.id) ?? 0,
         fieldValues: fieldValuesByCard.get(row.id) ?? {},
-        activityEntries: activityByCard.get(row.id) ?? []
+        activityEntries: activityByCard.get(row.id) ?? [],
+        readyAttachments: readyAttachmentsByCardId.get(row.id) ?? []
       });
     }
   }
@@ -356,7 +291,9 @@ export default async function BoardPage({ params, searchParams }: BoardPageProps
             canManageCardFields={canManageCardFields}
             canManageCardPreview={canManageCardPreview}
             canChangeBoardBackground={canChangeBoardBackground}
-            canStartYandexDiskOAuth={canStartYandexDiskOAuth}
+            canViewYandexDiskIntegration={canViewYandexDiskIntegration}
+            canManageYandexDiskIntegration={canManageYandexDiskIntegration}
+            yandexDiskIntegration={snapshot.yandex_disk_integration}
             boardLabels={boardLabels}
             fieldDefinitions={fieldDefinitions}
             previewItems={previewItems}

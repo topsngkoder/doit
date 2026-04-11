@@ -5,8 +5,10 @@ import { BoardLabelsButton } from "./board-labels-button";
 import { BoardFieldsButton } from "./board-fields-button";
 import { BoardCardPreviewButton } from "./board-card-preview-button";
 import { BoardBackgroundButton } from "./board-background-button";
+import { BoardYandexDiskButton } from "./board-yandex-disk-button";
 import type { BoardLabelOption, BoardCardPreviewItem } from "./column-types";
 import type { NewCardFieldDefinition } from "./card-field-drafts";
+import type { BoardYandexDiskIntegrationSnapshot } from "@/lib/board-snapshot-types";
 
 type BoardSettingsMenuProps = {
   boardId: string;
@@ -14,8 +16,11 @@ type BoardSettingsMenuProps = {
   canManageCardFields: boolean;
   canManageCardPreview: boolean;
   canChangeBoardBackground: boolean;
-  /** Временно: старт OAuth Яндекс.Диска (владелец доски или sysadmin). Убрать при готовом UI YDB7.x. */
-  canStartYandexDiskOAuth: boolean;
+  /** Просмотр блока интеграции в настройках (спец. 14 — статус для участников). */
+  canViewYandexDiskIntegration: boolean;
+  /** Подключение / переподключение OAuth (владелец доски или sysadmin). */
+  canManageYandexDiskIntegration: boolean;
+  yandexDiskIntegration: BoardYandexDiskIntegrationSnapshot;
   boardLabels: BoardLabelOption[];
   fieldDefinitions: NewCardFieldDefinition[];
   previewItems: BoardCardPreviewItem[];
@@ -28,7 +33,9 @@ export function BoardSettingsMenu({
   canManageCardFields,
   canManageCardPreview,
   canChangeBoardBackground,
-  canStartYandexDiskOAuth,
+  canViewYandexDiskIntegration,
+  canManageYandexDiskIntegration,
+  yandexDiskIntegration,
   boardLabels,
   fieldDefinitions,
   previewItems,
@@ -43,9 +50,7 @@ export function BoardSettingsMenu({
     canManageCardFields ||
     canManageCardPreview ||
     canChangeBoardBackground ||
-    canStartYandexDiskOAuth;
-
-  const yandexDiskOAuthStartHref = `/api/yandex-disk/oauth/start?boardId=${encodeURIComponent(boardId)}`;
+    canViewYandexDiskIntegration;
 
   const clearCloseTimer = React.useCallback(() => {
     if (!closeTimerRef.current) return;
@@ -168,15 +173,16 @@ export function BoardSettingsMenu({
               onTriggerClick={closeMenuFromAction}
             />
           </div>
-          {canStartYandexDiskOAuth ? (
+          {canViewYandexDiskIntegration ? (
             <div className={itemRevealClass()} style={{ transitionDelay: menuOpen ? "180ms" : "0ms" }}>
-              <a
-                href={yandexDiskOAuthStartHref}
-                className="focus-ring-app inline-flex w-full items-center justify-start rounded-md px-3 py-2 text-left text-xs font-medium text-app-primary hover:bg-app-surface-muted"
-                onClick={closeMenuFromAction}
-              >
-                Яндекс.Диск — OAuth (временно)
-              </a>
+              <BoardYandexDiskButton
+                boardId={boardId}
+                canManageIntegration={canManageYandexDiskIntegration}
+                integration={yandexDiskIntegration}
+                triggerVariant="ghost"
+                triggerClassName="w-full justify-start whitespace-nowrap cursor-pointer hover:bg-app-surface-muted"
+                onTriggerClick={closeMenuFromAction}
+              />
             </div>
           ) : null}
         </div>

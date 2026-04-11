@@ -4,20 +4,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { normalizeUuidParam } from "@/lib/board-id-param";
 
+import type { CardAttachmentReadyListItem } from "@/lib/card-attachment-ui-types";
+
 import { YANDEX_DISK_MSG_AUTH_REQUIRED } from "./yandex-disk-product-messages";
 
-/**
- * Поля списка вложений для UI (спец. 13.4; без `storage_path` и служебных полей).
- * YDB4.6: в постоянном списке только `ready` — см. RLS и явный фильтр ниже.
- */
-export type CardAttachmentReadyListItem = {
-  id: string;
-  original_file_name: string;
-  mime_type: string;
-  size_bytes: number;
-  uploaded_at: string;
-  uploaded_by_user_id: string;
-};
+export type { CardAttachmentReadyListItem };
+
+/** YDB4.6: в постоянном списке только `ready` — см. RLS и явный фильтр ниже. */
 
 export type ListReadyCardAttachmentsResult =
   | { ok: true; attachments: CardAttachmentReadyListItem[] }
