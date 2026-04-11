@@ -88,6 +88,12 @@
 |------|--------|-------------|
 | 2026-04-10 | YDB1.1 | Миграция `20260410180000_board_yandex_disk_integrations.sql`: таблица `board_yandex_disk_integrations`, поля по спец. 7.1, `UNIQUE(board_id)`, индекс по `status`, CHECK статусов, FK на `boards` CASCADE и `profiles` SET NULL, токены nullable для состояний без секрета, RLS включён без политик (политики — YDB1.4), триггер `updated_at`. `supabase db push` применён. |
 | 2026-04-10 | YDB1.2 | Миграция `20260410181000_card_attachments.sql`: таблица `card_attachments`, поля по спец. 7.2, `storage_provider` с CHECK `yandex_disk`, статусы `uploading|ready|failed`, индексы на `card_id`, `board_id`, `status`, FK `board_id`/`card_id` CASCADE, `uploaded_by_user_id` → `profiles` RESTRICT, RLS без политик. `supabase db push` применён. |
+| 2026-04-11 | YDB1.3 | Миграция `20260411120000_ydb1_3_fk_delete_rules.sql`: `UNIQUE (id, board_id)` на `cards` для цели составного FK; `card_attachments (card_id, board_id) REFERENCES cards (id, board_id) ON DELETE CASCADE`; комментарии к таблицам/ограничению про спец. 9.6 (disconnect ≠ удаление на Диске), 12.4 (каскад БД при удалении карточки, провайдер — приложение). `supabase db push` применён. |
+| 2026-04-11 | YDB1.4 | Миграция `20260411143000_ydb1_4_rls_integrations_attachments.sql`: функция `can_edit_card_content(uuid)` (как у `card_field_values`); `REVOKE SELECT` на `board_yandex_disk_integrations` для `authenticated`/`anon` (клиент не читает токены); политики INSERT/UPDATE/DELETE интеграции — только `boards.owner_user_id` или sysadmin; `card_attachments`: SELECT только `status = 'ready'` + `board.view` + согласованная пара `(card_id, board_id)`; INSERT/UPDATE — право редактирования содержимого карточки, `uploaded_by_user_id = auth.uid()` на INSERT; DELETE — то же или `cards.delete_any` / `delete_own` по карточке (для CASCADE при удалении карточки). `npx supabase db push` применён (вместе с YDB1.5). |
+| 2026-04-11 | YDB1.5 | Миграция `20260411160000_ydb1_5_status_checks_documented.sql`: CHECK на статусы уже заданы в YDB1.1/YDB1.2 (`active|reauthorization_required|disconnected|error` и `uploading|ready|failed`); добавлены `COMMENT ON CONSTRAINT` для каталожной фиксации допустимых значений. `npx supabase db push` применён. |
+| 2026-04-11 | YDB2.1 | `web/src/lib/yandex-disk/integration-env.ts`: `getYandexDiskIntegrationEnv()` с `import "server-only"`, ленивая валидация `YANDEX_DISK_OAUTH_*` и `YANDEX_DISK_TOKEN_ENCRYPTION_KEY` (мин. длина ключа 32), проверка абсолютного http(s) redirect URI; понятные `Error` на русском. Зависимость `server-only`. Пример переменных в `web/.env.local.example`. Миграций нет. |
+| 2026-04-11 | YDB2.2 | `web/src/lib/yandex-disk/token-crypto.ts`: `encryptSecret` / `decryptSecret`, `server-only`, ключ из `getYandexDiskIntegrationEnv()`, производный AES-256 ключ через SHA-256 от passphrase; хранение `v1.` + base64url(iv12 ‖ tag16 ‖ ct), AES-256-GCM; пустой plaintext запрещён; v2 можно добавить отдельным префиксом. Комментарий в `.env.local.example` про неизменность ключа. Миграций нет. |
+| 2026-04-11 | YDB2.3 | `web/src/lib/yandex-disk/yandex-disk-client.ts`: server-only клиент OAuth (`exchangeAuthorizationCodeForTokens`, `refreshAccessToken` → `oauth.yandex.com/token`) и REST Диска (`cloud-api.yandex.net/v1/disk`): `fetchLoginProfile`, `getDiskResourceMeta`, `diskResourceExists`, `diskCreateFolder`, `diskEnsureFolder`, `diskEnsureFolderChain`, `diskGetUploadLink`, `diskGetDownloadLink`, `diskDeleteResource`, `diskPutUpload`. Ошибки через `YandexDiskClientError` + коды (`oauth_invalid_grant`, `unauthorized`, `not_found`, `already_exists`, и т.д.) для YDB2.4. Миграций нет. |
 
 ### EPIC YDB1 - Подготовить модель данных и миграции
 - [x] **YDB1.1 (done)** Спроектировать таблицу привязки Яндекс.Диска к доске
@@ -100,31 +106,31 @@
   - `storage_provider` в этой доработке фиксирован на Yandex Disk, но поле всё равно сохраняется как часть продуктового контракта;
   - предусмотреть индексы по `card_id`, `board_id`, `status`;
   - **DoD**: таблица позволяет отдельно хранить `uploading`, `ready`, `failed` и быстро строить список файлов карточки.
-- [ ] **YDB1.3 (todo)** Зафиксировать внешние ключи и delete-правила
+- [x] **YDB1.3 (done)** Зафиксировать внешние ключи и delete-правила
   - вложения должны каскадно удаляться при удалении карточки или удаляться через серверный сценарий с Яндекс.Диском до cleanup БД;
   - интеграция доски не должна каскадно физически удалять файлы из Яндекс.Диска при `disconnected`;
   - **DoD**: SQL-структура не противоречит правилам разделов 9.6 и 12.4.
-- [ ] **YDB1.4 (todo)** Добавить RLS/policies или RPC-слой для чтения и мутаций
+- [x] **YDB1.4 (done)** Добавить RLS/policies или RPC-слой для чтения и мутаций
   - чтение `ready`-вложений должно соответствовать праву просмотра карточки;
   - insert/update/delete интеграции должен быть owner-only;
   - мутации вложений должны быть завязаны на права редактирования/просмотра карточки;
   - **DoD**: прямой client-side обход правил через таблицы невозможен.
-- [ ] **YDB1.5 (todo)** Подготовить миграцию на enum-like CHECK/константы статусов
+- [x] **YDB1.5 (done)** Подготовить миграцию на enum-like CHECK/константы статусов
   - интеграция: `active | reauthorization_required | disconnected | error`;
   - вложения: `uploading | ready | failed`;
-  - **DoD**: БД не принимает посторонние статусы.
+  - **DoD**: БД не принимает посторонние статусы (CHECK в YDB1.1/YDB1.2; YDB1.5 — комментарии к ограничениям + запись в журнале миграций).
 
 ### EPIC YDB2 - Подготовить серверную инфраструктуру Яндекс.Диска
-- [ ] **YDB2.1 (todo)** Создать server-only конфигурацию интеграции
+- [x] **YDB2.1 (done)** Создать server-only конфигурацию интеграции
   - env для OAuth client id / client secret / redirect URI / encryption key;
   - явная валидация env на сервере;
   - **DoD**: отсутствие обязательных env даёт понятную ошибку на сервере, а не тихую поломку.
-- [ ] **YDB2.2 (todo)** Создать crypto helper для шифрования токенов
+- [x] **YDB2.2 (done)** Создать crypto helper для шифрования токенов
   - `encryptSecret(...)` / `decryptSecret(...)`;
   - формат хранения должен быть стабильным и версионируемым;
   - helper должен использовать только server-side API;
   - **DoD**: access/refresh token нигде не сохраняются в открытом виде.
-- [ ] **YDB2.3 (todo)** Создать модуль клиента Яндекс.Диска
+- [x] **YDB2.3 (done)** Создать модуль клиента Яндекс.Диска
   - обмен auth code на токены;
   - refresh access token;
   - получение информации об аккаунте;
