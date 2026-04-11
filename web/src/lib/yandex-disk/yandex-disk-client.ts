@@ -318,6 +318,101 @@ export async function diskResourceExists(accessToken: string, path: string): Pro
   return meta !== null;
 }
 
+export type DiskDirectoryListItem = {
+  path: string;
+  type: "file" | "dir";
+  name: string;
+};
+
+function normalizeDiskApiResourcePath(path: string): string {
+  const t = path.trim();
+  if (t.startsWith("disk:")) {
+    const rest = t.slice("disk:".length).replace(/^\/+/, "");
+    return normalizeDiskPath(`/${rest}`);
+  }
+  return normalizeDiskPath(t);
+}
+
+type DiskResourcesListJson = {
+  type?: string;
+  _embedded?: {
+    items?: unknown[];
+    total?: number;
+    limit?: number;
+    offset?: number;
+  };
+};
+
+function parseDiskDirectoryItems(body: unknown): DiskDirectoryListItem[] {
+  const o = body && typeof body === "object" ? (body as DiskResourcesListJson) : {};
+  const raw = o._embedded?.items;
+  if (!Array.isArray(raw)) return [];
+  const out: DiskDirectoryListItem[] = [];
+  for (const it of raw) {
+    if (!it || typeof it !== "object") continue;
+    const r = it as { path?: unknown; type?: unknown; name?: unknown };
+    if (typeof r.path !== "string" || (r.type !== "file" && r.type !== "dir") || typeof r.name !== "string") {
+      continue;
+    }
+    out.push({
+      path: normalizeDiskApiResourcePath(r.path),
+      type: r.type,
+      name: r.name
+    });
+  }
+  return out;
+}
+
+/**
+ * Постраничный листинг непосредственных детей каталога (файлы и подпапки).
+ * Путь не существует → пустой массив; путь — файл → ошибка `bad_request`.
+ */
+export async function diskListDirectoryPage(
+  accessToken: string,
+  path: string,
+  options?: { limit?: number; offset?: number }
+): Promise<DiskDirectoryListItem[]> {
+  const p = normalizeDiskPath(path);
+  const limit = Math.min(Math.max(options?.limit ?? 200, 1), 1000);
+  const offset = Math.max(options?.offset ?? 0, 0);
+  const q = new URLSearchParams({
+    path: p,
+    limit: String(limit),
+    offset: String(offset)
+  });
+  const res = await fetchDisk(accessToken, `/resources?${q.toString()}`, { method: "GET" });
+  const body = await safeReadJson(res);
+  if (res.status === 404) return [];
+  assertDiskError(res, body);
+  const o = body && typeof body === "object" ? (body as DiskResourcesListJson) : {};
+  if (o.type === "file") {
+    throw new YandexDiskClientError(
+      `Яндекс.Диск: ожидалась папка для листинга, по пути «${p}» найден файл.`,
+      "bad_request",
+      { httpStatus: res.status }
+    );
+  }
+  return parseDiskDirectoryItems(body);
+}
+
+/**
+ * Все непосредственные дети каталога (с пагинацией по API Диска).
+ */
+export async function diskListDirectoryAll(
+  accessToken: string,
+  path: string
+): Promise<DiskDirectoryListItem[]> {
+  const pageSize = 200;
+  const acc: DiskDirectoryListItem[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const page = await diskListDirectoryPage(accessToken, path, { limit: pageSize, offset });
+    if (page.length === 0) break;
+    acc.push(...page);
+    if (page.length < pageSize) break;
+  }
+  return acc;
+}
+
 /**
  * Создать папку по пути (один сегмент пути; родитель должен существовать).
  */

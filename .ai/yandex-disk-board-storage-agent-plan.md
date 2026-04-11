@@ -147,6 +147,10 @@
 | 2026-04-11 | YDB8.4 | Спец. 13.3/13.5: `YandexDiskCardFieldAttachmentsSection` в `edit-card-modal.tsx` — скрытый `input[type=file][multiple]`, кнопка «Добавить файлы», DnD только внутри `role="region"` поля (`onDrop` на зоне поля); индикатор «Загрузка…» при `cardAttachmentUploadAction`; ошибки по полю в блоке; частичный batch — текст по файлам; при загрузке в одном поле остальные поля `yandex_disk` временно отключены; список + зона «добавить ещё» при наличии `ready`. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
 | 2026-04-11 | YDB8.5 | Поведение при недоступной интеграции доведено в карточке и создании карточки: `board-yandex-disk-integration-context.tsx`/`board-canvas.tsx` теперь прокидывают `canManageIntegration` в клиентский контекст; `yandex-disk-card-field-empty-copy.ts` — `getYandexDiskCardFieldUnavailableCopy()` с product-safe причиной недоступности и owner-only подсказкой для `reauthorization_required`; `edit-card-modal.tsx` показывает причину недоступности поля даже при уже существующих файлах и скрывает интерактив при неактивной интеграции; `create-card-modal.tsx` показывает ту же причину и owner-only next step. `npx tsc --noEmit` в `web/` — ок. |
 | 2026-04-11 | YDB8.6 | Аудит запрещённых точек входа по спекам 13.x: `cardAttachmentUploadAction` используется только из `edit-card-modal.tsx`; единственный `input[type=file]` для вложений находится внутри `YandexDiskCardFieldAttachmentsSection`; `onDrop` есть только в зоне конкретного поля внутри открытой карточки; в `create-card-modal.tsx` загрузка до создания карточки отсутствует; UI вложений не содержит rename attachment и preview внутри приложения, только `Скачать`/`Удалить`. Дополнительных кодовых правок не потребовалось. |
+| 2026-04-11 | YDB9.1 | Миграция `20260412140000_ydb9_1_cleanup_failed_card_attachments.sql`: частичный индекс `card_attachments_failed_uploaded_at_idx` на `uploaded_at` для `status = 'failed'`; RPC `cleanup_failed_card_attachments_older_than(p_min_age_hours default 24)` (SECURITY DEFINER) — DELETE строк `failed` с `uploaded_at < now() - interval`, возврат числа удалённых; `GRANT EXECUTE` только `service_role`, `REVOKE` от `PUBLIC`. `web/src/lib/yandex-disk/cleanup-failed-card-attachments.ts`: `cleanupFailedCardAttachmentsOlderThan` для service-role клиента. Файлы на Диске при failed-upload — зона YDB9.2. `npx supabase db push`, `npx tsc --noEmit` в `web/` — ок. Периодический запуск — YDB9.3. |
+| 2026-04-11 | YDB9.2 | Миграция `20260412150000_ydb9_2_yandex_disk_orphan_attachment_paths.sql`: таблица `yandex_disk_orphan_attachment_paths` (`board_id`, `disk_path`, `first_detected_at`, UNIQUE пары), RLS + только `service_role`. `yandex-disk-client.ts`: `diskListDirectoryPage` / `diskListDirectoryAll` (пагинация). `cleanup-orphan-yandex-disk-card-attachment-files.ts`: обход `/doit/boards/<boardId>/cards/` (файлы у корня + в подпапках-UUID карточек), сопоставление с `card_attachments.storage_path`, учёт сирот с SLA 24 ч (`minAgeHours`), удаление с Диска + строки учёта; снятие учёта при появлении вложения в БД; удаление устаревших записей учёта, если файла на Диске уже нет. `npx supabase db push`, `npx tsc --noEmit` в `web/` — ок. Вызов по cron/endpoint — YDB9.3. |
+| 2026-04-11 | YDB9.3 | `GET|POST /api/cron/yandex-disk-cleanup`: авторизация `Authorization: Bearer` — `YANDEX_DISK_CLEANUP_CRON_SECRET` → `NOTIFICATION_OUTBOX_CRON_SECRET` → `CRON_SECRET` (как outbox + Vercel Cron). Подряд: `cleanupFailedCardAttachmentsOlderThan`, `cleanupOrphanYandexDiskCardAttachmentFiles` (service-role). Query: `minAgeHours` (оба шага), `boardId` (только сироты, UUID). `vercel.json`: cron `30 9 * * *`. `web/.env.local.example` — закомментированный `YANDEX_DISK_CLEANUP_CRON_SECRET`; `README.md` — строка про расписание. `maxDuration=60`, `nodejs`. Миграций нет; `npx supabase db push` — БД актуальна; `npx tsc --noEmit` в `web/` — ок. Структурированные логи cleanup — YDB9.4. |
+| 2026-04-11 | YDB9.4 | `yandex-disk-cleanup-logger.ts`: JSON-строки в stdout с `scope: yandex_disk_cleanup` + `event` + поля (без токенов). `cleanup-failed-card-attachments.ts` — `failed_attachments_rpc_error` / `failed_attachments_rpc_unexpected_payload`. `cleanup-orphan-yandex-disk-card-attachment-files.ts` — интеграции/БД/Диск (`orphan_integrations_list_failed`, `orphan_disk_list_*`, `orphan_disk_delete_failed`, `orphan_*_observation_*`, `orphan_attachment_*`), агрегат `orphan_cleanup_boards_skipped_aggregate`. `ensureBoardYandexDiskAccessToken(..., { cleanupDiagnostics: true })` из orphan-прохода: недействительная интеграция / отзыв refresh (`oauth_refresh_fatal_revoked_or_invalid` + `client_error_code`) / ошибки провайдера при refresh (`oauth_refresh_provider_error`), decrypt/persist/read. `yandex-disk-cleanup/route.ts` — предупреждения при `ok: false` шагов, `cron_run_unhandled_exception`. Миграций нет; `npx tsc --noEmit` в `web/` — ок. |
 
 ### EPIC YDB1 - Подготовить модель данных и миграции
 - [x] **YDB1.1 (done)** Спроектировать таблицу привязки Яндекс.Диска к доске
@@ -382,20 +386,20 @@
   - **DoD**: UI не добавляет сценарии, запрещённые спецификацией. *(Проверено аудитом текущего UI: upload/DnD только внутри `edit-card-modal.tsx` и конкретного поля `yandex_disk`; иных entry-point'ов, rename и preview не найдено.)*
 
 ### EPIC YDB9 - Реализовать cleanup и консистентность
-- [ ] **YDB9.1 (todo)** Подготовить cleanup `failed`-вложений
+- [x] **YDB9.1 (done)** Подготовить cleanup `failed`-вложений
   - искать записи `failed` старше 24 часов;
   - удалять их из БД;
-  - **DoD**: `failed`-мусор автоматически вычищается в заданный SLA.
-- [ ] **YDB9.2 (todo)** Подготовить cleanup осиротевших файлов в Яндекс.Диске
+  - **DoD**: `failed`-мусор автоматически вычищается в заданный SLA. *(RPC + хелпер; автозапуск по расписанию — YDB9.3.)*
+- [x] **YDB9.2 (done)** Подготовить cleanup осиротевших файлов в Яндекс.Диске
   - сканировать папки досок/карточек;
   - искать файлы, для которых нет attachment row;
   - удалять такие файлы не позднее 24 часов после обнаружения;
   - **DoD**: provider-side orphan files не копятся бесконтрольно.
-- [ ] **YDB9.3 (todo)** Зафиксировать механизм запуска cleanup
+- [x] **YDB9.3 (done)** Зафиксировать механизм запуска cleanup
   - cron job / scheduled task / отдельный служебный endpoint;
   - безопасный запуск только на сервере;
   - **DoD**: cleanup можно реально выполнять, а не только описать в коде.
-- [ ] **YDB9.4 (todo)** Логировать проблемные случаи cleanup
+- [x] **YDB9.4 (done)** Логировать проблемные случаи cleanup
   - недействительная интеграция;
   - revoked tokens;
   - provider-side API failures;

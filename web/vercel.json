@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/process-notification-outbox",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/yandex-disk-cleanup",
+      "schedule": "30 9 * * *"
     }
   ]
 }

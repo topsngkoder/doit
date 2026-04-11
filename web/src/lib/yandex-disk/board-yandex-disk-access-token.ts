@@ -11,6 +11,10 @@ import {
   YANDEX_DISK_MSG_YANDEX_SERVICE_UNAVAILABLE,
   mapYandexDiskClientErrorToProductMessage
 } from "./yandex-disk-product-messages";
+import {
+  logYandexDiskCleanup,
+  yandexDiskClientErrorFields
+} from "./yandex-disk-cleanup-logger";
 
 const DEFAULT_SKEW_SECONDS = 120;
 
@@ -103,9 +107,10 @@ async function persistReauthorizationRequired(boardId: string): Promise<void> {
  */
 export async function ensureBoardYandexDiskAccessToken(
   boardId: string,
-  options?: { skewSeconds?: number }
+  options?: { skewSeconds?: number; cleanupDiagnostics?: boolean }
 ): Promise<EnsureBoardYandexDiskAccessTokenResult> {
   const skewSeconds = options?.skewSeconds ?? DEFAULT_SKEW_SECONDS;
+  const diag = options?.cleanupDiagnostics === true;
   const admin = getSupabaseServiceRoleClient();
 
   const { data: row, error: readError } = await admin
@@ -116,6 +121,12 @@ export async function ensureBoardYandexDiskAccessToken(
 
   if (readError) {
     console.error("board_yandex_disk_integrations read (service):", readError.message);
+    if (diag) {
+      logYandexDiskCleanup("error", "integration_read_failed", {
+        board_id: boardId,
+        db_error: readError.message
+      });
+    }
     return {
       ok: false,
       kind: "refresh_transient",
@@ -124,12 +135,21 @@ export async function ensureBoardYandexDiskAccessToken(
   }
 
   if (!row) {
+    if (diag) {
+      logYandexDiskCleanup("warn", "integration_row_missing", { board_id: boardId });
+    }
     return { ok: false, kind: "not_found", message: YANDEX_DISK_MSG_NOT_CONNECTED };
   }
 
   const integration = row as IntegrationRow;
 
   if (integration.status === "disconnected") {
+    if (diag) {
+      logYandexDiskCleanup("warn", "integration_disconnected", {
+        board_id: boardId,
+        integration_status: integration.status
+      });
+    }
     return {
       ok: false,
       kind: "disconnected",
@@ -143,6 +163,12 @@ export async function ensureBoardYandexDiskAccessToken(
     integration.status === "error";
 
   if (!canAttemptDisk) {
+    if (diag) {
+      logYandexDiskCleanup("warn", "integration_status_unexpected", {
+        board_id: boardId,
+        integration_status: integration.status
+      });
+    }
     return {
       ok: false,
       kind: "reauthorization_required",
@@ -152,6 +178,12 @@ export async function ensureBoardYandexDiskAccessToken(
 
   if (!integration.encrypted_refresh_token) {
     await persistReauthorizationRequired(boardId);
+    if (diag) {
+      logYandexDiskCleanup("warn", "integration_missing_refresh_token", {
+        board_id: boardId,
+        integration_status: integration.status
+      });
+    }
     return {
       ok: false,
       kind: "missing_tokens",
@@ -165,6 +197,13 @@ export async function ensureBoardYandexDiskAccessToken(
   } catch (e) {
     console.error("Yandex Disk: decrypt refresh_token failed", e);
     await persistReauthorizationRequired(boardId);
+    if (diag) {
+      logYandexDiskCleanup("error", "token_decrypt_failed", {
+        board_id: boardId,
+        integration_status: integration.status,
+        which: "refresh"
+      });
+    }
     return {
       ok: false,
       kind: "reauthorization_required",
@@ -179,6 +218,13 @@ export async function ensureBoardYandexDiskAccessToken(
     } catch (e) {
       console.error("Yandex Disk: decrypt access_token failed", e);
       await persistReauthorizationRequired(boardId);
+      if (diag) {
+        logYandexDiskCleanup("error", "token_decrypt_failed", {
+          board_id: boardId,
+          integration_status: integration.status,
+          which: "access"
+        });
+      }
       return {
         ok: false,
         kind: "reauthorization_required",
@@ -198,12 +244,26 @@ export async function ensureBoardYandexDiskAccessToken(
     const bundle = await refreshAccessToken(refreshPlain);
     const persisted = await persistRefreshedTokens(boardId, bundle);
     if (!persisted.ok) {
+      if (diag) {
+        logYandexDiskCleanup("warn", "persist_tokens_after_refresh_failed", {
+          board_id: boardId,
+          integration_status: integration.status
+        });
+      }
       return { ok: false, kind: "refresh_transient", message: persisted.message };
     }
     return { ok: true, accessToken: bundle.accessToken };
   } catch (e) {
     if (e instanceof YandexDiskClientError && isFatalOAuthRefreshFailure(e)) {
       await persistReauthorizationRequired(boardId);
+      if (diag) {
+        logYandexDiskCleanup("warn", "oauth_refresh_fatal_revoked_or_invalid", {
+          board_id: boardId,
+          integration_status: integration.status,
+          oauth_grant_type: e.oauthGrantType ?? "refresh_token",
+          ...yandexDiskClientErrorFields(e)
+        });
+      }
       return {
         ok: false,
         kind: "reauthorization_required",
@@ -215,10 +275,24 @@ export async function ensureBoardYandexDiskAccessToken(
       const msg =
         mapYandexDiskClientErrorToProductMessage(e, "oauth_refresh") ??
         YANDEX_DISK_MSG_REAUTHORIZATION_REQUIRED;
+      if (diag) {
+        logYandexDiskCleanup("warn", "oauth_refresh_provider_error", {
+          board_id: boardId,
+          integration_status: integration.status,
+          oauth_grant_type: e.oauthGrantType ?? "refresh_token",
+          ...yandexDiskClientErrorFields(e)
+        });
+      }
       return { ok: false, kind: "refresh_transient", message: msg };
     }
 
     console.error("Yandex Disk: unexpected refresh error", e);
+    if (diag) {
+      logYandexDiskCleanup("error", "oauth_refresh_unexpected_error", {
+        board_id: boardId,
+        integration_status: integration.status
+      });
+    }
     return {
       ok: false,
       kind: "refresh_transient",
