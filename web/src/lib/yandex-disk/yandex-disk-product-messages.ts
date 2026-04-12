@@ -70,6 +70,13 @@ export const YANDEX_DISK_MSG_UPLOAD_FAILED = "Не удалось загрузи
 export const YANDEX_DISK_MSG_DOWNLOAD_FAILED = "Не удалось скачать файл из Яндекс.Диска." as const;
 export const YANDEX_DISK_MSG_DELETE_FAILED = "Не удалось удалить файл из Яндекс.Диска." as const;
 
+/** Заголовок внутреннего уведомления при сбое удаления вложения (YDB8.9, «технические уведомления»). */
+export const YANDEX_DISK_TECH_NOTIFY_DELETE_ATTACHMENT_TITLE =
+  "Не удалось удалить файл из карточки" as const;
+/** Текст уведомления до строки с деталями ошибки. */
+export const YANDEX_DISK_TECH_NOTIFY_DELETE_ATTACHMENT_BODY_INTRO =
+  "Файл по-прежнему отображается в карточке. Ниже — причина сбоя." as const;
+
 /**
  * Нет отдельной строки в разделе 15 для сетевых/неизвестных сбоев OAuth и login.yandex.ru;
  * используется вместо сырого текста провайдера.

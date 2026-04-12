@@ -11,7 +11,7 @@
  * | Отключить | `disconnectBoardYandexDiskIntegrationAction` |
  * | Загрузка | Текущий UI с прогрессом: POST `cardAttachmentUploadApiPath(boardId, cardId)` + `FormData`; direct-upload prepare: POST `cardAttachmentPrepareUploadApiPath(boardId, cardId)` с JSON `{ field_definition_id, file }`; server actions: `cardAttachmentPrepareUploadAction`, `cardAttachmentUploadAction`; precheck — `cardAttachmentUploadPrecheckAction` |
  * | Скачать | GET `cardAttachmentDownloadPath(boardId, cardId, attachmentId, fieldDefinitionId)` — ответ с телом файла и именем из БД (`original_file_name`, спец. 11.5) |
- * | Удалить | `deleteCardAttachmentAction(boardId, cardId, attachmentId, fieldDefinitionId)` |
+ * | Удалить | `deleteCardAttachmentAction(...)` — при ошибке ставит техническое уведомление (`event_type: technical`, настройки уведомлений) |
  * | Список вне snapshot | `listReadyCardAttachmentsAction(boardId, cardId, fieldDefinitionId)` |
  */
 

@@ -6,7 +6,8 @@ const EVENT_LABEL: Record<NotificationEventType, string> = {
   card_comment_new: "Новый комментарий",
   card_moved: "Перемещение карточки",
   card_in_progress: "Карточка в работе",
-  card_ready: "Карточка готова"
+  card_ready: "Карточка готова",
+  technical: "Техническое уведомление"
 };
 
 type FormatOutboxEmailInput = {

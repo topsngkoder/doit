@@ -189,11 +189,7 @@ function YandexDiskCardFieldAttachmentsSection({
   uploadProgress,
   uploadError,
   onUpload,
-  yandexAttachmentDeletingId,
-  setYandexAttachmentDeletingId,
-  onDeleteAttachmentError,
-  onAfterYandexAttachmentMutation,
-  router
+  onDeleteAttachment
 }: {
   boardId: string;
   cardId: string;
@@ -213,12 +209,8 @@ function YandexDiskCardFieldAttachmentsSection({
   uploadProgress: YandexCardAttachmentUploadProgress | null;
   uploadError: string | undefined;
   onUpload: (files: File[]) => void | Promise<void>;
-  yandexAttachmentDeletingId: string | null;
-  setYandexAttachmentDeletingId: React.Dispatch<React.SetStateAction<string | null>>;
-  onDeleteAttachmentError: React.Dispatch<React.SetStateAction<string | null>>;
-  /** После успешного удаления: подтянуть актуальный список `ready` в локальный state доски (в обход кэша RSC). */
-  onAfterYandexAttachmentMutation?: () => void | Promise<void>;
-  router: ReturnType<typeof useRouter>;
+  /** YDB8.9: оптимистичное скрытие строки — родитель сразу убирает вложение из списка и вызывает server action в фоне. */
+  onDeleteAttachment: (attachmentId: string) => void;
 }) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = React.useState(false);
@@ -286,33 +278,13 @@ function YandexDiskCardFieldAttachmentsSection({
                       {canDeleteThisField ?
                         <button
                           type="button"
-                          disabled={
-                            yandexAttachmentDeletingId !== null ||
-                            formPending ||
-                            uploadingFieldId !== null
-                          }
+                          disabled={formPending || uploadingFieldId !== null}
                           onClick={() => {
-                            onDeleteAttachmentError(null);
-                            setYandexAttachmentDeletingId(a.id);
-                            void (async () => {
-                              const res = await deleteCardAttachmentAction(
-                                boardId,
-                                cardId,
-                                a.id,
-                                fieldId
-                              );
-                              setYandexAttachmentDeletingId(null);
-                              if (!res.ok) {
-                                onDeleteAttachmentError(res.message);
-                                return;
-                              }
-                              await onAfterYandexAttachmentMutation?.();
-                              router.refresh();
-                            })();
+                            onDeleteAttachment(a.id);
                           }}
                           className="text-xs font-medium text-app-validation-error underline-offset-2 hover:underline disabled:opacity-50"
                         >
-                          {yandexAttachmentDeletingId === a.id ? "Удаление…" : "Удалить"}
+                          Удалить
                         </button>
                       : null}
                     </div>
@@ -544,12 +516,8 @@ export function EditCardModal({
   const [openLabelMenuId, setOpenLabelMenuId] = React.useState<string | "new" | null>(null);
   const [isEditingTitle, setIsEditingTitle] = React.useState(false);
   const titleInputRef = React.useRef<HTMLInputElement>(null);
-  const [yandexAttachmentDeletingId, setYandexAttachmentDeletingId] = React.useState<string | null>(
-    null
-  );
-  const [yandexAttachmentDeleteError, setYandexAttachmentDeleteError] = React.useState<string | null>(
-    null
-  );
+  const [optimisticRemovedYandexAttachmentIds, setOptimisticRemovedYandexAttachmentIds] =
+    React.useState<Set<string>>(() => new Set());
   const [yandexAttachmentUploadingFieldId, setYandexAttachmentUploadingFieldId] = React.useState<
     string | null
   >(null);
@@ -573,8 +541,7 @@ export function EditCardModal({
     setPending(false);
     setConfirmDelete(false);
     setIsEditingTitle(false);
-    setYandexAttachmentDeletingId(null);
-    setYandexAttachmentDeleteError(null);
+    setOptimisticRemovedYandexAttachmentIds(new Set());
     setYandexAttachmentUploadingFieldId(null);
     setYandexAttachmentUploadProgress(null);
     setYandexAttachmentUploadErrorByFieldId({});
@@ -644,6 +611,30 @@ export function EditCardModal({
       }
     },
     [boardId, card, onYandexFieldReadyAttachmentsSynced]
+  );
+
+  const handleYandexAttachmentDelete = React.useCallback(
+    (fieldId: string, attachmentId: string) => {
+      if (!card) return;
+      setOptimisticRemovedYandexAttachmentIds((prev) => new Set(prev).add(attachmentId));
+      const prevList = card.readyAttachmentsByFieldId[fieldId] ?? [];
+      onYandexFieldReadyAttachmentsSynced?.(
+        card.id,
+        fieldId,
+        prevList.filter((a) => a.id !== attachmentId)
+      );
+      void (async () => {
+        await deleteCardAttachmentAction(boardId, card.id, attachmentId, fieldId);
+        setOptimisticRemovedYandexAttachmentIds((prev) => {
+          const next = new Set(prev);
+          next.delete(attachmentId);
+          return next;
+        });
+        await pullYandexReadyAttachmentsForField(fieldId);
+        router.refresh();
+      })();
+    },
+    [boardId, card, onYandexFieldReadyAttachmentsSynced, pullYandexReadyAttachmentsForField, router]
   );
 
   const handleYandexDiskFieldUpload = React.useCallback(
@@ -1066,11 +1057,6 @@ export function EditCardModal({
               return (
                 <div className="space-y-4 border-t border-app-divider pt-4">
                   <p className="text-xs font-medium text-app-secondary">Поля доски</p>
-                  {yandexAttachmentDeleteError ?
-                    <p className="text-xs text-app-validation-error" role="alert">
-                      {yandexAttachmentDeleteError}
-                    </p>
-                  : null}
                   {sortedFields.map((f) => {
                     const d = fieldDrafts[f.id];
                     const reqLabel = f.isRequired ? " *" : "";
@@ -1221,8 +1207,9 @@ export function EditCardModal({
                     }
 
                     if (f.fieldType === "yandex_disk" && d.fieldType === "yandex_disk") {
-                      const attachments: CardAttachmentListItem[] =
-                        card.readyAttachmentsByFieldId[f.id] ?? [];
+                      const attachments: CardAttachmentListItem[] = (
+                        card.readyAttachmentsByFieldId[f.id] ?? []
+                      ).filter((a) => !optimisticRemovedYandexAttachmentIds.has(a.id));
                       const yandexIntegrationActive = yandexDiskIntegration?.status === "active";
                       const canOfferYandexUpload = canEditContent && yandexIntegrationActive;
                       const canDownloadThisField =
@@ -1261,13 +1248,9 @@ export function EditCardModal({
                           onUpload={(files) => {
                             void handleYandexDiskFieldUpload(f.id, files);
                           }}
-                          yandexAttachmentDeletingId={yandexAttachmentDeletingId}
-                          setYandexAttachmentDeletingId={setYandexAttachmentDeletingId}
-                          onDeleteAttachmentError={setYandexAttachmentDeleteError}
-                          onAfterYandexAttachmentMutation={() =>
-                            void pullYandexReadyAttachmentsForField(f.id)
+                          onDeleteAttachment={(attachmentId) =>
+                            handleYandexAttachmentDelete(f.id, attachmentId)
                           }
-                          router={router}
                         />
                       );
                     }

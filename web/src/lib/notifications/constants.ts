@@ -4,7 +4,8 @@ export const NOTIFICATION_EVENT_TYPES = [
   "card_comment_new",
   "card_moved",
   "card_in_progress",
-  "card_ready"
+  "card_ready",
+  "technical"
 ] as const;
 
 export type NotificationEventType = (typeof NOTIFICATION_EVENT_TYPES)[number];
@@ -27,7 +28,8 @@ export const NOTIFICATION_EVENT_TYPE_LABEL: Record<NotificationEventType, string
   card_comment_new: "Новый комментарий в карточке",
   card_moved: "Перемещение карточки",
   card_in_progress: "Ваша карточка в работе",
-  card_ready: "Ваша карточка готова"
+  card_ready: "Ваша карточка готова",
+  technical: "Технические уведомления"
 };
 
 export const NOTIFICATION_CHANNEL_LABEL: Record<NotificationChannel, string> = {
