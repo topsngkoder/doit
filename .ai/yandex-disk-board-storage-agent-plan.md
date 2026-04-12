@@ -107,6 +107,9 @@
 | Дата | Задача | Что сделано |
 |------|--------|-------------|
 | 2026-04-12 | architecture-correction / direct-upload | Зафиксирована целевая production-архитектура загрузки для Vercel: приложение не должно принимать большие файлы целиком через body serverless route handler. Вместо этого upload-flow должен быть перестроен на `prepare upload` -> direct upload browser -> Yandex Disk по временному URL -> `complete upload`/`failed`, при сохранении server-side контроля доступа, путей и статусов. Спецификация и план обновлены. |
+| 2026-04-12 | YDB4.8 | Начат перевод upload-flow на direct upload: добавлен короткий server-side шаг `prepare-upload` без передачи байтов файла через приложение. Реализованы `cardAttachmentPrepareUploadAction`, route `POST /api/boards/[boardId]/cards/[cardId]/attachments/prepare-upload`, новый endpoint helper и серверный helper `prepareOneCardAttachmentUpload(...)`, который после валидации/ensure папки создаёт строку `card_attachments.status = uploading` и получает краткоживущий upload URL Яндекс.Диска. Текущий legacy upload временно переведён на повторное использование этого prepare-шага, чтобы не ломать UI до завершения `complete upload` (YDB4.9). `npx tsc --noEmit` в `web/` — ок. |
+| 2026-04-12 | YDB4.9 | Добавлен server-side `complete-upload` для direct upload: helper `completeOneCardAttachmentUpload(...)` (без доверия клиенту читает `uploading`-строку через service-role, повторно проверяет права/активность интеграции, ждёт появления объекта на Диске и переводит `uploading -> ready`), route `POST /api/boards/[boardId]/cards/[cardId]/attachments/complete-upload`, server action `cardAttachmentCompleteUploadAction`. При временной задержке появления файла на Диске возвращается retryable-ошибка (HTTP 409), статус в БД не ломается. |
+| 2026-04-12 | YDB4.8/YDB4.9 (UI) | UI карточки переведён на direct upload: `edit-card-modal.tsx` вызывает `prepare-upload` → браузер делает прямой PUT в Яндекс.Диск (с прогрессом и скоростью на клиенте) → `complete-upload`. Добавлен recovery endpoint `POST .../attachments/fail-upload` для best-effort пометки `uploading -> failed` при сбое/отмене на клиенте, чтобы не копить «зависшие» строки. `npx tsc --noEmit` в `web/` — ок. |
 | 2026-04-10 | YDB1.1 | Миграция `20260410180000_board_yandex_disk_integrations.sql`: таблица `board_yandex_disk_integrations`, поля по спец. 7.1, `UNIQUE(board_id)`, индекс по `status`, CHECK статусов, FK на `boards` CASCADE и `profiles` SET NULL, токены nullable для состояний без секрета, RLS включён без политик (политики — YDB1.4), триггер `updated_at`. `supabase db push` применён. |
 | 2026-04-10 | YDB1.2 | Миграция `20260410181000_card_attachments.sql`: таблица `card_attachments`, поля по спец. 7.2, `storage_provider` с CHECK `yandex_disk`, статусы `uploading|ready|failed`, индексы на `card_id`, `board_id`, `status`, FK `board_id`/`card_id` CASCADE, `uploaded_by_user_id` → `profiles` RESTRICT, RLS без политик. `supabase db push` применён. |
 | 2026-04-11 | YDB1.3 | Миграция `20260411120000_ydb1_3_fk_delete_rules.sql`: `UNIQUE (id, board_id)` на `cards` для цели составного FK; `card_attachments (card_id, board_id) REFERENCES cards (id, board_id) ON DELETE CASCADE`; комментарии к таблицам/ограничению про спец. 9.6 (disconnect ≠ удаление на Диске), 12.4 (каскад БД при удалении карточки, провайдер — приложение). `supabase db push` применён. |
@@ -310,12 +313,12 @@
   - `precheck`, upload action и list action должны принимать `field_definition_id`;
   - сервер обязан проверить, что поле принадлежит доске, доступно в карточке и имеет тип `yandex_disk`;
   - **DoD**: загрузка и выдача списка файлов работают в разрезе конкретного файлового поля, а не карточки целиком.
-- [ ] **YDB4.8 (todo)** Перевести upload-flow на direct upload browser -> Yandex Disk
+- [x] **YDB4.8 (done)** Перевести upload-flow на direct upload browser -> Yandex Disk
   - выделить короткий server-side шаг `prepare`: валидация, ensure папки, создание `card_attachments.status = uploading`, получение `diskGetUploadLink`, возврат краткоживущего upload URL и технических идентификаторов;
   - браузер должен отправлять байты файла напрямую в Яндекс.Диск, не проксируя весь multipart через body serverless-функции приложения;
   - постоянные токены Яндекса по-прежнему не должны покидать сервер;
   - **DoD**: production deployment на Vercel принимает большие файлы без упора в лимит request body функции, сохраняя все проверки прав и путей.
-- [ ] **YDB4.9 (todo)** Добавить server-side завершение и recovery direct upload
+- [x] **YDB4.9 (done)** Добавить server-side завершение и recovery direct upload
   - после успешной прямой загрузки клиент вызывает короткий `complete upload` endpoint/action;
   - сервер переводит строку `uploading -> ready` только после подтверждённого успеха;
   - при ошибке direct upload или потере клиента строка переводится в `failed` либо подхватывается reconcile/cleanup-сценарием stale-`uploading`;

@@ -9,15 +9,19 @@
  * |----------|----------------|
  * | Подключить / переподключить | навигация на URL из `yandexDiskOAuthStartPath(boardId)` (`@/lib/yandex-disk/yandex-disk-board-ui-endpoints`) |
  * | Отключить | `disconnectBoardYandexDiskIntegrationAction` |
- * | Загрузка | UI с прогрессом (спец. 13.5): POST `cardAttachmentUploadApiPath(boardId, cardId)` (`@/lib/yandex-disk/yandex-disk-board-ui-endpoints`), `FormData`: `field_definition_id`, по одному `files` за запрос; либо `cardAttachmentUploadAction` + `FormData` с несколькими `files` без прогресса; precheck — `cardAttachmentUploadPrecheckAction` |
+ * | Загрузка | Текущий UI с прогрессом: POST `cardAttachmentUploadApiPath(boardId, cardId)` + `FormData`; direct-upload prepare: POST `cardAttachmentPrepareUploadApiPath(boardId, cardId)` с JSON `{ field_definition_id, file }`; server actions: `cardAttachmentPrepareUploadAction`, `cardAttachmentUploadAction`; precheck — `cardAttachmentUploadPrecheckAction` |
  * | Скачать | GET `cardAttachmentDownloadPath(boardId, cardId, attachmentId, fieldDefinitionId)` — ответ с телом файла и именем из БД (`original_file_name`, спец. 11.5) |
  * | Удалить | `deleteCardAttachmentAction(boardId, cardId, attachmentId, fieldDefinitionId)` |
  * | Список вне snapshot | `listReadyCardAttachmentsAction(boardId, cardId, fieldDefinitionId)` |
  */
 
 export {
+  cardAttachmentCompleteUploadAction,
+  cardAttachmentPrepareUploadAction,
   cardAttachmentUploadAction,
   cardAttachmentUploadPrecheckAction,
+  type CardAttachmentPrepareUploadResult,
+  type CardAttachmentCompleteUploadResult,
   type CardAttachmentUploadActionResult,
   type CardAttachmentUploadFileItemResult,
   type CardAttachmentUploadPrecheckResult

@@ -17,6 +17,30 @@ export function cardAttachmentUploadApiPath(boardId: string, cardId: string): st
   return `/api/boards/${encodeURIComponent(boardId)}/cards/${encodeURIComponent(cardId)}/attachments/upload`;
 }
 
+/**
+ * POST JSON — короткий `prepare-upload` без передачи байтов файла через приложение (YDB4.8).
+ * Тело: `{ field_definition_id, file: { name, size, type? } }`.
+ */
+export function cardAttachmentPrepareUploadApiPath(boardId: string, cardId: string): string {
+  return `/api/boards/${encodeURIComponent(boardId)}/cards/${encodeURIComponent(cardId)}/attachments/prepare-upload`;
+}
+
+/**
+ * POST JSON — короткий `complete-upload` (YDB4.9): перевод `uploading -> ready` после direct upload.
+ * Тело: `{ field_definition_id, attachment_id }`.
+ */
+export function cardAttachmentCompleteUploadApiPath(boardId: string, cardId: string): string {
+  return `/api/boards/${encodeURIComponent(boardId)}/cards/${encodeURIComponent(cardId)}/attachments/complete-upload`;
+}
+
+/**
+ * POST JSON — best-effort пометка `uploading -> failed` при сбое/отмене direct upload (YDB4.9 recovery).
+ * Тело: `{ field_definition_id, attachment_id }`.
+ */
+export function cardAttachmentFailUploadApiPath(boardId: string, cardId: string): string {
+  return `/api/boards/${encodeURIComponent(boardId)}/cards/${encodeURIComponent(cardId)}/attachments/fail-upload`;
+}
+
 /** GET — тело файла с `Content-Disposition` по `original_file_name` (спец. 11.5); временный URL Яндекса только на сервере (спец. 11.3). YDB5.6: `fieldDefinitionId` в query. */
 export function cardAttachmentDownloadPath(
   boardId: string,

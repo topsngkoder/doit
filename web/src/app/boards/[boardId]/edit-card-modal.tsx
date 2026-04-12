@@ -33,7 +33,9 @@ import {
 } from "@/lib/yandex-disk/yandex-disk-card-field-empty-copy";
 import {
   cardAttachmentDownloadPath,
-  cardAttachmentUploadApiPath
+  cardAttachmentCompleteUploadApiPath,
+  cardAttachmentFailUploadApiPath,
+  cardAttachmentPrepareUploadApiPath
 } from "@/lib/yandex-disk/yandex-disk-board-ui-endpoints";
 import {
   formatByteProgressRu,
@@ -654,12 +656,18 @@ export function EditCardModal({
       });
       setYandexAttachmentUploadingFieldId(fieldId);
       setYandexAttachmentUploadProgress(null);
-      const uploadUrl = cardAttachmentUploadApiPath(boardId, card.id);
-      const res = await uploadYandexCardAttachmentsWithProgress(uploadUrl, {
+      const res = await uploadYandexCardAttachmentsWithProgress(
+        {
+          prepareUrl: cardAttachmentPrepareUploadApiPath(boardId, card.id),
+          completeUrl: cardAttachmentCompleteUploadApiPath(boardId, card.id),
+          failUrl: cardAttachmentFailUploadApiPath(boardId, card.id)
+        },
+        {
         fieldDefinitionId: fieldId,
         files,
         onProgress: setYandexAttachmentUploadProgress
-      });
+        }
+      );
       setYandexAttachmentUploadingFieldId(null);
       setYandexAttachmentUploadProgress(null);
       if (!res.ok) {

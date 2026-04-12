@@ -36,11 +36,13 @@ export type YandexCardAttachmentUploadClientResult =
   | { ok: false; message: string }
   | { ok: true; files: YandexCardAttachmentUploadClientFileResult[] };
 
-type XhrJson = {
-  ok?: boolean;
-  message?: string;
-  files?: YandexCardAttachmentUploadClientFileResult[];
-};
+type PrepareJson =
+  | { ok: false; message?: string }
+  | { ok: true; file?: { attachmentId?: string; uploadUrl?: string; uploadMethod?: string } };
+
+type CompleteJson = { ok?: boolean; message?: string; retryable?: boolean };
+
+type FailJson = { ok?: boolean; message?: string };
 
 const EMA_ALPHA = 0.35;
 
@@ -71,9 +73,39 @@ function serverBarPercent(elapsedMs: number): number {
   return Math.min(99, BAR_CLIENT_MAX_PERCENT + span * ease);
 }
 
-function postFormDataWithProgress(
+async function postJson(
   url: string,
-  formData: FormData,
+  body: unknown,
+  options?: { signal?: AbortSignal }
+): Promise<{ status: number; json: unknown | null }> {
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: options?.signal
+    });
+    const status = res.status;
+    let json: unknown | null = null;
+    try {
+      json = (await res.json()) as unknown;
+    } catch {
+      json = null;
+    }
+    return { status, json };
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new Error("aborted");
+    }
+    throw new Error("network");
+  }
+}
+
+function putFileWithProgress(
+  uploadUrl: string,
+  uploadMethod: string,
+  file: File,
   options: {
     onProgress: (p: YandexCardAttachmentUploadProgress) => void;
     fileIndex: number;
@@ -83,24 +115,14 @@ function postFormDataWithProgress(
     knownFileSize: number | null;
     signal?: AbortSignal;
   }
-): Promise<{ status: number; text: string }> {
+): Promise<{ status: number; responseText: string }> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     let lastT = performance.now();
     let lastLoaded = 0;
     let emaSpeed: number | null = null;
-    let serverWaitInterval: ReturnType<typeof setInterval> | null = null;
-    const serverWaitStartedAt = { t: 0 as number };
-
-    const clearServerWaitInterval = () => {
-      if (serverWaitInterval !== null) {
-        clearInterval(serverWaitInterval);
-        serverWaitInterval = null;
-      }
-    };
 
     const abort = () => {
-      clearServerWaitInterval();
       xhr.abort();
     };
     options.signal?.addEventListener("abort", abort, { once: true });
@@ -130,60 +152,119 @@ function postFormDataWithProgress(
       });
     };
 
-    xhr.upload.onload = () => {
-      if (options.signal?.aborted) return;
-      const total = options.knownFileSize && options.knownFileSize > 0 ? options.knownFileSize : null;
-      const loaded = total !== null ? total : lastLoaded;
-      clearServerWaitInterval();
-      serverWaitStartedAt.t = performance.now();
-      const emitServerWait = () => {
-        if (options.signal?.aborted) return;
-        const elapsed = performance.now() - serverWaitStartedAt.t;
-        options.onProgress({
-          fileIndex: options.fileIndex,
-          fileCount: options.fileCount,
-          fileName: options.fileName,
-          phase: "server",
-          loaded,
-          total,
-          smoothedSpeedBps: null,
-          barPercent: serverBarPercent(elapsed),
-          serverStatusText: YANDEX_CARD_ATTACHMENT_UPLOAD_SERVER_PHASE_MESSAGE
-        });
-      };
-      emitServerWait();
-      serverWaitInterval = setInterval(emitServerWait, 180);
-    };
-
     xhr.onload = () => {
-      clearServerWaitInterval();
       options.signal?.removeEventListener("abort", abort);
-      resolve({ status: xhr.status, text: xhr.responseText ?? "" });
+      resolve({ status: xhr.status, responseText: xhr.responseText ?? "" });
     };
 
     xhr.onerror = () => {
-      clearServerWaitInterval();
       options.signal?.removeEventListener("abort", abort);
       reject(new Error("network"));
     };
 
     xhr.onabort = () => {
-      clearServerWaitInterval();
       options.signal?.removeEventListener("abort", abort);
       reject(new Error("aborted"));
     };
 
-    xhr.open("POST", url);
-    xhr.withCredentials = true;
-    xhr.send(formData);
+    xhr.open(uploadMethod, uploadUrl);
+    // В upload URL Яндекса cookies приложения не участвуют.
+    if (file.type) {
+      xhr.setRequestHeader("Content-Type", file.type);
+    } else {
+      xhr.setRequestHeader("Content-Type", "application/octet-stream");
+    }
+    xhr.send(file);
   });
+}
+
+function startServerPhaseProgressLoop(
+  options: {
+    onProgress: (p: YandexCardAttachmentUploadProgress) => void;
+    fileIndex: number;
+    fileCount: number;
+    fileName: string;
+    knownFileSize: number | null;
+    signal?: AbortSignal;
+  }
+): { stop: () => void } {
+  const total = options.knownFileSize && options.knownFileSize > 0 ? options.knownFileSize : null;
+  const loaded = total !== null ? total : 0;
+  const startedAt = performance.now();
+  const emit = () => {
+    if (options.signal?.aborted) return;
+    const elapsed = performance.now() - startedAt;
+    options.onProgress({
+      fileIndex: options.fileIndex,
+      fileCount: options.fileCount,
+      fileName: options.fileName,
+      phase: "server",
+      loaded,
+      total,
+      smoothedSpeedBps: null,
+      barPercent: serverBarPercent(elapsed),
+      serverStatusText: YANDEX_CARD_ATTACHMENT_UPLOAD_SERVER_PHASE_MESSAGE
+    });
+  };
+  emit();
+  const interval = setInterval(emit, 180);
+  return { stop: () => clearInterval(interval) };
+}
+
+async function completeWithRetry(
+  url: string,
+  body: unknown,
+  options: {
+    signal?: AbortSignal;
+    onServerWaitTick?: () => void;
+  }
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    if (options.signal?.aborted) throw new Error("aborted");
+    options.onServerWaitTick?.();
+    const { status, json } = await postJson(url, body, { signal: options.signal });
+    const parsed = (json ?? null) as CompleteJson | null;
+    if (parsed && parsed.ok === true) return { ok: true };
+
+    const msg =
+      parsed && typeof parsed.message === "string" && parsed.message.trim() ?
+        parsed.message
+      : status === 401 ? "Требуется войти в аккаунт."
+      : status >= 500 ? "Сервер временно недоступен. Попробуйте позже."
+      : "Не удалось завершить загрузку.";
+
+    const retryable = Boolean(parsed && parsed.retryable) || status === 409;
+    if (!retryable) return { ok: false, message: msg };
+
+    // Небольшая задержка; сервер сам ждёт появления файла, но иногда требуется повтор.
+    await new Promise((r) => setTimeout(r, 700));
+  }
+  return { ok: false, message: "Файл ещё обрабатывается. Попробуйте обновить карточку через минуту." };
+}
+
+async function bestEffortFailUpload(
+  url: string,
+  body: unknown,
+  options?: { signal?: AbortSignal }
+): Promise<void> {
+  try {
+    const { status, json } = await postJson(url, body, { signal: options?.signal });
+    const parsed = (json ?? null) as FailJson | null;
+    if (status >= 200 && status < 300 && parsed && parsed.ok === true) return;
+  } catch {
+    // ignore
+  }
 }
 
 /**
  * Последовательно загружает файлы (по одному POST) для показа прогресса и скорости по текущему файлу.
  */
 export async function uploadYandexCardAttachmentsWithProgress(
-  url: string,
+  urls: {
+    prepareUrl: string;
+    completeUrl: string;
+    failUrl: string;
+  },
   params: {
     fieldDefinitionId: string;
     files: File[];
@@ -191,6 +272,7 @@ export async function uploadYandexCardAttachmentsWithProgress(
     signal?: AbortSignal;
   }
 ): Promise<YandexCardAttachmentUploadClientResult> {
+  const { prepareUrl, completeUrl, failUrl } = urls;
   const { fieldDefinitionId, files, onProgress, signal } = params;
   const fileCount = files.length;
   const merged: YandexCardAttachmentUploadClientFileResult[] = [];
@@ -200,14 +282,40 @@ export async function uploadYandexCardAttachmentsWithProgress(
       return { ok: false, message: "Загрузка прервана." };
     }
     const file = files[i];
-    const fd = new FormData();
-    fd.set("field_definition_id", fieldDefinitionId);
-    fd.append("files", file);
-
     const knownFileSize = file.size > 0 ? file.size : null;
 
     try {
-      const { status, text } = await postFormDataWithProgress(url, fd, {
+      const { status: prepStatus, json: prepJson } = await postJson(
+        prepareUrl,
+        {
+          field_definition_id: fieldDefinitionId,
+          file: { name: file.name, size: file.size, type: file.type || null }
+        },
+        { signal }
+      );
+
+      const prep = (prepJson ?? null) as PrepareJson | null;
+      if (!prep || typeof prep !== "object" || typeof (prep as any).ok !== "boolean") {
+        return { ok: false, message: "Не удалось разобрать ответ сервера." };
+      }
+      if ((prep as any).ok !== true) {
+        const m =
+          typeof (prep as any).message === "string" && (prep as any).message.trim() ?
+            String((prep as any).message)
+          : prepStatus === 401 ? "Требуется войти в аккаунт."
+          : prepStatus >= 500 ? "Сервер временно недоступен. Попробуйте позже."
+          : "Не удалось подготовить загрузку.";
+        return { ok: false, message: m };
+      }
+
+      const attachmentId = String((prep as any).file?.attachmentId ?? "").trim();
+      const uploadUrl = String((prep as any).file?.uploadUrl ?? "").trim();
+      const uploadMethod = String((prep as any).file?.uploadMethod ?? "PUT").trim() || "PUT";
+      if (!attachmentId || !uploadUrl) {
+        return { ok: false, message: "Не удалось подготовить загрузку." };
+      }
+
+      const { status: putStatus } = await putFileWithProgress(uploadUrl, uploadMethod, file, {
         fileIndex: i,
         fileCount,
         fileName: file.name,
@@ -215,34 +323,44 @@ export async function uploadYandexCardAttachmentsWithProgress(
         signal,
         onProgress
       });
-
-      let json: XhrJson;
-      try {
-        json = JSON.parse(text) as XhrJson;
-      } catch {
-        return {
+      if (putStatus < 200 || putStatus >= 300) {
+        await bestEffortFailUpload(failUrl, {
+          field_definition_id: fieldDefinitionId,
+          attachment_id: attachmentId
+        });
+        merged.push({
+          originalName: file.name,
           ok: false,
-          message:
-            status === 401 ? "Требуется войти в аккаунт."
-            : status >= 500 ?
-              "Сервер временно недоступен. Попробуйте позже."
-            : "Не удалось разобрать ответ сервера."
-        };
+          message: "Не удалось загрузить файл в Яндекс.Диск."
+        });
+        continue;
       }
 
-      if (!json || typeof json.ok !== "boolean") {
-        return { ok: false, message: "Не удалось разобрать ответ сервера." };
+      const serverLoop = startServerPhaseProgressLoop({
+        fileIndex: i,
+        fileCount,
+        fileName: file.name,
+        knownFileSize,
+        signal,
+        onProgress
+      });
+      const completed = await completeWithRetry(
+        completeUrl,
+        { field_definition_id: fieldDefinitionId, attachment_id: attachmentId },
+        { signal }
+      );
+      serverLoop.stop();
+
+      if (!completed.ok) {
+        await bestEffortFailUpload(failUrl, {
+          field_definition_id: fieldDefinitionId,
+          attachment_id: attachmentId
+        });
+        merged.push({ originalName: file.name, ok: false, message: completed.message });
+        continue;
       }
 
-      if (!json.ok) {
-        return { ok: false, message: String(json.message ?? "Ошибка загрузки.") };
-      }
-
-      if (!Array.isArray(json.files)) {
-        return { ok: false, message: "Не удалось разобрать ответ сервера." };
-      }
-
-      merged.push(...json.files);
+      merged.push({ originalName: file.name, ok: true });
     } catch (e) {
       if (e instanceof Error && e.message === "aborted") {
         return { ok: false, message: "Загрузка прервана." };
