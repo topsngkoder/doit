@@ -18,6 +18,7 @@ export type InternalNotificationInsertRow = {
 };
 
 type BrowserNativeNotificationsContextValue = {
+  currentUserId: string | null;
   subscribe: (listener: (row: InternalNotificationInsertRow) => void) => () => void;
 };
 
@@ -65,9 +66,12 @@ function trimDedupeSet(ids: Set<string>) {
  * Показ нативного уведомления по правилам §8 (внутренняя запись уже создана — событие INSERT).
  */
 function BrowserNativeNotificationPresenter() {
+  const ctx = React.useContext(BrowserNativeNotificationsContext);
   const shownIdsRef = React.useRef(new Set<string>());
 
   useInternalNotificationInserts((row) => {
+    if (!ctx?.currentUserId || ctx.currentUserId !== row.user_id) return;
+
     const ids = shownIdsRef.current;
     /** Синхронно до любого await — иначе два INSERT/realtime-дубля запускают параллельные IIFE и оба выходят на new Notification (NT7.6). */
     if (ids.has(row.id)) return;
@@ -79,7 +83,6 @@ function BrowserNativeNotificationPresenter() {
 
       const perm = readBrowserNotificationPermission();
       if (perm.kind !== "ready" || perm.permission !== "granted") return;
-
       let supabase: ReturnType<typeof createSupabaseBrowserClient>;
       try {
         supabase = createSupabaseBrowserClient();
@@ -87,16 +90,10 @@ function BrowserNativeNotificationPresenter() {
         return;
       }
 
-      const {
-        data: { user },
-        error: userError
-      } = await supabase.auth.getUser();
-      if (userError || !user || user.id !== row.user_id) return;
-
       const { data: pref } = await supabase
         .from("notification_preferences")
         .select("enabled")
-        .eq("user_id", user.id)
+        .eq("user_id", row.user_id)
         .eq("channel", "browser")
         .eq("event_type", row.event_type)
         .maybeSingle();
@@ -132,9 +129,16 @@ function BrowserNativeNotificationPresenter() {
  * Единая точка подписки на INSERT в `internal_notifications` для текущего пользователя.
  * Нативный показ и дедупликация — см. `BrowserNativeNotificationPresenter` (§8, NT7.5+).
  */
-export function BrowserNativeNotificationsProvider({ children }: { children: React.ReactNode }) {
+export function BrowserNativeNotificationsProvider({
+  children,
+  initialUserId
+}: {
+  children: React.ReactNode;
+  initialUserId: string;
+}) {
   const listenersRef = React.useRef(new Set<(row: InternalNotificationInsertRow) => void>());
   const emitDedupeRef = React.useRef(new Set<string>());
+  const [currentUserId, setCurrentUserId] = React.useState<string | null>(initialUserId);
 
   const subscribe = React.useCallback((listener: (row: InternalNotificationInsertRow) => void) => {
     listenersRef.current.add(listener);
@@ -197,16 +201,7 @@ export function BrowserNativeNotificationsProvider({ children }: { children: Rea
         .subscribe();
       activeChannel = ch;
     };
-
-    const syncSession = async () => {
-      const { data: { session } } = await supabase!.auth.getSession();
-      if (cancelled) return;
-      removeChannel();
-      const uid = session?.user?.id;
-      if (uid) attachForUser(uid);
-    };
-
-    void syncSession();
+    attachForUser(initialUserId);
 
     const {
       data: { subscription }
@@ -214,6 +209,7 @@ export function BrowserNativeNotificationsProvider({ children }: { children: Rea
       if (cancelled) return;
       removeChannel();
       const uid = session?.user?.id;
+      setCurrentUserId(uid ?? null);
       if (uid) attachForUser(uid);
     });
 
@@ -222,9 +218,12 @@ export function BrowserNativeNotificationsProvider({ children }: { children: Rea
       removeChannel();
       subscription.unsubscribe();
     };
-  }, [emit]);
+  }, [emit, initialUserId]);
 
-  const value = React.useMemo(() => ({ subscribe }), [subscribe]);
+  const value = React.useMemo(
+    () => ({ currentUserId, subscribe }),
+    [currentUserId, subscribe]
+  );
 
   return (
     <BrowserNativeNotificationsContext.Provider value={value}>

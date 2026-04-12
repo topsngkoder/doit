@@ -7,8 +7,11 @@ import { UserDebugClient } from "./UserDebugClient";
 export default async function LoginPage() {
   const supabase = await createSupabaseServerClient();
   const {
-    data: { user }
+    data: { user },
+    error
   } = await supabase.auth.getUser();
+  const isSessionMissing = error?.message === "Auth session missing!";
+  const isAuthenticated = !!user && !(error && !isSessionMissing);
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-6">
@@ -37,7 +40,7 @@ export default async function LoginPage() {
           variant="info"
         />
       </section>
-      <UserDebugClient />
+      <UserDebugClient isAuthenticated={isAuthenticated} userId={user?.id ?? null} />
     </main>
   );
 }
